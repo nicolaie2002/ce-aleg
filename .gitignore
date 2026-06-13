@@ -1,0 +1,39 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+venv/
+backend/venv/
+backend/libretranslate-venv/
+backend/instance/
+backend/uploads/
+/uploads/
+
+# Node / Next.js
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/.next-codex-*.log
+frontend/.open-next/
+frontend/.wrangler/
+frontend/.dev.vars
+frontend/cloudflare-env.d.ts
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

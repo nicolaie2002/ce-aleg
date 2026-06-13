@@ -1,0 +1,83 @@
+services:
+  - type: web
+    name: cealeg-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: APP_ENV
+        value: production
+      - key: FLASK_DEBUG
+        value: "false"
+      - key: ALLOW_DEV_TUNNEL_ORIGINS
+        value: "false"
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: PAYMENT_PROVIDER
+        value: stripe
+      - key: FRONTEND_PUBLIC_URL
+        sync: false
+      - key: FRONTEND_ORIGINS
+        sync: false
+      - key: SUPABASE_PRODUCT_IMAGES_BUCKET
+        value: product-images
+      - key: SUPABASE_SUBMISSIONS_BUCKET
+        value: product-submissions
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRO_PRICE_ID
+        sync: false
+      - key: STRIPE_FAMILY_PRICE_ID
+        sync: false
+      - key: PASSWORD_MIN_LENGTH
+        value: "8"
+      - key: PASSWORD_RESET_MAX_AGE
+        value: "3600"
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_SMTP_HOST
+        sync: false
+      - key: EMAIL_SMTP_PORT
+        sync: false
+      - key: EMAIL_SMTP_USERNAME
+        sync: false
+      - key: EMAIL_SMTP_PASSWORD
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: EMAIL_FROM_NAME
+        value: Ce aleg?
+      - key: EMAIL_USE_TLS
+        value: "true"
+      - key: EMAIL_USE_SSL
+        value: "false"
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: AUTH_RATE_LIMIT
+        value: "5"
+      - key: AUTH_RATE_LIMIT_WINDOW
+        value: "900"
+      - key: GLOBAL_RATE_LIMIT
+        value: "180"
+      - key: GLOBAL_RATE_LIMIT_WINDOW
+        value: "60"
+      - key: MAX_JSON_BODY_BYTES
+        value: "1048576"
