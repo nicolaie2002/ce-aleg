@@ -255,3 +255,26 @@ Security headers:       OK
 Stripe webhook:         asteapta secretul in Render
 CORS frontend:          https://ce-aleg.vercel.app
 ```
+
+Atentie: verificarea din 14 iunie 2026 a aratat ca instanta Render nu avea
+`DATABASE_URL` configurat si folosea SQLite temporar. Codul refuza acum sa
+porneasca un deploy nou de productie fara Postgres, pentru a evita pierderea
+conturilor.
+
+In Render -> `cealeg-api` -> `Environment`, copiaza din `backend/.env`:
+
+```text
+DATABASE_URL
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
+STRIPE_SECRET_KEY
+STRIPE_WEBHOOK_SECRET
+STRIPE_PRO_PRICE_ID
+STRIPE_FAMILY_PRICE_ID
+BREVO_API_KEY
+EMAIL_FROM
+ADMIN_EMAIL
+```
+
+Nu copia valorile in documentatie, GitHub sau conversatii. Dupa salvare,
+Render trebuie sa faca un deploy reusit, iar apoi se retesteaza inregistrarea.

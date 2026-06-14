@@ -156,6 +156,12 @@ CORS(app, resources={r"/*": {"origins": frontend_origins}})
 
 database_url = os.environ.get("DATABASE_URL", "").strip()
 
+if PRODUCTION_MODE and not database_url:
+    raise RuntimeError(
+        "DATABASE_URL is required in production. "
+        "Refusing to use ephemeral SQLite storage."
+    )
+
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
 elif database_url.startswith("postgresql://"):
