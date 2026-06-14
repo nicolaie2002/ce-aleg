@@ -33,18 +33,19 @@ git status
 git commit -m "Initial production-ready version"
 ```
 
-Pe GitHub:
+Repository GitHub:
 
-1. `New repository`
-2. Nume recomandat: `ce-aleg`
-3. Alege `Private` pentru inceput.
-4. Nu adauga README, `.gitignore` sau licenta.
+```text
+https://github.com/nicolaie2002/ce-aleg
+```
 
-Apoi ruleaza, inlocuind utilizatorul:
+Repository-ul este deja creat si conectat. Pentru urmatoarele modificari este
+suficient:
 
 ```powershell
-git remote add origin https://github.com/UTILIZATOR/ce-aleg.git
-git push -u origin main
+git add .
+git commit -m "Descrierea modificarilor"
+git push
 ```
 
 Fisierul `backend/.env` este ignorat si nu trebuie urcat niciodata.
@@ -184,22 +185,27 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 
 ### Facut in proiect
 
+- [x] Repository GitHub creat si conectat
 - [x] Frontend Next.js si backend Flask separate
 - [x] Proxy frontend `/api/backend`
 - [x] Configuratie Render Blueprint
-- [x] Supabase Postgres si Storage integrate in cod
+- [x] Supabase Postgres conectat si testat
+- [x] Bucketurile Supabase Storage create si testate
 - [x] Stripe Checkout si webhook implementate
+- [x] Produsele Stripe de test sunt valide
 - [x] Brevo integrat
 - [x] Pagini Privacy si Terms
 - [x] Resetare parola si stergere cont prin email
 - [x] Rate limiting, limite payload si security headers
 - [x] Fisierele `.env`, bazele locale si uploadurile sunt ignorate de Git
+- [x] Buildul de productie trece
+- [x] Cele 33 de teste smoke trec
+- [x] GitHub Actions si Dependabot configurate
 
 ### De facut de tine
 
-- [ ] Inlocuieste `DATABASE_URL` cu connection string-ul Supabase valid
-- [ ] Verifica bucketurile Supabase
-- [ ] Creeaza repository-ul GitHub si adauga remote-ul
+- [ ] Genereaza o cheie Brevo noua si actualizeaza `BREVO_API_KEY`
+- [ ] Verifica expeditorul `EMAIL_FROM` in Brevo
 - [ ] Creeaza Blueprint-ul Render
 - [ ] Creeaza proiectul Vercel cu root `frontend`
 - [ ] Actualizeaza URL-urile Vercel/Render reciproc
@@ -219,3 +225,18 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 - [ ] Stripe este in modul dorit si webhookul returneaza `2xx`
 - [ ] Emailurile ajung in inbox
 - [ ] Scanarea este testata pe telefon prin HTTPS
+
+## Stare verificata la 14 iunie 2026
+
+```text
+GitHub repository:      OK
+Supabase Postgres:      OK
+Supabase Storage:       OK
+Stripe test prices:     OK
+Frontend production:   OK
+Smoke tests:            33/33
+Brevo API:              EROARE 401 - cheia trebuie regenerata
+Render deployment:      NEFACUT
+Vercel deployment:      NEFACUT
+Custom domain:          NEFACUT
+```
