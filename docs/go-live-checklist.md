@@ -105,7 +105,7 @@ STRIPE_FAMILY_PRICE_ID=<price id>
 Render genereaza automat `AUTH_SECRET`. Dupa deploy verifica:
 
 ```text
-https://NUME-BACKEND.onrender.com/health
+https://cealeg-api.onrender.com/health
 ```
 
 Nota: serviciul Render gratuit poate intra in repaus cand nu este folosit.
@@ -121,7 +121,7 @@ un plan fara repaus.
 5. Adauga:
 
 ```text
-BACKEND_URL=https://NUME-BACKEND.onrender.com
+BACKEND_URL=https://cealeg-api.onrender.com
 NEXT_PUBLIC_API_URL=/api/backend
 ```
 
@@ -142,7 +142,7 @@ Redeploy backendul dupa modificarea variabilelor.
 3. Endpoint:
 
 ```text
-https://NUME-BACKEND.onrender.com/billing/stripe/webhook
+https://cealeg-api.onrender.com/billing/stripe/webhook
 ```
 
 4. Copiaza signing secret-ul `whsec_...` in Render ca
@@ -189,10 +189,12 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 - [x] Frontend Next.js si backend Flask separate
 - [x] Proxy frontend `/api/backend`
 - [x] Configuratie Render Blueprint
+- [x] Backend publicat la `https://cealeg-api.onrender.com`
 - [x] Supabase Postgres conectat si testat
 - [x] Bucketurile Supabase Storage create si testate
 - [x] Stripe Checkout si webhook implementate
 - [x] Produsele Stripe de test sunt valide
+- [x] Endpointul Stripe de test a fost creat pentru backendul Render
 - [x] Brevo integrat
 - [x] Pagini Privacy si Terms
 - [x] Resetare parola si stergere cont prin email
@@ -206,7 +208,7 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 
 - [ ] Genereaza o cheie Brevo noua si actualizeaza `BREVO_API_KEY`
 - [ ] Verifica expeditorul `EMAIL_FROM` in Brevo
-- [ ] Creeaza Blueprint-ul Render
+- [ ] Copiaza noul `STRIPE_WEBHOOK_SECRET` din `backend/.env` in Render
 - [ ] Creeaza proiectul Vercel cu root `frontend`
 - [ ] Actualizeaza URL-urile Vercel/Render reciproc
 - [ ] Creeaza webhookul Stripe public
@@ -236,7 +238,18 @@ Stripe test prices:     OK
 Frontend production:   OK
 Smoke tests:            33/33
 Brevo API:              EROARE 401 - cheia trebuie regenerata
-Render deployment:      NEFACUT
+Render deployment:      OK
 Vercel deployment:      NEFACUT
 Custom domain:          NEFACUT
+```
+
+Backendul public a fost verificat:
+
+```text
+/health:                HTTP 200
+/readiness anonim:      HTTP 401
+/auth/me anonim:        HTTP 401
+Security headers:       OK
+Stripe webhook:         asteapta secretul in Render
+CORS temporar:          https://example.com
 ```
