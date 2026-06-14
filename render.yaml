@@ -29,9 +29,9 @@ services:
       - key: PAYMENT_PROVIDER
         value: stripe
       - key: FRONTEND_PUBLIC_URL
-        sync: false
+        value: https://ce-aleg.vercel.app
       - key: FRONTEND_ORIGINS
-        sync: false
+        value: https://ce-aleg.vercel.app
       - key: SUPABASE_PRODUCT_IMAGES_BUCKET
         value: product-images
       - key: SUPABASE_SUBMISSIONS_BUCKET

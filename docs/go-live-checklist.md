@@ -90,8 +90,8 @@ Valori importante:
 DATABASE_URL=<connection string Supabase>
 SUPABASE_URL=<project URL>
 SUPABASE_SERVICE_ROLE_KEY=<service role key>
-FRONTEND_PUBLIC_URL=https://NUME-PROIECT.vercel.app
-FRONTEND_ORIGINS=https://NUME-PROIECT.vercel.app
+FRONTEND_PUBLIC_URL=https://ce-aleg.vercel.app
+FRONTEND_ORIGINS=https://ce-aleg.vercel.app
 ADMIN_EMAIL=<emailul tau>
 EMAIL_PROVIDER=brevo
 EMAIL_FROM=<expeditor verificat in Brevo>
@@ -126,14 +126,14 @@ NEXT_PUBLIC_API_URL=/api/backend
 ```
 
 6. Deploy.
-7. Copiaza URL-ul Vercel si actualizeaza pe Render:
+7. URL-ul Vercel este:
 
 ```text
-FRONTEND_PUBLIC_URL=https://NUME-PROIECT.vercel.app
-FRONTEND_ORIGINS=https://NUME-PROIECT.vercel.app
+https://ce-aleg.vercel.app
 ```
 
-Redeploy backendul dupa modificarea variabilelor.
+Valorile corespunzatoare sunt deja salvate in `render.yaml`, iar Render le
+sincronizeaza la urmatorul deploy.
 
 ## 5. Stripe
 
@@ -190,6 +190,7 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 - [x] Proxy frontend `/api/backend`
 - [x] Configuratie Render Blueprint
 - [x] Backend publicat la `https://cealeg-api.onrender.com`
+- [x] Frontend publicat la `https://ce-aleg.vercel.app`
 - [x] Supabase Postgres conectat si testat
 - [x] Bucketurile Supabase Storage create si testate
 - [x] Stripe Checkout si webhook implementate
@@ -209,8 +210,9 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 - [ ] Genereaza o cheie Brevo noua si actualizeaza `BREVO_API_KEY`
 - [ ] Verifica expeditorul `EMAIL_FROM` in Brevo
 - [ ] Copiaza noul `STRIPE_WEBHOOK_SECRET` din `backend/.env` in Render
-- [ ] Creeaza proiectul Vercel cu root `frontend`
-- [ ] Actualizeaza URL-urile Vercel/Render reciproc
+- [x] Proiectul Vercel foloseste root `frontend`
+- [x] Proxy-ul public Vercel -> Render raspunde corect
+- [x] URL-urile Vercel/Render sunt configurate reciproc
 - [ ] Creeaza webhookul Stripe public
 - [ ] Testeaza cele trei emailuri din admin
 - [ ] Testeaza inregistrare, login, scanare, cos, plata si stergere cont
@@ -239,7 +241,7 @@ Frontend production:   OK
 Smoke tests:            33/33
 Brevo API:              EROARE 401 - cheia trebuie regenerata
 Render deployment:      OK
-Vercel deployment:      NEFACUT
+Vercel deployment:      OK
 Custom domain:          NEFACUT
 ```
 
@@ -251,5 +253,5 @@ Backendul public a fost verificat:
 /auth/me anonim:        HTTP 401
 Security headers:       OK
 Stripe webhook:         asteapta secretul in Render
-CORS temporar:          https://example.com
+CORS frontend:          https://ce-aleg.vercel.app
 ```
