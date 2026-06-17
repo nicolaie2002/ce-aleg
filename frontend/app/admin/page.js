@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CheckCircle2, Mail, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
+import { readApiJson } from "../utils/apiResponse";
 
 const statLabels = {
   users: "Conturi",
@@ -98,8 +99,14 @@ export default function AdminPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const data = await response.json();
-      setMessage(data.message || data.error || "Test email finalizat.");
+      const data = await readApiJson(response);
+      setMessage(
+        data.message ||
+          data.error ||
+          (response.ok
+            ? "Test email finalizat."
+            : "Emailul de test nu a putut fi trimis.")
+      );
     } catch {
       setMessage("Emailul de test nu a putut fi trimis.");
     } finally {
