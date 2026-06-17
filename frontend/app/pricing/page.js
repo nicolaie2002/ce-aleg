@@ -6,6 +6,7 @@ import { ArrowLeft, Check, CreditCard, Crown, Sparkles, Zap } from "lucide-react
 import { API_URL } from "../config";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
+import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 
 const fallbackPlans = {
@@ -111,7 +112,8 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
   const isBusy = busyPlan === id;
 
   return (
-    <article
+    <InteractiveSurface
+      as="article"
       className={`ce-plan-card ce-plan-${id} ${
         isCurrent ? "ce-plan-current" : ""
       } relative flex h-full min-h-[438px] flex-col overflow-hidden rounded-2xl border p-6 shadow-2xl transition hover:-translate-y-1`}
@@ -173,7 +175,7 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
             ? pick("Ramai pe Free", "Stay on Free")
             : pick("Alege planul", "Choose plan")}
       </button>
-    </article>
+    </InteractiveSurface>
   );
 }
 

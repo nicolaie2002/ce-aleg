@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Check, MapPin, Store } from "lucide-react";
 import { AppHeader } from "../components/AppHeader";
+import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 
 const stores = [
@@ -65,7 +66,7 @@ export default function StorePage() {
     <main className="min-h-screen bg-[#0b0f14] text-white">
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
       <section className="ce-shell ce-page flex flex-col">
-        <div className="ce-store-panel overflow-hidden rounded-2xl border shadow-2xl">
+        <div className="ce-store-panel ce-lifted-shell ce-reveal overflow-hidden rounded-2xl border shadow-2xl">
           <div className="ce-store-panel-head border-b p-6">
             <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-300">
               <MapPin className="h-4 w-4" />{" "}
@@ -86,7 +87,8 @@ export default function StorePage() {
 
           <div className="grid gap-4 p-6 sm:grid-cols-2 lg:grid-cols-4 2xl:gap-6">
             {stores.map((store) => (
-              <button
+              <InteractiveSurface
+                as="button"
                 key={store.id}
                 type="button"
                 onClick={() => setSelectedStore(store.id)}
@@ -114,7 +116,7 @@ export default function StorePage() {
                       : pick("Recomandari pentru magazin", "Store-based recommendations")}
                   </span>
                 </span>
-              </button>
+              </InteractiveSurface>
             ))}
           </div>
 

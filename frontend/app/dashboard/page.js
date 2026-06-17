@@ -19,6 +19,7 @@ import {
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { InlineNotice } from "../components/InlineNotice";
+import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 
 const ACTION_TONES = {
@@ -209,7 +210,7 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="ce-panel p-6 md:p-8">
+        <div className="ce-panel ce-lifted-shell ce-reveal p-6 md:p-8">
           <p className="text-sm font-bold text-emerald-300">{pick("Spatiul tau", "Your space")}</p>
           <h1 className="mt-3 text-4xl font-bold md:text-5xl">{pick("Salut", "Hello")}, {user.name}</h1>
           <p className="mt-4 max-w-2xl text-gray-300">
@@ -246,10 +247,10 @@ export default function DashboardPage() {
               [pick("Favorite", "Favorites"), counts.favorites, "ce-stat-violet", "text-violet-200"],
               [pick("Ultima scanare", "Latest scan"), lastScannedProduct, "ce-stat-amber", "text-yellow-200"],
             ].map(([label, value, tone, valueClass]) => (
-              <div key={label} className={`ce-stat-card ${tone} p-5`}>
+              <InteractiveSurface key={label} className={`ce-stat-card ${tone} p-5`}>
                 <p className="relative z-10 text-sm font-semibold text-gray-400">{label}</p>
                 <p className={`relative z-10 mt-2 truncate text-2xl font-black ${valueClass}`}>{value}</p>
-              </div>
+              </InteractiveSurface>
             ))}
           </div>
 
@@ -275,7 +276,12 @@ export default function DashboardPage() {
               const selectedTone = ACTION_TONES[tone] || ACTION_TONES.cyan;
 
               return (
-                <Link key={href} href={href} className={`group flex items-center gap-4 rounded-lg border p-5 transition hover:-translate-y-0.5 ${selectedTone.card}`}>
+                <InteractiveSurface
+                  as={Link}
+                  key={href}
+                  href={href}
+                  className={`group flex items-center gap-4 rounded-lg border p-5 transition hover:-translate-y-0.5 ${selectedTone.card}`}
+                >
                   <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${selectedTone.icon}`}>
                     <Icon size={23} />
                   </span>
@@ -284,7 +290,7 @@ export default function DashboardPage() {
                     <span className={`mt-1 block text-sm leading-6 ${selectedTone.description}`}>{description}</span>
                   </span>
                   <ArrowRight size={18} className="shrink-0 transition group-hover:translate-x-1" />
-                </Link>
+                </InteractiveSurface>
               );
             })}
           </div>

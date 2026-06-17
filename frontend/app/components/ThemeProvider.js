@@ -23,7 +23,15 @@ function getStoredTheme() {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(getStoredTheme);
+  const [theme, setThemeState] = useState("dark");
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      const storedTheme = getStoredTheme();
+      setThemeState(storedTheme);
+      document.documentElement.dataset.theme = storedTheme;
+    });
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;

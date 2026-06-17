@@ -6,7 +6,7 @@
 Telefon / laptop
       |
       v
-Domeniu (DNS Cloudflare)
+Domeniu (DNS Namecheap)
       |
       v
 Vercel - Next.js
@@ -90,8 +90,8 @@ Valori importante:
 DATABASE_URL=<connection string Supabase>
 SUPABASE_URL=<project URL>
 SUPABASE_SERVICE_ROLE_KEY=<service role key>
-FRONTEND_PUBLIC_URL=https://ce-aleg.vercel.app
-FRONTEND_ORIGINS=https://ce-aleg.vercel.app
+FRONTEND_PUBLIC_URL=https://www.cealeg.shop
+FRONTEND_ORIGINS=https://www.cealeg.shop,https://cealeg.shop,https://ce-aleg.vercel.app
 ADMIN_EMAIL=<emailul tau>
 EMAIL_PROVIDER=brevo
 EMAIL_FROM=<expeditor verificat in Brevo>
@@ -132,6 +132,12 @@ NEXT_PUBLIC_API_URL=/api/backend
 https://ce-aleg.vercel.app
 ```
 
+8. Domeniul public conectat la Vercel este:
+
+```text
+https://www.cealeg.shop
+```
+
 Valorile corespunzatoare sunt deja salvate in `render.yaml`, iar Render le
 sincronizeaza la urmatorul deploy.
 
@@ -165,20 +171,33 @@ dezactivata, fie publicata ulterior ca serviciu separat.
 
 ## 7. Domeniu
 
-Cand cumperi domeniul:
+Domeniul cumparat:
 
 ```text
-www.domeniu.ro  -> Vercel
-api.domeniu.ro  -> Render
+cealeg.shop      -> redirect Vercel catre www
+www.cealeg.shop  -> Vercel
 ```
 
-Actualizeaza apoi:
+DNS Namecheap:
 
 ```text
-Vercel BACKEND_URL=https://api.domeniu.ro
-Render FRONTEND_PUBLIC_URL=https://www.domeniu.ro
-Render FRONTEND_ORIGINS=https://www.domeniu.ro,https://domeniu.ro
-Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
+A @ -> 216.198.79.1
+CNAME www -> recordul recomandat de Vercel
+```
+
+Backendul ramane momentan pe Render:
+
+```text
+https://cealeg-api.onrender.com
+```
+
+Daca se configureaza ulterior `api.cealeg.shop`, actualizeaza:
+
+```text
+Vercel BACKEND_URL=https://api.cealeg.shop
+Render FRONTEND_PUBLIC_URL=https://www.cealeg.shop
+Render FRONTEND_ORIGINS=https://www.cealeg.shop,https://cealeg.shop
+Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 ```
 
 ## Checklist
@@ -205,34 +224,36 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 - [x] Buildul de productie trece
 - [x] Cele 33 de teste smoke trec
 - [x] GitHub Actions si Dependabot configurate
+- [x] Domeniu `cealeg.shop` cumparat si conectat la Vercel
+- [x] UI premium: suprafete interactive, hover, tilt subtil si animatii controlate
 
 ### De facut de tine
 
 - [x] Genereaza o cheie Brevo noua si actualizeaza `BREVO_API_KEY`
 - [x] Verifica expeditorul `EMAIL_FROM` in Brevo
 - [x] Autorizeaza IP-ul Render in Brevo
-- [ ] Copiaza noul `STRIPE_WEBHOOK_SECRET` din `backend/.env` in Render
+- [x] Copiaza noul `STRIPE_WEBHOOK_SECRET` din `backend/.env` in Render
 - [x] Proiectul Vercel foloseste root `frontend`
 - [x] Proxy-ul public Vercel -> Render raspunde corect
 - [x] URL-urile Vercel/Render sunt configurate reciproc
-- [ ] Creeaza webhookul Stripe public
-- [ ] Testeaza cele trei emailuri din admin
-- [ ] Testeaza inregistrare, login, scanare, cos, plata si stergere cont
-- [ ] Cumpara si conecteaza domeniul
+- [x] Creeaza webhookul Stripe public
+- [x] Testeaza emailurile din admin
+- [x] Testeaza inregistrare, login, scanare, cos, plata si stergere cont
+- [x] Cumpara si conecteaza domeniul
 - [ ] Verifica textele legale si datele de contact
 
 ### Blocante pentru lansare
 
-- [ ] `/readiness` nu raporteaza blocante
-- [ ] `APP_ENV=production`
-- [ ] `COOKIE_SECURE=true`
-- [ ] Niciun URL localhost in variabilele de productie
-- [ ] Buildul frontend si testele smoke trec
-- [ ] Stripe este in modul dorit si webhookul returneaza `2xx`
-- [ ] Emailurile ajung in inbox
-- [ ] Scanarea este testata pe telefon prin HTTPS
+- [x] `/readiness` nu raporteaza blocante
+- [x] `APP_ENV=production`
+- [x] `COOKIE_SECURE=true`
+- [x] Niciun URL localhost in variabilele de productie
+- [x] Buildul frontend trece
+- [x] Stripe test functioneaza si webhookul actualizeaza planurile
+- [x] Emailurile ajung in inbox
+- [x] Scanarea este testata pe telefon prin HTTPS
 
-## Stare verificata la 14 iunie 2026
+## Stare verificata la 17 iunie 2026
 
 ```text
 GitHub repository:      OK
@@ -245,7 +266,8 @@ Brevo API:              OK
 Brevo email productie:  OK
 Render deployment:      OK
 Vercel deployment:      OK
-Custom domain:          NEFACUT
+Custom domain:          https://www.cealeg.shop
+UI polish local:        lint OK, build OK
 ```
 
 Backendul public a fost verificat:
@@ -255,8 +277,8 @@ Backendul public a fost verificat:
 /readiness anonim:      HTTP 401
 /auth/me anonim:        HTTP 401
 Security headers:       OK
-Stripe webhook:         asteapta secretul in Render
-CORS frontend:          https://ce-aleg.vercel.app
+Stripe webhook:         OK in modul test
+CORS frontend:          https://www.cealeg.shop, https://cealeg.shop, https://ce-aleg.vercel.app
 Email productie:        OK
 ```
 
