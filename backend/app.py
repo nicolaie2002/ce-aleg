@@ -70,6 +70,7 @@ APPROX_RON_EXCHANGE_RATES = {
     "MDL": 0.26,
 }
 RATE_LIMIT_BUCKETS = defaultdict(deque)
+EMAIL_DELIVERY_LAST_ERROR = None
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 PRODUCTION_MODE = APP_ENV in {"production", "prod"}
 DEFAULT_AUTH_SECRET = "local-development-change-this-secret"
@@ -381,6 +382,24 @@ def get_email_html_body(text_body, html_body=None):
     return "<br>".join(escaped_lines)
 
 
+def clear_email_delivery_error():
+    global EMAIL_DELIVERY_LAST_ERROR
+    EMAIL_DELIVERY_LAST_ERROR = None
+
+
+def set_email_delivery_error(provider, status=None, message=""):
+    global EMAIL_DELIVERY_LAST_ERROR
+    EMAIL_DELIVERY_LAST_ERROR = {
+        "provider": provider,
+        "status": status,
+        "message": str(message or "")[:220],
+    }
+
+
+def get_email_delivery_error():
+    return EMAIL_DELIVERY_LAST_ERROR
+
+
 def send_brevo_email(to_email, subject, text_body, html_body=None):
     payload = {
         "sender": {
@@ -406,8 +425,10 @@ def send_brevo_email(to_email, subject, text_body, html_body=None):
         )
 
         if 200 <= response.status_code < 300:
+            clear_email_delivery_error()
             return True
 
+        set_email_delivery_error("brevo", response.status_code, response.text)
         app.logger.warning(
             "Brevo email failed with status %s: %s",
             response.status_code,
@@ -415,6 +436,7 @@ def send_brevo_email(to_email, subject, text_body, html_body=None):
         )
         return False
     except Exception as error:
+        set_email_delivery_error("brevo", None, error)
         app.logger.warning("Brevo email failed: %s", error)
         return False
 
@@ -440,8 +462,10 @@ def send_resend_email(to_email, subject, text_body, html_body=None):
         )
 
         if 200 <= response.status_code < 300:
+            clear_email_delivery_error()
             return True
 
+        set_email_delivery_error("resend", response.status_code, response.text)
         app.logger.warning(
             "Resend email failed with status %s: %s",
             response.status_code,
@@ -449,6 +473,7 @@ def send_resend_email(to_email, subject, text_body, html_body=None):
         )
         return False
     except Exception as error:
+        set_email_delivery_error("resend", None, error)
         app.logger.warning("Resend email failed: %s", error)
         return False
 
@@ -486,8 +511,10 @@ def send_smtp_email(to_email, subject, text_body, html_body=None):
 
             server.send_message(message)
 
+        clear_email_delivery_error()
         return True
     except Exception as error:
+        set_email_delivery_error("smtp", None, error)
         app.logger.warning("SMTP email failed: %s", error)
         return False
 
@@ -3268,15 +3295,19 @@ def register():
     db.session.add(new_user)
     db.session.commit()
     welcome_email_sent = send_welcome_email(new_user)
+    email_status = {
+        "welcomeSent": welcome_email_sent,
+        "configured": is_email_configured(),
+        "provider": EMAIL_PROVIDER,
+    }
+
+    if not welcome_email_sent:
+        email_status["lastError"] = get_email_delivery_error()
 
     response = jsonify({
         "message": "Cont creat cu succes.",
         "user": user_to_dict(new_user),
-        "emailStatus": {
-            "welcomeSent": welcome_email_sent,
-            "configured": is_email_configured(),
-            "provider": EMAIL_PROVIDER,
-        },
+        "emailStatus": email_status,
     })
     return set_auth_cookie(response, new_user), 201
 
