@@ -855,6 +855,9 @@ def validate_request_payload():
         if content_length > MAX_JSON_BODY_BYTES:
             return jsonify({"error": "Cererea este prea mare."}), 413
 
+        if content_length == 0:
+            return None
+
         try:
             request.get_json(silent=False)
         except BadRequest:

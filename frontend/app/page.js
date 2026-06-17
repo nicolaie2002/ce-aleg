@@ -22,7 +22,6 @@ import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { InteractiveSurface } from "./components/InteractiveSurface";
 import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
-import { BentoTrustShowcase } from "./components/BentoTrustShowcase";
 import { useLocale } from "./components/LocaleProvider";
 import { API_URL } from "./config";
 
@@ -234,15 +233,15 @@ export default function Home() {
                   ))}
                 </div>
 
-                <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 p-4">
-                  <p className="flex items-center gap-2 font-black text-cyan-100">
+                <div className="ce-demo-recommendation rounded-xl p-4">
+                  <p className="ce-demo-recommendation-title flex items-center gap-2 font-black">
                     <Star size={18} className="text-yellow-200" />
-                    {pick("Recomandare", "Recommendation")}
+                    {pick("Verdict recomandat", "Suggested verdict")}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-cyan-50/85">
+                  <p className="ce-demo-recommendation-copy mt-2 text-sm leading-6">
                     {pick(
-                      "Bun pentru o gustare rapida. Daca vrei mai multa proteina, vezi alternativele recomandate.",
-                      "Good for a quick snack. If you want more protein, check the recommended alternatives."
+                      "Potrivit pentru o gustare simpla. Compara alternativele daca vrei mai multa proteina, zahar mai putin sau ingrediente mai curate.",
+                      "Good for a simple snack. Compare alternatives if you want more protein, less sugar or cleaner ingredients."
                     )}
                   </p>
                 </div>
@@ -263,7 +262,6 @@ export default function Home() {
                     <ArrowRight size={18} />
                   </Link>
                 </div>
-                <span className="ce-scan-line" />
               </InteractiveSurface>
             </div>
           </div>
@@ -287,8 +285,6 @@ export default function Home() {
           ))}
         </div>
       </section>
-
-      <BentoTrustShowcase />
 
       <section className="bg-[#070a0e]">
         <div className="ce-shell ce-page">
@@ -329,12 +325,12 @@ export default function Home() {
           <InteractiveSurface className="mt-10 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(135deg,rgba(103,232,249,.14),rgba(250,204,21,.09),rgba(255,255,255,.035))] p-5 md:flex md:items-center md:justify-between md:gap-6 md:p-7">
             <div>
               <p className="text-sm font-black text-cyan-100">
-                {pick("Gata de testat", "Ready to test")}
+                {pick("Pentru urmatoarea cumparatura", "For your next shop")}
               </p>
               <h2 className="mt-2 text-2xl font-black">
                 {pick(
-                  "Intra in cont si scaneaza primul produs.",
-                  "Sign in and scan your first product."
+                  "Deschide camera si verifica produsul inainte sa il pui in cos.",
+                  "Open the camera and check the product before it goes in your cart."
                 )}
               </h2>
             </div>

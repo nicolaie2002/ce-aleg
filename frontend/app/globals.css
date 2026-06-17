@@ -144,7 +144,7 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: -3;
   background: var(--app-background);
 }
 
@@ -152,7 +152,7 @@ body::after {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: -2;
   pointer-events: none;
   background-image: var(--app-overlay);
   background-size: var(--app-overlay-size);
@@ -161,17 +161,17 @@ body::after {
 .ce-carbon-vapor {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.45;
+  opacity: 0.34;
   mix-blend-mode: screen;
 }
 
 .ce-carbon-vapor-hero {
   position: absolute;
   z-index: 1;
-  opacity: 0.5;
+  opacity: 0.24;
 }
 
 .ce-carbon-vapor-layer {
@@ -219,11 +219,13 @@ body::after {
 }
 
 [data-theme="light"] .ce-carbon-vapor {
-  opacity: 0.24;
+  opacity: 0.32;
   mix-blend-mode: multiply;
 }
 
 main {
+  position: relative;
+  z-index: 1;
   flex: 1 0 auto;
   background-color: transparent !important;
 }
@@ -312,16 +314,6 @@ textarea:focus {
   to {
     opacity: 1;
     transform: translateY(0);
-  }
-}
-
-@keyframes ce-soft-scan {
-  from {
-    transform: translateX(-36%);
-  }
-
-  to {
-    transform: translateX(36%);
   }
 }
 
@@ -537,22 +529,6 @@ textarea:focus {
   box-shadow:
     0 22px 70px -42px oklch(0 0 0 / 80%),
     inset 0 1px 0 oklch(1 0 0 / 11%);
-}
-
-.ce-scan-line {
-  position: absolute;
-  inset: auto 8% 16% 8%;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0.75;
-}
-
-.ce-scan-line::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, oklch(0.78 0.17 165), transparent);
-  animation: ce-soft-scan 3.8s ease-in-out infinite alternate;
 }
 
 .ce-gradient-text {
@@ -1081,6 +1057,22 @@ textarea:focus {
   background-color: oklch(0.26 0.08 165 / 48%) !important;
 }
 
+.ce-demo-recommendation {
+  border: 1px solid oklch(0.75 0.12 215 / 34%);
+  background:
+    radial-gradient(circle at 12% 12%, oklch(0.82 0.12 215 / 18%), transparent 36%),
+    linear-gradient(135deg, oklch(0.17 0.04 235 / 92%), oklch(0.11 0.035 245 / 96%));
+  color: oklch(0.97 0.01 235);
+}
+
+.ce-demo-recommendation-title {
+  color: oklch(0.9 0.08 215);
+}
+
+.ce-demo-recommendation-copy {
+  color: oklch(0.84 0.03 235);
+}
+
 .ce-demo-secondary-action {
   background-color: oklch(0.08 0.02 245 / 42%) !important;
   color: white !important;
@@ -1101,6 +1093,12 @@ textarea:focus {
 [data-theme="light"] .ce-hero-secondary-action:hover,
 [data-theme="light"] .ce-demo-secondary-action:hover {
   background-color: oklch(0.93 0.035 215 / 96%) !important;
+}
+
+[data-theme="light"] .ce-hero-pill {
+  background-color: oklch(0.99 0.012 230 / 86%) !important;
+  color: oklch(0.2 0.075 220) !important;
+  border-color: oklch(0.56 0.12 220 / 34%) !important;
 }
 
 [data-theme="light"] .ce-hero-plan-action {
@@ -1126,111 +1124,20 @@ textarea:focus {
   color: oklch(0.38 0.035 240) !important;
 }
 
-.ce-bento-showcase {
-  position: relative;
-  overflow: hidden;
+[data-theme="light"] .ce-demo-recommendation {
+  border-color: oklch(0.68 0.11 215 / 30%);
   background:
-    radial-gradient(circle at 15% 5%, oklch(0.72 0.13 215 / 14%), transparent 32%),
-    radial-gradient(circle at 88% 24%, oklch(0.86 0.15 88 / 10%), transparent 30%),
-    linear-gradient(180deg, oklch(0.07 0.022 245 / 86%), oklch(0.1 0.026 240 / 92%));
+    radial-gradient(circle at 12% 12%, oklch(0.82 0.12 215 / 16%), transparent 34%),
+    linear-gradient(145deg, oklch(0.99 0.012 230 / 98%), oklch(0.91 0.03 220 / 96%));
+  color: oklch(0.16 0.035 240);
 }
 
-.ce-bento-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.875rem;
+[data-theme="light"] .ce-demo-recommendation-title {
+  color: oklch(0.24 0.08 220);
 }
 
-.ce-bento-tile {
-  min-height: 10rem;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid oklch(1 0 0 / 10%);
-  border-radius: 1.25rem;
-  padding: 1.1rem;
-  background:
-    linear-gradient(145deg, oklch(0.2 0.028 240 / 78%), oklch(0.12 0.026 250 / 92%));
-  box-shadow: 0 22px 55px -38px oklch(0 0 0 / 78%);
-}
-
-.ce-bento-tile::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.22;
-  background:
-    linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: linear-gradient(135deg, black, transparent 72%);
-}
-
-.ce-bento-tile::after {
-  content: "";
-  position: absolute;
-  inset: auto -20% -50% 20%;
-  height: 70%;
-  border-radius: 999px;
-  background: oklch(0.72 0.13 215 / 16%);
-  filter: blur(34px);
-  transition: transform 220ms ease, opacity 220ms ease;
-}
-
-.ce-bento-tile:hover::after {
-  transform: translateY(-16%);
-  opacity: 1;
-}
-
-.ce-bento-icon {
-  position: relative;
-  z-index: 1;
-  display: inline-flex;
-  width: 2.6rem;
-  height: 2.6rem;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0.8rem;
-  color: oklch(0.88 0.08 220);
-  background: oklch(0.78 0.13 215 / 14%);
-}
-
-.ce-bento-tile h3 {
-  position: relative;
-  z-index: 1;
-  margin-top: 1.1rem;
-  font-size: 1.05rem;
-  font-weight: 900;
-}
-
-.ce-bento-tile p {
-  position: relative;
-  z-index: 1;
-  margin-top: 0.45rem;
-  color: var(--text-soft);
-  font-size: 0.92rem;
-  line-height: 1.55;
-}
-
-@media (min-width: 1024px) {
-  .ce-bento-grid {
-    min-height: 34rem;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
-    grid-auto-rows: minmax(7.5rem, auto);
-  }
-}
-
-[data-theme="light"] .ce-bento-showcase {
-  background:
-    radial-gradient(circle at 15% 5%, oklch(0.72 0.13 215 / 12%), transparent 32%),
-    radial-gradient(circle at 88% 24%, oklch(0.86 0.15 88 / 12%), transparent 30%),
-    linear-gradient(180deg, oklch(0.98 0.014 230 / 94%), oklch(0.94 0.025 225 / 92%));
-}
-
-[data-theme="light"] .ce-bento-tile {
-  border-color: oklch(0.28 0.025 240 / 14%);
-  background:
-    linear-gradient(145deg, oklch(1 0 0 / 92%), oklch(0.94 0.025 225 / 88%));
+[data-theme="light"] .ce-demo-recommendation-copy {
+  color: oklch(0.28 0.04 240);
 }
 
 .ce-store-panel {
