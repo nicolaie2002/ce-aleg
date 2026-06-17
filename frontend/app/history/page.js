@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowLeft, FileClock, Heart, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
 import { ExpandableText } from "../components/ExpandableText";
@@ -191,31 +192,34 @@ export default function HistoryPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
-            className="text-sm text-emerald-300 hover:text-emerald-200"
+            className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            ← Înapoi la dashboard
+            <ArrowLeft size={16} /> Înapoi la dashboard
           </Link>
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <Link
               href="/store"
-              className="rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
+              <ScanLine size={17} />
               Scanează produs
             </Link>
 
             <Link
               href="/favorites"
-              className="rounded-2xl border border-yellow-300/30 px-5 py-3 text-center font-semibold text-yellow-300 hover:bg-yellow-300/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-5 py-3 text-center font-semibold text-yellow-300 hover:bg-yellow-300/10"
             >
-              Favorite ⭐
+              <Heart size={17} />
+              Favorite
             </Link>
 
             <Link
               href="/cart"
-              className="rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
-              Vezi coșul 🛒
+              <ShoppingCart size={17} />
+              Vezi coșul
             </Link>
           </div>
         </div>
@@ -264,7 +268,9 @@ export default function HistoryPage() {
 
           {history.length === 0 ? (
             <div className="mt-8 rounded-3xl border border-white/10 bg-black/30 p-8 text-center">
-              <p className="text-5xl">📜</p>
+              <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
+                <FileClock size={32} />
+              </span>
               <h2 className="mt-4 text-2xl font-bold">
                 Nu există scanări încă
               </h2>
@@ -274,8 +280,9 @@ export default function HistoryPage() {
 
               <Link
                 href="/store"
-                className="mt-6 inline-block rounded-2xl bg-emerald-400 px-6 py-3 font-semibold text-black hover:bg-emerald-300"
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 font-black text-black hover:bg-cyan-100"
               >
+                <ScanLine size={18} />
                 Scanează primul produs
               </Link>
             </div>
@@ -326,16 +333,18 @@ export default function HistoryPage() {
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => addToCart(item)}
-                      className="rounded-2xl bg-emerald-400 px-5 py-3 font-semibold text-black hover:bg-emerald-300"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
                     >
+                      <ShoppingCart size={18} />
                       Adaugă în coș
                     </button>
 
                     <button
                       onClick={() => addToFavorites(item)}
-                      className="rounded-2xl border border-yellow-300/30 px-5 py-3 font-semibold text-yellow-300 hover:bg-yellow-300/10"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-5 py-3 font-semibold text-yellow-300 hover:bg-yellow-300/10"
                     >
-                      Favorite ⭐
+                      <Heart size={18} />
+                      Favorite
                     </button>
 
                     <button

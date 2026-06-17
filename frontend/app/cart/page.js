@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { ArrowLeft, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -290,15 +291,16 @@ export default function CartPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
-            className="text-sm text-emerald-300 hover:text-emerald-200"
+            className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            ← Înapoi la dashboard
+            <ArrowLeft size={16} /> Înapoi la dashboard
           </Link>
 
           <Link
             href="/store"
-            className="rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
           >
+            <ScanLine size={17} />
             Scanează alt produs
           </Link>
         </div>
@@ -362,7 +364,9 @@ export default function CartPage() {
 
           {cartItems.length === 0 ? (
             <div className="mt-8 rounded-3xl border border-white/10 bg-black/30 p-8 text-center">
-              <p className="text-5xl">🛒</p>
+              <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
+                <ShoppingCart size={32} />
+              </span>
               <h2 className="mt-4 text-2xl font-bold">Coșul este gol</h2>
               <p className="mt-3 text-gray-400">
                 Scanează un produs, alege o alternativă și apasă „Adaugă în coș”.
@@ -370,8 +374,9 @@ export default function CartPage() {
 
               <Link
                 href="/store"
-                className="mt-6 inline-block rounded-2xl bg-emerald-400 px-6 py-3 font-semibold text-black hover:bg-emerald-300"
+                className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 font-black text-black hover:bg-cyan-100"
               >
+                <ScanLine size={18} />
                 Începe scanarea
               </Link>
             </div>

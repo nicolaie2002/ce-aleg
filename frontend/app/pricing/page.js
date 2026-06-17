@@ -323,7 +323,7 @@ export default function PricingPage() {
         <div className="flex items-center justify-between gap-4">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200"
+            className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
             <ArrowLeft size={16} /> {pick("Inapoi la dashboard", "Back to dashboard")}
           </Link>
@@ -335,7 +335,7 @@ export default function PricingPage() {
 
         <div className="mt-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_520px] xl:items-end">
           <div className="max-w-4xl">
-            <p className="flex items-center gap-2 text-sm font-bold text-emerald-300">
+            <p className="flex items-center gap-2 text-sm font-bold text-cyan-200">
               <Sparkles size={16} /> {pick("Planuri", "Plans")}
             </p>
             <h1 className="mt-3 text-5xl font-black leading-tight md:text-6xl">
@@ -354,7 +354,7 @@ export default function PricingPage() {
 
           <div className="ce-pricing-note rounded-2xl border p-5 shadow-2xl backdrop-blur">
             <div className="flex items-start gap-3">
-              <span className="rounded-lg bg-emerald-400 p-2 text-black">
+              <span className="rounded-lg bg-cyan-200 p-2 text-black">
                 <Zap size={20} />
               </span>
               <div>
@@ -400,7 +400,7 @@ export default function PricingPage() {
           <p
             className={`mt-5 rounded-lg border p-4 ${
               messageTone === "success"
-                ? "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+                ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"
                 : messageTone === "error"
                   ? "border-red-400/30 bg-red-400/10 text-red-200"
                   : "border-yellow-300/25 bg-yellow-300/10 text-yellow-100"

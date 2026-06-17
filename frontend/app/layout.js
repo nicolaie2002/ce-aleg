@@ -4,6 +4,7 @@ import { LocaleProvider } from "./components/LocaleProvider";
 import { AutomaticPageTranslation } from "./components/AutomaticPageTranslation";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { LegalFooter } from "./components/LegalFooter";
+import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -33,6 +34,7 @@ export default function RootLayout({ children }) {
         <LocaleProvider>
           <ThemeProvider>
             <AutomaticPageTranslation />
+            <CarbonVaporBackground />
             {children}
             <LegalFooter />
           </ThemeProvider>

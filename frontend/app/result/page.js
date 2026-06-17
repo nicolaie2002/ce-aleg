@@ -3,6 +3,20 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import {
+  ArrowLeft,
+  BadgeCheck,
+  BadgeDollarSign,
+  CandyOff,
+  Flame,
+  Heart,
+  Leaf,
+  MilkOff,
+  Search,
+  ShoppingCart,
+  Sprout,
+  Zap,
+} from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
 import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
@@ -11,15 +25,15 @@ import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
 
 const criteriaOptions = [
-  { id: "caffeine", label: "Mai multa cafeina", icon: "⚡" },
-  { id: "cheap", label: "Mai ieftin", icon: "💸" },
-  { id: "protein", label: "Mai multă proteină", icon: "💪" },
-  { id: "low_calorie", label: "Mai puține calorii", icon: "🔥" },
-  { id: "low_sugar", label: "Mai puțin zahăr", icon: "🍬" },
-  { id: "vegan", label: "De post", icon: "🌱" },
-  { id: "lactose_free", label: "Fără lactoză", icon: "🥛" },
-  { id: "natural", label: "Ingrediente mai curate", icon: "🌿" },
-  { id: "value", label: "Best value", icon: "⭐" },
+  { id: "caffeine", label: "Mai multa cafeina", icon: Zap },
+  { id: "cheap", label: "Mai ieftin", icon: BadgeDollarSign },
+  { id: "protein", label: "Mai multă proteină", icon: BadgeCheck },
+  { id: "low_calorie", label: "Mai puține calorii", icon: Flame },
+  { id: "low_sugar", label: "Mai puțin zahăr", icon: CandyOff },
+  { id: "vegan", label: "De post", icon: Sprout },
+  { id: "lactose_free", label: "Fără lactoză", icon: MilkOff },
+  { id: "natural", label: "Ingrediente mai curate", icon: Leaf },
+  { id: "value", label: "Raport calitate-pret", icon: BadgeCheck },
 ];
 
 const emptyScannedProduct = {
@@ -272,9 +286,9 @@ function ResultPageContent() {
       <section className="ce-shell-lg ce-page">
           <Link
           href={`/scan?store=${storeParam}`}
-          className="mb-8 inline-block text-sm text-emerald-300 hover:text-emerald-200"
+          className="mb-8 inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
         >
-          ← Înapoi la scanare
+          <ArrowLeft size={16} /> Înapoi la scanare
           </Link>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl">
@@ -338,23 +352,26 @@ function ResultPageContent() {
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={addScannedProductToCart}
-                  className="rounded-2xl bg-emerald-400 px-6 py-4 text-center text-lg font-semibold text-black transition hover:bg-emerald-300"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-center text-lg font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
                 >
+                  <ShoppingCart size={20} />
                   Adaugă în coș
                 </button>
 
                 <button
                   onClick={addScannedProductToFavorites}
-                  className="rounded-2xl border border-yellow-300/30 px-6 py-4 text-center text-lg font-semibold text-yellow-300 transition hover:bg-yellow-300/10"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-6 py-4 text-center text-lg font-semibold text-yellow-300 transition hover:-translate-y-0.5 hover:bg-yellow-300/10"
                 >
-                  Adaugă la favorite ⭐
+                  <Heart size={20} />
+                  Adaugă la favorite
                 </button>
 
           <Link
                   href="/cart"
-                  className="rounded-2xl border border-white/10 px-6 py-4 text-center text-lg font-semibold text-white transition hover:bg-white/10"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-6 py-4 text-center text-lg font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
                 >
-                  Vezi coșul 🛒
+                  <ShoppingCart size={20} />
+                  Vezi coșul
           </Link>
               </div>
 
@@ -432,6 +449,7 @@ function ResultPageContent() {
             <div className="mt-5 grid gap-3 sm:grid-cols-2 md:grid-cols-4">
               {criteriaOptions.map((option) => {
                 const selected = selectedCriteria.includes(option.id);
+                const Icon = option.icon;
 
                 return (
                   <button
@@ -443,7 +461,9 @@ function ResultPageContent() {
                         : "border-white/10 bg-white/5 hover:border-emerald-400/50 hover:bg-white/10"
                     }`}
                   >
-                    <span className="text-2xl">{option.icon}</span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
+                      <Icon size={22} />
+                    </span>
                     <span className="mt-2 block text-sm font-bold">
                       {option.label}
                     </span>
@@ -467,8 +487,9 @@ function ResultPageContent() {
 
             <Link
               href={buildAlternativeLink()}
-              className="mt-6 block rounded-2xl bg-emerald-400 px-6 py-4 text-center text-lg font-semibold text-black transition hover:bg-emerald-300"
+              className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-center text-lg font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
             >
+              <Search size={20} />
               Caută alternative potrivite
             </Link>
           </div>

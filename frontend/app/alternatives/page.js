@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { ArrowLeft, Heart, Search, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
 import { ExpandableText } from "../components/ExpandableText";
@@ -737,7 +738,7 @@ function AlternativesPageContent() {
         throw new Error(data.error || "Nu s-a putut adăuga produsul în coș.");
       }
 
-      setAddedProduct(`${product.name} → ${storeName}`);
+      setAddedProduct(`${product.name} - ${storeName}`);
 
       setTimeout(() => {
         setAddedProduct("");
@@ -810,24 +811,26 @@ function AlternativesPageContent() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href={`/result?store=${storeParam}`}
-            className="text-sm text-emerald-300 hover:text-emerald-200"
+            className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            ← Înapoi la rezultat
+            <ArrowLeft size={16} /> Înapoi la rezultat
           </Link>
 
           <div className="flex flex-col gap-3 sm:flex-row">
           <Link
               href="/favorites"
-              className="rounded-2xl border border-yellow-300/30 px-5 py-3 text-center font-semibold text-yellow-300 hover:bg-yellow-300/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-5 py-3 text-center font-semibold text-yellow-300 hover:bg-yellow-300/10"
             >
-              Favorite ⭐
+              <Heart size={17} />
+              Favorite
           </Link>
 
           <Link
               href="/cart"
-              className="rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
-              Vezi coșul 🛒
+              <ShoppingCart size={17} />
+              Vezi coșul
           </Link>
           </div>
         </div>
@@ -987,7 +990,9 @@ function AlternativesPageContent() {
 
         {visibleProducts.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-black/30 p-8 text-center">
-            <p className="text-5xl">🔍</p>
+            <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
+              <Search size={32} />
+            </span>
             <h2 className="mt-4 text-2xl font-bold">
               Nu am găsit alternative potrivite
             </h2>
@@ -1117,16 +1122,18 @@ function AlternativesPageContent() {
                 <div className="mt-5 grid gap-3">
                   <button
                     onClick={() => addToCart(product)}
-                    className="w-full rounded-2xl bg-emerald-400 px-4 py-3 font-semibold text-black transition hover:bg-emerald-300"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
                   >
+                    <ShoppingCart size={18} />
                     Adaugă în coș
                   </button>
 
                   <button
                     onClick={() => addToFavorites(product)}
-                    className="w-full rounded-2xl border border-yellow-300/30 px-4 py-3 font-semibold text-yellow-300 transition hover:bg-yellow-300/10"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-4 py-3 font-semibold text-yellow-300 transition hover:-translate-y-0.5 hover:bg-yellow-300/10"
                   >
-                    Adaugă la favorite ⭐
+                    <Heart size={18} />
+                    Adaugă la favorite
                   </button>
                 </div>
               </div>

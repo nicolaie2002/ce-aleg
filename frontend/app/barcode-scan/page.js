@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import Link from "next/link";
-import { SwitchCamera } from "lucide-react";
+import { ArrowLeft, Search, SwitchCamera } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
@@ -1154,15 +1154,16 @@ export default function BarcodeScanPage() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
-            className="text-sm text-emerald-300 hover:text-emerald-200"
+            className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            ← Înapoi la dashboard
+            <ArrowLeft size={16} /> Înapoi la dashboard
           </Link>
 
           <Link
             href="/store"
-            className="rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
           >
+            <Search size={17} />
             Scanare după nume
           </Link>
         </div>

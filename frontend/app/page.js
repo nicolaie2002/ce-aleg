@@ -21,6 +21,8 @@ import {
 import { LanguageSwitcher } from "./components/LanguageSwitcher";
 import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { InteractiveSurface } from "./components/InteractiveSurface";
+import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
+import { BentoTrustShowcase } from "./components/BentoTrustShowcase";
 import { useLocale } from "./components/LocaleProvider";
 import { API_URL } from "./config";
 
@@ -103,14 +105,15 @@ export default function Home() {
   return (
     <main className="min-h-screen text-white">
       <section className="ce-home-hero relative overflow-hidden border-b border-white/10">
+        <CarbonVaporBackground variant="hero" />
         <div
           className="absolute inset-0 bg-cover bg-center opacity-70"
           style={{
             backgroundImage:
-              "linear-gradient(90deg, rgba(4,8,11,.98) 0%, rgba(4,8,11,.9) 38%, rgba(4,8,11,.48) 100%), url('https://images.unsplash.com/photo-1760463921956-b21cfa5cb2ac?auto=format&fit=crop&q=85&w=2400')",
+              "linear-gradient(90deg, rgba(4,8,11,.98) 0%, rgba(4,8,11,.88) 40%, rgba(4,8,11,.52) 100%), url('https://images.unsplash.com/photo-1760463921956-b21cfa5cb2ac?auto=format&fit=crop&q=85&w=2400')",
           }}
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(16,185,129,.22),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(250,204,21,.14),transparent_28%),linear-gradient(180deg,transparent,#070a0e_96%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(56,189,248,.16),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(250,204,21,.10),transparent_28%),linear-gradient(180deg,transparent,#070a0e_96%)]" />
 
         <div className="ce-shell relative z-10 pb-14 pt-5 md:pb-20 md:pt-7">
           <nav className="ce-glass-nav ce-reveal flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3 backdrop-blur-xl">
@@ -217,7 +220,7 @@ export default function Home() {
                       {pick("Iaurt grecesc 2%", "Greek yogurt 2%")}
                     </h2>
                   </div>
-                  <span className="rounded-full bg-emerald-400 px-3 py-1 text-sm font-black text-black">
+                  <span className="rounded-full bg-cyan-200 px-3 py-1 text-sm font-black text-black">
                     8.7/10
                   </span>
                 </div>
@@ -284,6 +287,8 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <BentoTrustShowcase />
 
       <section className="bg-[#070a0e]">
         <div className="ce-shell ce-page">

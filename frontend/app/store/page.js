@@ -11,50 +11,42 @@ const stores = [
   {
     id: "lidl",
     name: "Lidl",
-    image:
-      "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&q=80&w=900",
+    tagline: "Calitate la pret bun",
   },
   {
     id: "kaufland",
     name: "Kaufland",
-    image:
-      "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=900",
+    tagline: "Totul pentru cumparaturi mari",
   },
   {
     id: "carrefour",
     name: "Carrefour",
-    image:
-      "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=900",
+    tagline: "Alternative pentru fiecare buget",
   },
   {
     id: "mega",
     name: "Mega Image",
-    image:
-      "https://images.unsplash.com/photo-1534723452862-4c874018d66d?auto=format&fit=crop&q=80&w=900",
+    tagline: "Alegeri rapide de zi cu zi",
   },
   {
     id: "profi",
     name: "Profi",
-    image:
-      "https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&q=80&w=900",
+    tagline: "Optiuni aproape de tine",
   },
   {
     id: "penny",
     name: "Penny",
-    image:
-      "https://images.unsplash.com/photo-1516594798947-e65505dbb29d?auto=format&fit=crop&q=80&w=900",
+    tagline: "Preturi mici, comparatii clare",
   },
   {
     id: "local",
     name: "Market local",
-    image:
-      "https://images.unsplash.com/photo-1566385101042-1a0aa0c1268c?auto=format&fit=crop&q=80&w=900",
+    tagline: "Magazine independente",
   },
   {
     id: "any",
     name: "Orice magazin",
-    image:
-      "https://images.unsplash.com/photo-1601599963565-b7f49cfca6a4?auto=format&fit=crop&q=80&w=900",
+    tagline: "Recomandari generale",
   },
 ];
 
@@ -92,28 +84,26 @@ export default function StorePage() {
                 key={store.id}
                 type="button"
                 onClick={() => setSelectedStore(store.id)}
-                className={`ce-store-card group relative min-h-44 overflow-hidden rounded-2xl border text-left shadow-xl transition hover:-translate-y-1 xl:min-h-56 ${
+                className={`ce-store-card ce-store-card-${store.id} group relative min-h-44 overflow-hidden rounded-2xl border text-left shadow-xl transition hover:-translate-y-1 xl:min-h-56 ${
                   selectedStore === store.id
                     ? "border-cyan-200 ring-2 ring-cyan-200/30"
                     : "border-white/10 hover:border-cyan-300/50"
                 }`}
               >
-                <span
-                  className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105"
-                  style={{ backgroundImage: `url(${store.image})` }}
-                />
-                <span className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/56 to-black/14" />
+                <span className={`ce-store-brand-visual ce-store-brand-${store.id}`} />
+                <span className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/30 to-transparent" />
                 {selectedStore === store.id && (
                   <span className="absolute right-4 top-4 rounded-full bg-cyan-200 p-2 text-black">
                     <Check className="h-4 w-4" />
                   </span>
                 )}
+                <span className="absolute inset-x-4 top-4">
+                  <span className="ce-store-wordmark">{store.name}</span>
+                </span>
                 <span className="absolute bottom-4 left-4 right-4">
                   <span className="block text-2xl font-black text-white">{store.name}</span>
                   <span className="mt-1 block text-sm text-gray-200">
-                    {store.id === "any"
-                      ? pick("Recomandari generale", "General recommendations")
-                      : pick("Recomandari pentru magazin", "Store-based recommendations")}
+                    {pick(store.tagline, store.id === "any" ? "General recommendations" : "Store-based recommendations")}
                   </span>
                 </span>
               </InteractiveSurface>
