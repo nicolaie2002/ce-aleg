@@ -109,10 +109,10 @@ export default function Home() {
           className="absolute inset-0 bg-cover bg-center opacity-70"
           style={{
             backgroundImage:
-              "linear-gradient(90deg, rgba(4,8,11,.98) 0%, rgba(4,8,11,.88) 40%, rgba(4,8,11,.52) 100%), url('https://images.unsplash.com/photo-1760463921956-b21cfa5cb2ac?auto=format&fit=crop&q=85&w=2400')",
+              "linear-gradient(90deg, rgba(2,4,7,.99) 0%, rgba(3,5,8,.9) 42%, rgba(5,7,10,.62) 100%), url('https://images.unsplash.com/photo-1760463921956-b21cfa5cb2ac?auto=format&fit=crop&q=85&w=2400')",
           }}
         />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(56,189,248,.16),transparent_30%),radial-gradient(circle_at_80%_20%,rgba(250,204,21,.10),transparent_28%),linear-gradient(180deg,transparent,#070a0e_96%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(225,232,236,.12),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(250,204,21,.07),transparent_30%),linear-gradient(180deg,rgba(0,0,0,.06),#070a0e_96%)]" />
 
         <div className="ce-shell relative z-10 pb-14 pt-5 md:pb-20 md:pt-7">
           <nav className="ce-glass-nav ce-reveal flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3 backdrop-blur-xl">

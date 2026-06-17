@@ -164,63 +164,44 @@ body::after {
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
-  opacity: 0.34;
-  mix-blend-mode: screen;
+  opacity: 0.82;
+  mix-blend-mode: normal;
 }
 
 .ce-carbon-vapor-hero {
   position: absolute;
   z-index: 1;
-  opacity: 0.24;
+  opacity: 0.68;
 }
 
-.ce-carbon-vapor-layer {
+.ce-carbon-vapor::after {
+  content: "";
   position: absolute;
-  inset: -25%;
-  border-radius: 999px;
-  filter: blur(55px);
-  opacity: 0.5;
-  transform-origin: center;
-  animation: ce-vapor-drift 18s ease-in-out infinite alternate;
-}
-
-.ce-carbon-vapor-layer-one {
+  inset: 0;
+  pointer-events: none;
   background:
-    radial-gradient(circle at 30% 35%, oklch(0.82 0.08 220 / 34%), transparent 34%),
-    radial-gradient(circle at 70% 58%, oklch(0.95 0.02 245 / 16%), transparent 34%);
+    linear-gradient(90deg, oklch(0 0 0 / 42%), transparent 20%, transparent 78%, oklch(0 0 0 / 44%)),
+    radial-gradient(circle at 50% 42%, transparent 0 24%, oklch(0 0 0 / 38%) 72%),
+    repeating-linear-gradient(0deg, oklch(1 0 0 / 2.5%) 0 1px, transparent 1px 5px);
+  opacity: 0.78;
 }
 
-.ce-carbon-vapor-layer-two {
-  background:
-    conic-gradient(from 130deg at 50% 50%, transparent, oklch(0.82 0.04 235 / 20%), transparent 42%, oklch(0.76 0.12 215 / 18%), transparent 72%);
-  animation-duration: 24s;
-  animation-direction: alternate-reverse;
-}
-
-.ce-carbon-vapor-layer-three {
-  background:
-    radial-gradient(ellipse at 65% 22%, oklch(0.86 0.13 88 / 16%), transparent 30%),
-    radial-gradient(ellipse at 20% 82%, oklch(0.72 0.16 292 / 14%), transparent 34%);
-  animation-duration: 30s;
-}
-
-@keyframes ce-vapor-drift {
-  0% {
-    transform: translate3d(-3%, -2%, 0) rotate(0deg) scale(1);
-  }
-
-  50% {
-    transform: translate3d(3%, 2%, 0) rotate(10deg) scale(1.08);
-  }
-
-  100% {
-    transform: translate3d(1%, -3%, 0) rotate(-8deg) scale(1.03);
-  }
+.ce-carbon-vapor-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 [data-theme="light"] .ce-carbon-vapor {
-  opacity: 0.32;
+  opacity: 0.38;
   mix-blend-mode: multiply;
+}
+
+[data-theme="light"] .ce-carbon-vapor::after {
+  opacity: 0.22;
+  background:
+    radial-gradient(circle at 50% 42%, transparent 0 28%, oklch(0.72 0.04 230 / 20%) 78%),
+    repeating-linear-gradient(0deg, oklch(0.2 0.02 240 / 2.2%) 0 1px, transparent 1px 6px);
 }
 
 main {
