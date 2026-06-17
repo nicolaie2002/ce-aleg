@@ -157,7 +157,7 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
         disabled={isCurrent || isBusy}
         className={`mt-7 w-full rounded-lg px-4 py-3 font-black transition ${
           isCurrent
-            ? "cursor-default bg-emerald-400 text-black"
+            ? "cursor-default border border-white/15 bg-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
             : isBusy
               ? "cursor-wait bg-white/10 text-gray-400"
             : isFree
