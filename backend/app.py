@@ -143,6 +143,16 @@ def load_local_environment():
 
 load_local_environment()
 
+
+def read_secret_env(name, default=""):
+    value = os.environ.get(name, default).strip().strip("\"'")
+    prefixed_name = f"{name}="
+
+    if value.startswith(prefixed_name):
+        value = value[len(prefixed_name):].strip().strip("\"'")
+
+    return value
+
 app = Flask(__name__)
 frontend_origins = [
     origin.strip()
@@ -216,12 +226,12 @@ FRONTEND_PUBLIC_URL = (
     or (frontend_origins[0].rstrip("/") if frontend_origins else "http://localhost:3000")
 )
 EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "smtp").strip().lower()
-BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+BREVO_API_KEY = read_secret_env("BREVO_API_KEY")
+RESEND_API_KEY = read_secret_env("RESEND_API_KEY")
 EMAIL_SMTP_HOST = os.environ.get("EMAIL_SMTP_HOST", "").strip()
 EMAIL_SMTP_PORT = int(os.environ.get("EMAIL_SMTP_PORT", "587"))
 EMAIL_SMTP_USERNAME = os.environ.get("EMAIL_SMTP_USERNAME", "").strip()
-EMAIL_SMTP_PASSWORD = os.environ.get("EMAIL_SMTP_PASSWORD", "").strip()
+EMAIL_SMTP_PASSWORD = read_secret_env("EMAIL_SMTP_PASSWORD")
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Ce aleg?").strip()
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").strip().lower() in {
