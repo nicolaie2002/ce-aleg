@@ -68,7 +68,7 @@ export default function StorePage() {
       <section className="ce-shell ce-page flex flex-col">
         <div className="ce-store-panel ce-lifted-shell ce-reveal overflow-hidden rounded-2xl border shadow-2xl">
           <div className="ce-store-panel-head border-b p-6">
-            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-emerald-300">
+            <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-cyan-200">
               <MapPin className="h-4 w-4" />{" "}
               {pick("Alege magazinul", "Choose the store")}
             </p>
@@ -94,8 +94,8 @@ export default function StorePage() {
                 onClick={() => setSelectedStore(store.id)}
                 className={`ce-store-card group relative min-h-44 overflow-hidden rounded-2xl border text-left shadow-xl transition hover:-translate-y-1 xl:min-h-56 ${
                   selectedStore === store.id
-                    ? "border-emerald-300 ring-2 ring-emerald-300/30"
-                    : "border-white/10 hover:border-emerald-400/50"
+                    ? "border-cyan-200 ring-2 ring-cyan-200/30"
+                    : "border-white/10 hover:border-cyan-300/50"
                 }`}
               >
                 <span
@@ -104,7 +104,7 @@ export default function StorePage() {
                 />
                 <span className="absolute inset-0 bg-gradient-to-t from-black/92 via-black/56 to-black/14" />
                 {selectedStore === store.id && (
-                  <span className="absolute right-4 top-4 rounded-full bg-emerald-400 p-2 text-black">
+                  <span className="absolute right-4 top-4 rounded-full bg-cyan-200 p-2 text-black">
                     <Check className="h-4 w-4" />
                   </span>
                 )}
@@ -125,7 +125,7 @@ export default function StorePage() {
               href={selectedStore ? `/scan?store=${selectedStore}` : "#"}
               className={`inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-center font-black transition ${
                 selectedStore
-                  ? "bg-emerald-400 text-black hover:bg-emerald-300"
+                  ? "bg-white text-black hover:bg-cyan-100"
                   : "cursor-not-allowed bg-white/10 text-gray-500"
               }`}
             >

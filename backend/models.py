@@ -186,6 +186,20 @@ class Subscription(db.Model):
     user = db.relationship("User", backref="subscription")
 
 
+class FamilyProfile(db.Model):
+    __tablename__ = "family_profiles"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    name = db.Column(db.String(80), nullable=False)
+    color = db.Column(db.String(30), nullable=False, default="teal")
+    avatar = db.Column(db.String(20), nullable=True)
+    is_primary = db.Column(db.Boolean, default=False, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    user = db.relationship("User", backref="family_profiles")
+
+
 class UsageEvent(db.Model):
     __tablename__ = "usage_events"
 

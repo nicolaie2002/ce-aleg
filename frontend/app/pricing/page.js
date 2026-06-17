@@ -127,20 +127,20 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
             </span>
           )}
           {!isFree && (
-            <Crown size={21} className={isCurrent ? "text-emerald-300" : "text-yellow-300"} />
+            <Crown size={21} className={isCurrent ? "text-cyan-200" : "text-yellow-300"} />
           )}
         </div>
       </div>
 
       <p className="mt-5 text-4xl font-black">
         {Number(plan.monthlyPrice || 0).toFixed(plan.monthlyPrice ? 2 : 0)} lei
-        <span className={`text-sm font-semibold ${isCurrent ? "text-emerald-100/70" : "text-gray-400"}`}>
+        <span className={`text-sm font-semibold ${isCurrent ? "text-cyan-100/70" : "text-gray-400"}`}>
           {" "}
           / luna
         </span>
       </p>
       {!isFree && (
-        <p className={`mt-1 text-sm ${isCurrent ? "text-emerald-100/70" : "text-gray-400"}`}>
+        <p className={`mt-1 text-sm ${isCurrent ? "text-cyan-100/70" : "text-gray-400"}`}>
           {plan.yearlyPrice} lei / an
         </p>
       )}
@@ -164,7 +164,7 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
               ? "cursor-wait bg-white/10 text-gray-400"
             : isFree
               ? "border border-white/15 text-white hover:bg-white/10"
-              : "bg-emerald-400 text-black shadow-[0_0_26px_rgba(52,211,153,0.18)] hover:bg-emerald-300"
+              : "bg-white text-black shadow-[0_0_26px_rgba(103,232,249,0.16)] hover:bg-cyan-100"
         }`}
       >
         {isBusy

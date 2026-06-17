@@ -42,6 +42,7 @@ from models import (
     PriceObservation,
     SearchEvent,
     Subscription,
+    FamilyProfile,
     UsageEvent,
 )
 
@@ -738,6 +739,7 @@ def delete_account_data(user):
     ProductSubmission.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     SearchEvent.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     Subscription.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    FamilyProfile.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     UsageEvent.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     db.session.delete(user)
     db.session.commit()
@@ -1242,6 +1244,57 @@ def is_paid_subscription(subscription):
     )
 
 
+def is_family_subscription(subscription):
+    return subscription and subscription.status == "active" and subscription.plan == "family"
+
+
+def family_profile_to_dict(profile):
+    return {
+        "id": profile.id,
+        "name": profile.name,
+        "color": profile.color,
+        "avatar": profile.avatar,
+        "isPrimary": bool(profile.is_primary),
+        "createdAt": profile.created_at.isoformat() + "Z" if profile.created_at else None,
+    }
+
+
+def get_or_create_primary_family_profile(user):
+    profile = FamilyProfile.query.filter_by(user_id=user.id, is_primary=True).first()
+
+    if profile:
+        return profile
+
+    existing_profile = FamilyProfile.query.filter_by(user_id=user.id).order_by(
+        FamilyProfile.created_at.asc()
+    ).first()
+
+    if existing_profile:
+        existing_profile.is_primary = True
+        db.session.commit()
+        return existing_profile
+
+    profile = FamilyProfile(
+        user_id=user.id,
+        name=user.name or "Profil principal",
+        color="teal",
+        avatar="user",
+        is_primary=True,
+    )
+    db.session.add(profile)
+    db.session.commit()
+    return profile
+
+
+def sanitize_family_profile_name(name):
+    name = re.sub(r"\s+", " ", str(name or "")).strip()
+
+    if len(name) < 2:
+        return None
+
+    return name[:80]
+
+
 def get_weekly_scan_count(user_id):
     week_start = get_week_start()
     return UsageEvent.query.filter(
@@ -1363,6 +1416,10 @@ AUTH_ENDPOINTS = {
     "get_billing_status",
     "start_checkout",
     "start_billing_portal",
+    "get_family_profiles",
+    "create_family_profile",
+    "update_family_profile",
+    "delete_family_profile",
     "request_account_deletion",
 }
 
@@ -3489,6 +3546,117 @@ def get_billing_status():
         "subscription": subscription_to_billing_dict(subscription),
         "plans": PLAN_CATALOG,
     })
+
+
+@app.route("/family/profiles", methods=["GET"])
+def get_family_profiles():
+    user = g.current_user
+    subscription = get_or_create_subscription(user)
+    get_or_create_primary_family_profile(user)
+    profiles = FamilyProfile.query.filter_by(user_id=user.id).order_by(
+        FamilyProfile.is_primary.desc(),
+        FamilyProfile.created_at.asc(),
+    ).all()
+
+    return jsonify({
+        "plan": subscription.plan,
+        "enabled": is_family_subscription(subscription),
+        "maxProfiles": 5,
+        "profiles": [family_profile_to_dict(profile) for profile in profiles],
+    })
+
+
+@app.route("/family/profiles", methods=["POST"])
+def create_family_profile():
+    user = g.current_user
+    subscription = get_or_create_subscription(user)
+
+    if not is_family_subscription(subscription):
+        return jsonify({
+            "error": "Profilurile pentru familie sunt disponibile in planul Family.",
+            "code": "family_plan_required",
+        }), 402
+
+    profile_count = FamilyProfile.query.filter_by(user_id=user.id).count()
+
+    if profile_count >= 5:
+        return jsonify({"error": "Planul Family permite pana la 5 profiluri."}), 400
+
+    data = request.get_json(silent=True) or {}
+    name = sanitize_family_profile_name(data.get("name"))
+
+    if not name:
+        return jsonify({"error": "Scrie un nume de profil de cel putin 2 caractere."}), 400
+
+    color = str(data.get("color") or "teal").strip().lower()[:30]
+    avatar = str(data.get("avatar") or "user").strip().lower()[:20]
+    profile = FamilyProfile(
+        user_id=user.id,
+        name=name,
+        color=color,
+        avatar=avatar,
+        is_primary=False,
+    )
+    db.session.add(profile)
+    db.session.commit()
+
+    return jsonify({"profile": family_profile_to_dict(profile)}), 201
+
+
+@app.route("/family/profiles/<int:profile_id>", methods=["PATCH"])
+def update_family_profile(profile_id):
+    user = g.current_user
+    subscription = get_or_create_subscription(user)
+
+    if not is_family_subscription(subscription):
+        return jsonify({
+            "error": "Profilurile pentru familie sunt disponibile in planul Family.",
+            "code": "family_plan_required",
+        }), 402
+
+    profile = FamilyProfile.query.filter_by(id=profile_id, user_id=user.id).first()
+
+    if not profile:
+        return jsonify({"error": "Profilul nu a fost gasit."}), 404
+
+    data = request.get_json(silent=True) or {}
+    name = sanitize_family_profile_name(data.get("name"))
+
+    if name:
+        profile.name = name
+
+    if data.get("color"):
+        profile.color = str(data.get("color")).strip().lower()[:30]
+
+    if data.get("avatar"):
+        profile.avatar = str(data.get("avatar")).strip().lower()[:20]
+
+    db.session.commit()
+    return jsonify({"profile": family_profile_to_dict(profile)})
+
+
+@app.route("/family/profiles/<int:profile_id>", methods=["DELETE"])
+def delete_family_profile(profile_id):
+    user = g.current_user
+    subscription = get_or_create_subscription(user)
+
+    if not is_family_subscription(subscription):
+        return jsonify({
+            "error": "Profilurile pentru familie sunt disponibile in planul Family.",
+            "code": "family_plan_required",
+        }), 402
+
+    profile = FamilyProfile.query.filter_by(id=profile_id, user_id=user.id).first()
+
+    if not profile:
+        return jsonify({"error": "Profilul nu a fost gasit."}), 404
+
+    if profile.is_primary:
+        return jsonify({"error": "Profilul principal nu poate fi sters."}), 400
+
+    db.session.delete(profile)
+    db.session.commit()
+    return jsonify({"deleted": True})
 
 
 @app.route("/billing/checkout", methods=["POST"])

@@ -226,6 +226,9 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] GitHub Actions si Dependabot configurate
 - [x] Domeniu `cealeg.shop` cumparat si conectat la Vercel
 - [x] UI premium: suprafete interactive, hover, tilt subtil si animatii controlate
+- [x] Profiluri Family v1: creare membru, selectare profil si preferinte separate
+- [x] Footer global profesional si header mai curat
+- [x] Accente UI rafinate: verde pastrat pentru brand/scor, cyan/amber pentru navigatie si actiuni
 
 ### De facut de tine
 
@@ -268,6 +271,8 @@ Render deployment:      OK
 Vercel deployment:      OK
 Custom domain:          https://www.cealeg.shop
 UI polish local:        lint OK, build OK
+Family profiles local:  API + UI OK
+Smoke local fara scrieri: 25/25
 ```
 
 Backendul public a fost verificat:

@@ -8,6 +8,7 @@ import { getImageUrl } from "../utils/getImageUrl";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+import { getActiveProfile, readProfilePreferences } from "../utils/profilePreferences";
 
 const criteriaLabels = {
   cheap: "mai ieftin",
@@ -530,6 +531,7 @@ function AlternativesPageContent() {
   const [billing, setBilling] = useState(null);
   const [alternativeSearch, setAlternativeSearch] = useState("");
   const [showMoreAlternatives, setShowMoreAlternatives] = useState(false);
+  const [profilePreferences, setProfilePreferences] = useState(null);
 
   const criteriaParam = searchParams.get("criteria") || "";
   const requestParam = searchParams.get("request") || "";
@@ -539,11 +541,16 @@ function AlternativesPageContent() {
 
   const selectedCriteriaIds = criteriaParam.split(",").filter(Boolean);
   const customRequest = decodeURIComponent(requestParam);
+  const profileCriteriaIds = Array.isArray(profilePreferences?.criteria)
+    ? profilePreferences.criteria
+    : [];
+  const profileRequest = profilePreferences?.request || "";
+  const preferenceRequest = [customRequest, profileRequest].filter(Boolean).join(" ");
 
-  const inferredCriteria = inferCriteriaFromRequest(customRequest);
+  const inferredCriteria = inferCriteriaFromRequest(preferenceRequest);
 
   const finalCriteriaIds = Array.from(
-    new Set([...selectedCriteriaIds, ...inferredCriteria])
+    new Set([...profileCriteriaIds, ...selectedCriteriaIds, ...inferredCriteria])
   );
 
   const selectedCriteria = finalCriteriaIds.map(
@@ -649,6 +656,12 @@ function AlternativesPageContent() {
       }
 
       const savedResult = localStorage.getItem("cealeg_last_result");
+      const activeProfile = getActiveProfile();
+      const savedPreferences = readProfilePreferences(activeProfile?.id);
+
+      if (savedPreferences) {
+        setProfilePreferences(savedPreferences);
+      }
 
       const parsedResult = savedResult ? JSON.parse(savedResult) : null;
 
@@ -663,7 +676,16 @@ function AlternativesPageContent() {
         .then((data) => setBilling(data))
         .catch(() => setBilling(null));
     });
-    // Produsele se încarcă o singură dată din rezultatul scanării curente.
+
+    function handleProfileChange(event) {
+      const profile = event.detail || getActiveProfile();
+      setProfilePreferences(readProfilePreferences(profile?.id));
+      setShowMoreAlternatives(false);
+    }
+
+    window.addEventListener("cealeg:profile-change", handleProfileChange);
+    return () => window.removeEventListener("cealeg:profile-change", handleProfileChange);
+    // Produsele se incarca o singura data din rezultatul scanarii curente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

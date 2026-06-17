@@ -20,12 +20,13 @@ import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
+import { FamilyProfiles } from "../components/FamilyProfiles";
 import { useLocale } from "../components/LocaleProvider";
 
 const ACTION_TONES = {
   emerald: {
-    card: "border-emerald-300/50 bg-emerald-400 text-black hover:bg-emerald-300",
-    icon: "bg-black/10 text-black",
+    card: "border-cyan-300/35 bg-white text-black hover:bg-cyan-100",
+    icon: "bg-cyan-200/40 text-black",
     description: "text-black/70",
   },
   cyan: {
@@ -202,7 +203,7 @@ export default function DashboardPage() {
       <AppHeader />
       <section className="ce-shell ce-page">
         <div className="mb-8 flex items-center justify-between gap-4">
-          <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white">
             <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
           </Link>
           <button onClick={logout} className="inline-flex items-center gap-2 rounded-lg border border-red-400/30 px-4 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-400/10">
@@ -211,7 +212,7 @@ export default function DashboardPage() {
         </div>
 
         <div className="ce-panel ce-lifted-shell ce-reveal p-6 md:p-8">
-          <p className="text-sm font-bold text-emerald-300">{pick("Spatiul tau", "Your space")}</p>
+          <p className="text-sm font-bold text-cyan-200">{pick("Spatiul tau", "Your space")}</p>
           <h1 className="mt-3 text-4xl font-bold md:text-5xl">{pick("Salut", "Hello")}, {user.name}</h1>
           <p className="mt-4 max-w-2xl text-gray-300">
             {pick("Continua cumparaturile sau scaneaza un produs nou pentru recomandari potrivite preferintelor tale.", "Continue shopping or scan a new product for recommendations matched to your preferences.")}
@@ -222,9 +223,9 @@ export default function DashboardPage() {
           <InlineNotice message={emailStatusNotice} tone="info" className="mt-6" />
 
           {billing?.usage && (
-            <div className="mt-6 flex flex-col gap-3 rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-5 text-emerald-100 sm:flex-row sm:items-center sm:justify-between">
+            <div className="ce-usage-banner mt-6 flex flex-col gap-3 rounded-lg border p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-bold uppercase tracking-wide text-emerald-300">{billing.usage.plan}</p>
+                <p className="text-sm font-bold uppercase tracking-wide text-cyan-200">{billing.usage.plan}</p>
                 <p className="mt-1 text-sm">
                   {billing.usage.isUnlimited
                     ? pick("Ai scanari nelimitate active.", "Unlimited scans are active.")
@@ -234,15 +235,19 @@ export default function DashboardPage() {
                       )}
                 </p>
               </div>
-              <Link href="/pricing" className="inline-flex justify-center rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-black text-black hover:bg-emerald-300">
+              <Link href="/pricing" className="inline-flex justify-center rounded-lg bg-white px-4 py-2.5 text-sm font-black text-black hover:bg-cyan-100">
                 {pick("Vezi planurile", "View plans")}
               </Link>
             </div>
           )}
 
+          <div className="mt-6">
+            <FamilyProfiles />
+          </div>
+
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              [pick("Produse in cos", "Cart products"), counts.cart, "ce-stat-emerald", "text-emerald-300"],
+              [pick("Produse in cos", "Cart products"), counts.cart, "ce-stat-cyan", "text-cyan-200"],
               [pick("Scanari salvate", "Saved scans"), counts.history, "ce-stat-cyan", "text-cyan-200"],
               [pick("Favorite", "Favorites"), counts.favorites, "ce-stat-violet", "text-violet-200"],
               [pick("Ultima scanare", "Latest scan"), lastScannedProduct, "ce-stat-amber", "text-yellow-200"],
@@ -256,7 +261,7 @@ export default function DashboardPage() {
 
           <div className="mt-9 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-black text-emerald-300">
+              <p className="text-sm font-black text-cyan-200">
                 {pick("Actiuni rapide", "Quick actions")}
               </p>
               <h2 className="mt-1 text-2xl font-black">
@@ -296,7 +301,7 @@ export default function DashboardPage() {
           </div>
 
           {user.isAdmin && (
-            <Link href="/admin" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200">
+            <Link href="/admin" className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white">
               <ShieldCheck size={16} /> {pick("Deschide administrarea", "Open administration")}
             </Link>
           )}

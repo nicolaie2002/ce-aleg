@@ -95,9 +95,9 @@ export default function Home() {
   ];
 
   const metrics = [
-    { label: pick("Scor", "Score"), value: "8.7/10", accent: "text-emerald-300" },
+    { label: pick("Scor", "Score"), value: "8.7/10", accent: "text-cyan-200" },
     { label: pick("Zahar", "Sugar"), value: "-42%", accent: "text-yellow-200" },
-    { label: pick("Proteina", "Protein"), value: "+6g", accent: "text-emerald-300" },
+    { label: pick("Proteina", "Protein"), value: "+6g", accent: "text-cyan-200" },
   ];
 
   return (
@@ -120,7 +120,7 @@ export default function Home() {
               </span>
               <span>
                 <span className="block text-lg font-black leading-none">Ce aleg?</span>
-                <span className="text-xs font-semibold text-emerald-200/80">
+                <span className="text-xs font-semibold text-cyan-100/80">
                   {pick("cumparaturi mai inteligente", "smarter shopping")}
                 </span>
               </span>
@@ -138,7 +138,7 @@ export default function Home() {
               <ThemeSwitcher />
               <Link
                 href={isAuthenticated ? "/dashboard" : "/login"}
-                className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-black hover:bg-emerald-200"
+                className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-black hover:bg-cyan-100"
               >
                 {isAuthenticated ? pick("Dashboard", "Dashboard") : pick("Intra in cont", "Sign in")}
                 <ArrowRight size={16} />
@@ -148,7 +148,7 @@ export default function Home() {
 
           <div className="grid gap-10 pt-12 lg:grid-cols-[minmax(0,1fr)_480px] lg:items-center xl:grid-cols-[minmax(0,1fr)_540px] xl:pt-16">
             <div className="ce-hero-copy ce-reveal ce-reveal-delay-1">
-              <div className="ce-hero-pill inline-flex items-center gap-2 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-4 py-2 text-sm font-black text-emerald-200">
+              <div className="ce-hero-pill inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
                 <BadgeCheck size={17} />
                 {pick("Verdict rapid inainte sa cumperi", "Quick verdict before you buy")}
               </div>
@@ -168,7 +168,7 @@ export default function Home() {
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
                   href={liveAssistantHref}
-                  className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-400 px-6 py-4 font-black text-black shadow-[0_0_30px_rgba(52,211,153,.25)] hover:-translate-y-0.5 hover:bg-emerald-300"
+                  className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-4 font-black text-black shadow-[0_0_30px_rgba(103,232,249,.18)] hover:-translate-y-0.5 hover:bg-cyan-100"
                 >
                   <Camera className="h-5 w-5" />
                   {pick("Deschide camera", "Open camera")}
@@ -191,26 +191,26 @@ export default function Home() {
 
               <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-gray-200">
                 <span className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-emerald-300" />
+                  <ShieldCheck className="h-4 w-4 text-cyan-200" />
                   {pick("Cont protejat", "Protected account")}
                 </span>
                 <span className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                  <CheckCircle2 className="h-4 w-4 text-cyan-200" />
                   {pick("Istoric si cos salvate", "Saved history and cart")}
                 </span>
                 <span className="flex items-center gap-2">
-                  <Zap className="h-4 w-4 text-emerald-300" />
+                  <Zap className="h-4 w-4 text-cyan-200" />
                   {pick("Recomandari rapide", "Fast recommendations")}
                 </span>
               </div>
             </div>
 
             <div className="relative ce-reveal ce-reveal-delay-2">
-              <div className="absolute -inset-5 rounded-[2rem] bg-emerald-400/12 blur-3xl" />
+              <div className="absolute -inset-5 rounded-[2rem] bg-cyan-300/12 blur-3xl" />
               <InteractiveSurface className="ce-home-demo-card ce-lifted-shell relative overflow-hidden rounded-[1.5rem] border border-white/12 bg-[#0d141b]/92 p-4 shadow-2xl backdrop-blur">
                 <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <div>
-                    <p className="text-xs font-black uppercase text-emerald-300">
+                    <p className="text-xs font-black uppercase text-cyan-200">
                       {pick("Analiza produs", "Product analysis")}
                     </p>
                     <h2 className="mt-1 text-2xl font-black">
@@ -231,12 +231,12 @@ export default function Home() {
                   ))}
                 </div>
 
-                <div className="rounded-xl border border-emerald-300/25 bg-emerald-300/10 p-4">
-                  <p className="flex items-center gap-2 font-black text-emerald-100">
+                <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 p-4">
+                  <p className="flex items-center gap-2 font-black text-cyan-100">
                     <Star size={18} className="text-yellow-200" />
                     {pick("Recomandare", "Recommendation")}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-50/85">
+                  <p className="mt-2 text-sm leading-6 text-cyan-50/85">
                     {pick(
                       "Bun pentru o gustare rapida. Daca vrei mai multa proteina, vezi alternativele recomandate.",
                       "Good for a quick snack. If you want more protein, check the recommended alternatives."
@@ -247,7 +247,7 @@ export default function Home() {
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <Link
                     href={barcodeHref}
-                    className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-3 font-black text-black hover:bg-emerald-300"
+                    className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100"
                   >
                     <ScanLine size={18} />
                     {pick("Testeaza acum", "Try now")}
@@ -273,9 +273,9 @@ export default function Home() {
             <InteractiveSurface
               as="article"
               key={title}
-              className={`ce-reveal ce-reveal-delay-${Math.min(index + 1, 3)} rounded-2xl border border-white/10 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-emerald-300/35 hover:bg-white/[0.055]`}
+              className={`ce-reveal ce-reveal-delay-${Math.min(index + 1, 3)} rounded-2xl border border-white/10 bg-white/[0.035] p-5 transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.055]`}
             >
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-emerald-400/12 text-emerald-300">
+              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-cyan-300/12 text-cyan-200">
                 <Icon size={22} />
               </span>
               <h2 className="mt-5 text-xl font-black">{title}</h2>
@@ -289,7 +289,7 @@ export default function Home() {
         <div className="ce-shell ce-page">
           <div className="grid gap-8 xl:grid-cols-[420px_minmax(0,1fr)] xl:items-start">
             <div>
-              <p className="text-sm font-black text-emerald-300">
+              <p className="text-sm font-black text-cyan-200">
                 {pick("Pentru cumparaturi reale", "For real shopping")}
               </p>
               <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
@@ -311,9 +311,9 @@ export default function Home() {
                 <InteractiveSurface
                   as="article"
                   key={label}
-                  className="rounded-2xl border border-white/10 bg-[#0d141b] p-5 shadow-xl transition hover:-translate-y-1 hover:border-emerald-300/35"
+                  className="rounded-2xl border border-white/10 bg-[#0d141b] p-5 shadow-xl transition hover:-translate-y-1 hover:border-cyan-300/35"
                 >
-                  <Icon className="h-6 w-6 text-emerald-300" />
+                  <Icon className="h-6 w-6 text-cyan-200" />
                   <h3 className="mt-5 text-lg font-black">{label}</h3>
                   <p className="mt-2 text-sm leading-6 text-gray-400">{detail}</p>
                 </InteractiveSurface>
@@ -321,9 +321,9 @@ export default function Home() {
             </div>
           </div>
 
-          <InteractiveSurface className="mt-10 rounded-2xl border border-emerald-300/25 bg-[linear-gradient(135deg,rgba(16,185,129,.16),rgba(250,204,21,.09),rgba(255,255,255,.035))] p-5 md:flex md:items-center md:justify-between md:gap-6 md:p-7">
+          <InteractiveSurface className="mt-10 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(135deg,rgba(103,232,249,.14),rgba(250,204,21,.09),rgba(255,255,255,.035))] p-5 md:flex md:items-center md:justify-between md:gap-6 md:p-7">
             <div>
-              <p className="text-sm font-black text-emerald-200">
+              <p className="text-sm font-black text-cyan-100">
                 {pick("Gata de testat", "Ready to test")}
               </p>
               <h2 className="mt-2 text-2xl font-black">
@@ -336,7 +336,7 @@ export default function Home() {
             <div className="mt-5 flex flex-col gap-3 sm:flex-row md:mt-0">
               <Link
                 href={isAuthenticated ? "/dashboard" : "/register"}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-emerald-200"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
               >
                 {isAuthenticated ? pick("Mergi la dashboard", "Go to dashboard") : pick("Creeaza cont", "Create account")}
                 <ArrowRight size={18} />

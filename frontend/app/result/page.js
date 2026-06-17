@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
+import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
@@ -118,10 +119,10 @@ function ResultPageContent() {
         }
       }
 
-      const savedPreferences = localStorage.getItem("cealeg_preferences");
+      const activeProfile = getActiveProfile();
+      const parsedPreferences = readProfilePreferences(activeProfile?.id);
 
-      if (savedPreferences) {
-        const parsedPreferences = JSON.parse(savedPreferences);
+      if (parsedPreferences) {
         setSelectedCriteria(parsedPreferences.criteria || []);
         setCustomRequest(parsedPreferences.request || "");
       }
@@ -133,13 +134,13 @@ function ResultPageContent() {
   useEffect(() => {
     if (!preferencesReady) return;
 
-    localStorage.setItem(
-      "cealeg_preferences",
-      JSON.stringify({
-        criteria: selectedCriteria,
-        request: customRequest,
-      })
-    );
+    const activeProfile = getActiveProfile();
+    saveProfilePreferences(activeProfile?.id, {
+      profileId: activeProfile?.id || null,
+      profileName: activeProfile?.name || "",
+      criteria: selectedCriteria,
+      request: customRequest,
+    });
   }, [selectedCriteria, customRequest, preferencesReady]);
 
   function toggleCriteria(id) {

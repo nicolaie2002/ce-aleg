@@ -6,6 +6,7 @@ from app import app, db
 from models import (
     CartItem,
     Favorite,
+    FamilyProfile,
     PriceObservation,
     Product,
     ProductSubmission,
@@ -25,6 +26,7 @@ MODELS = [
     (ProductSubmission, "product_submissions"),
     (ScanHistory, "scan_history"),
     (Favorite, "favorites"),
+    (FamilyProfile, "family_profiles"),
     (CartItem, "cart_items"),
     (PriceObservation, "price_observations"),
     (SearchEvent, "search_events"),

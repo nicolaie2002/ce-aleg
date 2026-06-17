@@ -18,6 +18,7 @@ import {
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
+import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
 
 function productToResult(product) {
   return {
@@ -152,10 +153,10 @@ export default function LiveAssistantPage() {
       }
 
       setUser(JSON.parse(savedUser));
-      const savedPreferences = localStorage.getItem("cealeg_preferences");
+      const activeProfile = getActiveProfile();
+      const parsedPreferences = readProfilePreferences(activeProfile?.id);
 
-      if (savedPreferences) {
-        const parsedPreferences = JSON.parse(savedPreferences);
+      if (parsedPreferences) {
         const criteria = Array.isArray(parsedPreferences.criteria)
           ? parsedPreferences.criteria
           : [];
@@ -378,8 +379,8 @@ export default function LiveAssistantPage() {
       return;
     }
 
-    const savedPreferences = localStorage.getItem("cealeg_preferences");
-    const parsedPreferences = savedPreferences ? JSON.parse(savedPreferences) : {};
+    const activeProfile = getActiveProfile();
+    const parsedPreferences = readProfilePreferences(activeProfile?.id) || {};
     const existingCriteria = Array.isArray(parsedPreferences.criteria)
       ? parsedPreferences.criteria
       : [];
@@ -391,13 +392,12 @@ export default function LiveAssistantPage() {
       ? `${previousRequest}; ${cleanText}`
       : cleanText;
 
-    localStorage.setItem(
-      "cealeg_preferences",
-      JSON.stringify({
-        criteria: nextCriteria,
-        request: nextRequest.slice(0, 500),
-      })
-    );
+    saveProfilePreferences(activeProfile?.id, {
+      profileId: activeProfile?.id || null,
+      profileName: activeProfile?.name || "",
+      criteria: nextCriteria,
+      request: nextRequest.slice(0, 500),
+    });
     setTranscript(cleanText);
     setManualPreference("");
     setPreferenceSummary(nextRequest.slice(0, 500));
@@ -518,7 +518,7 @@ export default function LiveAssistantPage() {
       <section className="ce-shell ce-page">
         <div className="flex flex-col gap-4 border-b border-white/10 pb-7 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="flex items-center gap-2 text-sm font-bold text-emerald-300">
+            <p className="flex items-center gap-2 text-sm font-bold text-cyan-200">
               <Sparkles size={16} /> {pick("Asistent live la raft", "Live shelf assistant")}
             </p>
             <h1 className="mt-3 max-w-3xl text-4xl font-black md:text-5xl">
@@ -536,26 +536,26 @@ export default function LiveAssistantPage() {
               <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
               {!isCameraOn && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-gray-300">
-                  <Camera className="text-emerald-300" size={36} />
+                  <Camera className="text-cyan-200" size={36} />
                   <p>{pick("Pornește camera pentru a începe.", "Start the camera to begin.")}</p>
                 </div>
               )}
               {isAnalyzing && (
-                <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-lg border border-emerald-300/30 bg-black/75 px-4 py-3 text-sm text-emerald-200">
+                <div className="absolute inset-x-4 bottom-4 flex items-center gap-2 rounded-lg border border-cyan-300/30 bg-black/75 px-4 py-3 text-sm text-cyan-100">
                   <RefreshCw className="animate-spin" size={16} /> {pick("Analizez produsul din cadru...", "Analyzing the product in frame...")}
                 </div>
               )}
             </div>
             <canvas ref={canvasRef} className="hidden" />
             <div className="flex flex-wrap gap-3 border-t border-white/10 p-4">
-              <button onClick={() => (isCameraOn ? stopCamera() : startCamera())} className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-4 py-3 text-sm font-black text-black hover:bg-emerald-300">
+              <button onClick={() => (isCameraOn ? stopCamera() : startCamera())} className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black text-black hover:bg-cyan-100">
                 <CameraIcon size={17} /> {isCameraOn ? pick("Oprește camera", "Stop camera") : pick("Pornește camera", "Start camera")}
               </button>
               <button onClick={switchCamera} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-bold hover:bg-white/10">
                 <RefreshCw size={17} /> {pick("Schimbă camera", "Switch camera")}
               </button>
               {cloudVision && (
-                <button onClick={analyzeFrame} className="inline-flex items-center gap-2 rounded-lg border border-emerald-300/40 px-4 py-3 text-sm font-bold text-emerald-200 hover:bg-emerald-400/10">
+                <button onClick={analyzeFrame} className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/40 px-4 py-3 text-sm font-bold text-cyan-100 hover:bg-cyan-300/10">
                   <ScanLine size={17} /> {pick("Analizează acum", "Analyze now")}
                 </button>
               )}
@@ -564,7 +564,7 @@ export default function LiveAssistantPage() {
 
           <aside className="space-y-4">
             <section className="rounded-lg border border-white/10 bg-[#11171d] p-5">
-              <p className="text-xs font-bold uppercase text-emerald-300">{pick("Status scanare", "Scan status")}</p>
+              <p className="text-xs font-bold uppercase text-cyan-200">{pick("Status scanare", "Scan status")}</p>
               <p className="mt-3 leading-7 text-gray-100">{message}</p>
             </section>
 
@@ -577,11 +577,11 @@ export default function LiveAssistantPage() {
                 value={manualPreference}
                 onChange={(event) => setManualPreference(event.target.value)}
                 placeholder={pick("Ex: vreau o varianta mai ieftina si fara mult zahar", "Example: I want a cheaper option with less sugar")}
-                className="mt-4 min-h-24 w-full rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-emerald-300"
+                className="mt-4 min-h-24 w-full rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
               />
               <div className={`mt-3 grid gap-2 ${voiceSupported ? "sm:grid-cols-2" : ""}`}>
                 {voiceSupported && (
-                  <button onClick={listen} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-300/35 px-4 py-3 font-bold text-emerald-200 hover:bg-emerald-400/10">
+                  <button onClick={listen} className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-cyan-300/35 px-4 py-3 font-bold text-cyan-100 hover:bg-cyan-300/10">
                     {isListening ? <MicOff size={18} /> : <Mic size={18} />}
                     {isListening ? pick("Te ascult...", "Listening...") : pick("Spune preferinta", "Speak preference")}
                   </button>
@@ -589,7 +589,7 @@ export default function LiveAssistantPage() {
                 <button
                   type="button"
                   onClick={() => savePreferenceText(manualPreference)}
-                  className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-400 px-4 py-3 font-black text-black hover:bg-emerald-300"
+                  className="inline-flex w-full items-center justify-center rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100"
                 >
                   {pick("Salveaza preferinta", "Save preference")}
                 </button>
@@ -604,9 +604,9 @@ export default function LiveAssistantPage() {
             )}
 
             {preferenceSummary && (
-              <section className="rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-5 text-sm leading-6 text-emerald-100">
-                <p className="font-bold text-emerald-200">{pick("Preferințe active", "Active preferences")}</p>
-                <p className="mt-2 text-emerald-50/90">{preferenceSummary}</p>
+              <section className="rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-5 text-sm leading-6 text-cyan-100">
+                <p className="font-bold text-cyan-100">{pick("Preferințe active", "Active preferences")}</p>
+                <p className="mt-2 text-cyan-50/90">{preferenceSummary}</p>
               </section>
             )}
 
@@ -623,7 +623,7 @@ export default function LiveAssistantPage() {
                 </p>
                 <Link
                   href="/pricing"
-                  className="mt-4 inline-flex rounded-lg bg-emerald-400 px-4 py-2.5 font-black text-black hover:bg-emerald-300"
+                  className="mt-4 inline-flex rounded-lg bg-white px-4 py-2.5 font-black text-black hover:bg-cyan-100"
                 >
                   {pick("Vezi planurile", "View plans")}
                 </Link>
@@ -631,17 +631,17 @@ export default function LiveAssistantPage() {
             )}
 
             {candidate && (
-              <section className="rounded-lg border border-emerald-300/30 bg-emerald-400/10 p-5">
-                <p className="text-xs font-bold uppercase text-emerald-200">{pick("Produs posibil", "Possible product")}</p>
+              <section className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 p-5">
+                <p className="text-xs font-bold uppercase text-cyan-100">{pick("Produs posibil", "Possible product")}</p>
                 <h2 className="mt-2 text-xl font-black">{candidate.product?.name || candidate.name}</h2>
                 {candidate.brand && <p className="mt-1 text-sm text-gray-300">{candidate.brand}</p>}
                 {candidate.product && (
-                  <button onClick={() => openProduct(candidate.product)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-3 font-black text-black hover:bg-emerald-300">
+                  <button onClick={() => openProduct(candidate.product)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100">
                     {pick("Vezi analiza", "View analysis")} <ArrowRight size={17} />
                   </button>
                 )}
                 {!candidate.product && candidate.barcode && (
-                  <button onClick={() => lookupBarcode(candidate.barcode)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-400 px-4 py-3 font-black text-black hover:bg-emerald-300">
+                  <button onClick={() => lookupBarcode(candidate.barcode)} className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100">
                     {pick("Confirmă după cod", "Confirm by barcode")} <Barcode size={17} />
                   </button>
                 )}

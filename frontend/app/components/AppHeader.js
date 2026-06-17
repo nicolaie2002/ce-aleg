@@ -58,7 +58,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-[#080d12]/88 shadow-[0_18px_55px_rgba(0,0,0,0.18)] backdrop-blur-xl">
+      <header className="ce-header sticky top-0 z-40 border-b border-white/10 shadow-[0_18px_55px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <div className="ce-shell flex min-h-16 items-center justify-between gap-3 py-3">
           <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-400 text-black shadow-[0_0_24px_rgba(52,211,153,0.22)]">
@@ -68,7 +68,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
               <span className="block truncate text-base font-black text-white">
                 Ce aleg?
               </span>
-              <span className="hidden items-center gap-1 text-xs text-emerald-200/80 sm:flex">
+              <span className="hidden items-center gap-1 text-xs text-cyan-100/75 sm:flex">
                 <Sparkles size={12} />
                 {pick("cumparaturi mai inteligente", "smarter shopping")}
               </span>
@@ -107,7 +107,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
             {actionHref && (
               <Link
                 href={actionHref}
-                className="hidden shrink-0 items-center gap-2 rounded-lg bg-emerald-400 px-4 py-2.5 text-sm font-bold text-black transition hover:-translate-y-0.5 hover:bg-emerald-300 xl:inline-flex"
+                className="hidden shrink-0 items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100 xl:inline-flex"
               >
                 <ScanLine size={17} />
                 {actionLabel || pick("Scaneaza", "Scan")}
@@ -128,7 +128,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
             aria-current={isActive(href) ? "page" : undefined}
             className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-bold ${
               isActive(href)
-                ? "bg-emerald-400 text-black"
+                ? "bg-cyan-200 text-black"
                 : "text-gray-300 hover:bg-white/10 hover:text-white"
             }`}
           >
