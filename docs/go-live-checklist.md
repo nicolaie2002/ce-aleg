@@ -197,6 +197,7 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 - [x] Produsele Stripe de test sunt valide
 - [x] Endpointul Stripe de test a fost creat pentru backendul Render
 - [x] Brevo integrat
+- [x] Brevo trimite emailuri din productie
 - [x] Pagini Privacy si Terms
 - [x] Resetare parola si stergere cont prin email
 - [x] Rate limiting, limite payload si security headers
@@ -207,8 +208,9 @@ Stripe webhook=https://api.domeniu.ro/billing/stripe/webhook
 
 ### De facut de tine
 
-- [ ] Genereaza o cheie Brevo noua si actualizeaza `BREVO_API_KEY`
-- [ ] Verifica expeditorul `EMAIL_FROM` in Brevo
+- [x] Genereaza o cheie Brevo noua si actualizeaza `BREVO_API_KEY`
+- [x] Verifica expeditorul `EMAIL_FROM` in Brevo
+- [x] Autorizeaza IP-ul Render in Brevo
 - [ ] Copiaza noul `STRIPE_WEBHOOK_SECRET` din `backend/.env` in Render
 - [x] Proiectul Vercel foloseste root `frontend`
 - [x] Proxy-ul public Vercel -> Render raspunde corect
@@ -239,7 +241,8 @@ Supabase Storage:       OK
 Stripe test prices:     OK
 Frontend production:   OK
 Smoke tests:            33/33
-Brevo API:              EROARE 401 - cheia trebuie regenerata
+Brevo API:              OK
+Brevo email productie:  OK
 Render deployment:      OK
 Vercel deployment:      OK
 Custom domain:          NEFACUT
@@ -254,7 +257,14 @@ Backendul public a fost verificat:
 Security headers:       OK
 Stripe webhook:         asteapta secretul in Render
 CORS frontend:          https://ce-aleg.vercel.app
+Email productie:        OK
 ```
+
+Brevo a blocat initial serverul Render pentru IP neautorizat. IP-ul folosit la
+test a fost adaugat in Brevo -> Security -> Authorised IPs. Pe Render Free,
+IP-ul de iesire se poate schimba; daca emailurile se opresc din nou, verifica
+logurile Render si autorizeaza noul IP sau dezactiveaza restrictia de IP in
+Brevo.
 
 Atentie: verificarea din 14 iunie 2026 a aratat ca instanta Render nu avea
 `DATABASE_URL` configurat si folosea SQLite temporar. Codul refuza acum sa
