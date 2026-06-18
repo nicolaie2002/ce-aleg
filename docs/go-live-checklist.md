@@ -102,6 +102,8 @@ STRIPE_PRO_PRICE_ID=<price id lunar Pro>
 STRIPE_PRO_YEARLY_PRICE_ID=<price id anual Pro>
 STRIPE_FAMILY_PRICE_ID=<price id lunar Family>
 STRIPE_FAMILY_YEARLY_PRICE_ID=<price id anual Family>
+STRIPE_AUTOMATIC_TAX=false
+STRIPE_TAX_ID_COLLECTION=false
 ```
 
 Render genereaza automat `AUTH_SECRET`. Dupa deploy verifica:
@@ -146,7 +148,7 @@ sincronizeaza la urmatorul deploy.
 ## 5. Stripe
 
 1. Cat timp testezi, pastreaza cheile Stripe test/sandbox.
-2. In Stripe creeaza pentru fiecare produs doua preturi recurente:
+2. In Stripe creeaza produse si preturi recurente, nu Payment Links manuale:
    - Pro lunar: `19.99 RON / month`
    - Pro anual: `149 RON / year`
    - Family lunar: `29.99 RON / month`
@@ -156,21 +158,46 @@ sincronizeaza la urmatorul deploy.
    - `STRIPE_PRO_YEARLY_PRICE_ID`
    - `STRIPE_FAMILY_PRICE_ID`
    - `STRIPE_FAMILY_YEARLY_PRICE_ID`
-4. Stripe -> Developers -> Webhooks -> `Add endpoint`.
-5. Endpoint:
+4. Lasa momentan:
+
+```text
+STRIPE_AUTOMATIC_TAX=false
+STRIPE_TAX_ID_COLLECTION=false
+```
+
+Activeaza-le doar dupa ce ai configurat taxele in Stripe si stii exact cum vrei
+sa colectezi datele de facturare.
+5. Stripe -> Developers -> Webhooks -> `Add endpoint`.
+6. Endpoint:
 
 ```text
 https://cealeg-api.onrender.com/billing/stripe/webhook
 ```
 
-6. Copiaza signing secret-ul `whsec_...` in Render ca
+Evenimente recomandate pentru endpoint:
+
+```text
+checkout.session.completed
+customer.subscription.created
+customer.subscription.updated
+customer.subscription.deleted
+customer.subscription.paused
+customer.subscription.resumed
+invoice.paid
+invoice.payment_succeeded
+invoice.payment_failed
+invoice.payment_action_required
+```
+
+7. Copiaza signing secret-ul `whsec_...` in Render ca
    `STRIPE_WEBHOOK_SECRET`.
-7. Testeaza Checkout cu `4242 4242 4242 4242`, o data viitoare si orice CVC.
-8. Treci pe chei live numai dupa ce firma, preturile si domeniul sunt gata.
+8. Testeaza Checkout cu `4242 4242 4242 4242`, o data viitoare si orice CVC.
+9. Treci pe chei live numai dupa ce firma, preturile si domeniul sunt gata.
 
 Nota: aplicatia foloseste Stripe Checkout prin API, nu Payment Links. In Stripe
-Dashboard, daca faci manual Payment Link, produsul trebuie pus ca line item
-principal cu pret recurent, nu la `Recommended products`.
+Dashboard nu trebuie sa creezi Payment Link pentru site. Preturile `price_...`
+din produse sunt suficiente; backendul creeaza sesiunea Checkout pentru
+utilizatorul autentificat si webhookul actualizeaza automat planul.
 
 ## 6. Brevo
 

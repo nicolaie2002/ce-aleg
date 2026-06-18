@@ -1214,6 +1214,30 @@ def get_subscription_line_price_id(stripe_subscription):
     return ((items[0].get("price") or {}).get("id") or "").strip()
 
 
+def sync_stripe_subscription_by_id(subscription_id):
+    if not subscription_id or not configure_stripe():
+        return None
+
+    try:
+        stripe_subscription = stripe.Subscription.retrieve(subscription_id)
+    except Exception as error:
+        app.logger.warning("Stripe subscription retrieve failed: %s", error)
+        return None
+
+    return sync_stripe_subscription(stripe_subscription)
+
+
+def get_invoice_subscription_id(stripe_invoice):
+    subscription_id = stripe_invoice.get("subscription")
+
+    if subscription_id:
+        return subscription_id
+
+    parent = stripe_invoice.get("parent") or {}
+    subscription_details = parent.get("subscription_details") or {}
+    return subscription_details.get("subscription")
+
+
 def find_user_for_stripe_subscription(stripe_subscription):
     metadata = stripe_subscription.get("metadata") or {}
     user_id = metadata.get("user_id")
@@ -1311,13 +1335,9 @@ def handle_stripe_checkout_completed(session):
         return None
 
     if subscription_id and configure_stripe():
-        try:
-            stripe_subscription = stripe.Subscription.retrieve(subscription_id)
-            synced_subscription = sync_stripe_subscription(stripe_subscription)
-            if synced_subscription:
-                return synced_subscription
-        except Exception as error:
-            app.logger.warning("Stripe subscription retrieve failed: %s", error)
+        synced_subscription = sync_stripe_subscription_by_id(subscription_id)
+        if synced_subscription:
+            return synced_subscription
 
     return update_local_subscription_from_stripe(
         user=user,
@@ -3784,7 +3804,11 @@ def start_checkout():
             "user_id": str(user.id),
             "plan": plan,
             "billing_interval": billing_interval,
+            "price_id": price_id,
+            "price_env": price_env_name,
+            "app": "ce-aleg",
         }
+        automatic_tax_enabled = env_flag("STRIPE_AUTOMATIC_TAX", False)
         checkout_params = {
             "mode": "subscription",
             "line_items": [{"price": price_id, "quantity": 1}],
@@ -3794,6 +3818,12 @@ def start_checkout():
             "metadata": metadata,
             "subscription_data": {"metadata": metadata},
             "allow_promotion_codes": True,
+            "locale": "auto",
+            "billing_address_collection": "auto",
+            "automatic_tax": {"enabled": automatic_tax_enabled},
+            "tax_id_collection": {
+                "enabled": env_flag("STRIPE_TAX_ID_COLLECTION", False),
+            },
         }
 
         if (
@@ -3801,6 +3831,10 @@ def start_checkout():
             and subscription.provider_customer_id
         ):
             checkout_params["customer"] = subscription.provider_customer_id
+            checkout_params["customer_update"] = {
+                "address": "auto",
+                "name": "auto",
+            }
         else:
             checkout_params["customer_email"] = user.email
 
@@ -3897,10 +3931,22 @@ def stripe_webhook():
 
     if event_type == "checkout.session.completed":
         handle_stripe_checkout_completed(event_object)
-    elif event_type == "customer.subscription.updated":
-        sync_stripe_subscription(event_object)
+    elif event_type in {
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.paused",
+        "customer.subscription.resumed",
+    }:
+        sync_stripe_subscription_by_id(event_object.get("id"))
     elif event_type == "customer.subscription.deleted":
         sync_stripe_subscription(event_object, deleted=True)
+    elif event_type in {
+        "invoice.paid",
+        "invoice.payment_succeeded",
+        "invoice.payment_failed",
+        "invoice.payment_action_required",
+    }:
+        sync_stripe_subscription_by_id(get_invoice_subscription_id(event_object))
 
     return jsonify({"received": True})
 
