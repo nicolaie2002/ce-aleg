@@ -206,15 +206,16 @@ export default function PricingPage() {
   const canManageBilling =
     subscription?.provider === "stripe" && subscription?.hasCustomer;
 
-  function loadBillingStatus() {
-    return fetch(`${API_URL}/billing/status`)
+  function loadBillingStatus({ syncStripe = false } = {}) {
+    const syncQuery = syncStripe ? "?sync=stripe" : "";
+    return fetch(`${API_URL}/billing/status${syncQuery}`)
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => setBilling(data))
       .catch(() => setBilling(null));
   }
 
   useEffect(() => {
-    loadBillingStatus();
+    loadBillingStatus({ syncStripe: true });
   }, []);
 
   useEffect(() => {
@@ -244,7 +245,7 @@ export default function PricingPage() {
         setMessageTone(nextTone);
         setMessage(nextMessage);
         if (checkoutStatus === "success") {
-          loadBillingStatus();
+          loadBillingStatus({ syncStripe: true });
         }
       });
     }
@@ -276,6 +277,19 @@ export default function PricingPage() {
 
       if (data.checkoutUrl) {
         window.location.assign(data.checkoutUrl);
+        return;
+      }
+
+      if (data.updated) {
+        setMessageTone("success");
+        setMessage(
+          data.message ||
+            pick(
+              "Abonamentul a fost actualizat.",
+              "Your subscription was updated."
+            )
+        );
+        loadBillingStatus({ syncStripe: true });
         return;
       }
 

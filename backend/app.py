@@ -356,6 +356,7 @@ STRIPE_PRICE_ENV_BY_PLAN = {
         "yearly": "STRIPE_FAMILY_YEARLY_PRICE_ID",
     },
 }
+PLAN_RANK = {"free": 0, "pro": 1, "family": 2}
 
 
 def get_auth_serializer():
@@ -1214,6 +1215,15 @@ def get_subscription_line_price_id(stripe_subscription):
     return ((items[0].get("price") or {}).get("id") or "").strip()
 
 
+def get_subscription_line_item_id(stripe_subscription):
+    items = (stripe_subscription.get("items") or {}).get("data") or []
+
+    if not items:
+        return None
+
+    return (items[0].get("id") or "").strip()
+
+
 def sync_stripe_subscription_by_id(subscription_id):
     if not subscription_id or not configure_stripe():
         return None
@@ -1236,6 +1246,108 @@ def get_invoice_subscription_id(stripe_invoice):
     parent = stripe_invoice.get("parent") or {}
     subscription_details = parent.get("subscription_details") or {}
     return subscription_details.get("subscription")
+
+
+def get_subscription_sync_rank(stripe_subscription):
+    price_id = get_subscription_line_price_id(stripe_subscription)
+    plan = get_plan_for_stripe_price(price_id)
+    status = stripe_subscription_status_to_local(stripe_subscription.get("status"))
+
+    if plan not in {"pro", "family"} or status != "active":
+        return None
+
+    return (
+        PLAN_RANK.get(plan, 0),
+        int(stripe_subscription.get("current_period_end") or 0),
+        int(stripe_subscription.get("created") or 0),
+    )
+
+
+def sync_best_stripe_subscription_for_user(user):
+    subscription = get_or_create_subscription(user)
+
+    if (
+        subscription.provider != "stripe"
+        or not subscription.provider_customer_id
+        or not configure_stripe()
+    ):
+        return subscription
+
+    try:
+        stripe_subscriptions = stripe.Subscription.list(
+            customer=subscription.provider_customer_id,
+            status="all",
+            limit=20,
+        )
+    except Exception as error:
+        app.logger.warning("Stripe customer subscription sync failed: %s", error)
+        return subscription
+
+    candidates = []
+
+    for stripe_subscription in stripe_subscriptions.get("data") or []:
+        rank = get_subscription_sync_rank(stripe_subscription)
+
+        if rank:
+            candidates.append((rank, stripe_subscription))
+
+    if not candidates:
+        return subscription
+
+    _rank, best_subscription = max(candidates, key=lambda candidate: candidate[0])
+    return sync_stripe_subscription(best_subscription) or subscription
+
+
+def update_existing_stripe_subscription_price(
+    local_subscription,
+    plan,
+    billing_interval,
+    price_id,
+    metadata,
+):
+    if (
+        local_subscription.provider != "stripe"
+        or not local_subscription.provider_subscription_id
+        or not configure_stripe()
+    ):
+        return None
+
+    try:
+        stripe_subscription = stripe.Subscription.retrieve(
+            local_subscription.provider_subscription_id
+        )
+        line_item_id = get_subscription_line_item_id(stripe_subscription)
+
+        if not line_item_id:
+            return None
+
+        updated_subscription = stripe.Subscription.modify(
+            local_subscription.provider_subscription_id,
+            cancel_at_period_end=False,
+            items=[{"id": line_item_id, "price": price_id}],
+            metadata=metadata,
+            proration_behavior=os.environ.get(
+                "STRIPE_PRORATION_BEHAVIOR",
+                "create_prorations",
+            ).strip()
+            or "create_prorations",
+        )
+    except Exception as error:
+        app.logger.warning("Stripe subscription update failed: %s", error)
+        return None
+
+    synced_subscription = sync_stripe_subscription(updated_subscription)
+
+    if synced_subscription:
+        return {
+            "mode": "stripe",
+            "plan": plan,
+            "billingInterval": billing_interval,
+            "updated": True,
+            "message": "Abonamentul a fost actualizat.",
+        }
+
+    return None
 
 
 def find_user_for_stripe_subscription(stripe_subscription):
@@ -1277,7 +1389,21 @@ def sync_stripe_subscription(stripe_subscription, deleted=False):
         )
         return None
 
+    local_subscription = get_or_create_subscription(user)
+    incoming_subscription_id = stripe_subscription.get("id")
+    is_current_subscription = (
+        not local_subscription.provider_subscription_id
+        or incoming_subscription_id == local_subscription.provider_subscription_id
+    )
+
     if deleted:
+        if not is_current_subscription:
+            app.logger.info(
+                "Stripe subscription deletion ignored for inactive local subscription %s",
+                incoming_subscription_id,
+            )
+            return None
+
         return update_local_subscription_from_stripe(
             user=user,
             plan="free",
@@ -1297,6 +1423,18 @@ def sync_stripe_subscription(stripe_subscription, deleted=False):
             "Stripe subscription event ignored: unknown price %s for subscription %s",
             price_id,
             stripe_subscription.get("id"),
+        )
+        return None
+
+    if (
+        not is_current_subscription
+        and local_subscription.status == "active"
+        and PLAN_RANK.get(plan, 0) < PLAN_RANK.get(local_subscription.plan, 0)
+    ):
+        app.logger.info(
+            "Stripe subscription event ignored: older lower plan %s cannot replace current %s",
+            plan,
+            local_subscription.plan,
         )
         return None
 
@@ -3651,7 +3789,11 @@ def get_users():
 @app.route("/billing/status", methods=["GET"])
 def get_billing_status():
     user = g.current_user
-    subscription = get_or_create_subscription(user)
+    if request.args.get("sync") == "stripe":
+        subscription = sync_best_stripe_subscription_for_user(user)
+    else:
+        subscription = get_or_create_subscription(user)
+
     return jsonify({
         "user": user_to_dict(user),
         "usage": get_usage_summary(user),
@@ -3808,6 +3950,17 @@ def start_checkout():
             "price_env": price_env_name,
             "app": "ce-aleg",
         }
+        existing_subscription_update = update_existing_stripe_subscription_price(
+            subscription,
+            plan,
+            billing_interval,
+            price_id,
+            metadata,
+        )
+
+        if existing_subscription_update:
+            return jsonify(existing_subscription_update)
+
         automatic_tax_enabled = env_flag("STRIPE_AUTOMATIC_TAX", False)
         checkout_params = {
             "mode": "subscription",
