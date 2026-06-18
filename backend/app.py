@@ -155,14 +155,68 @@ def read_secret_env(name, default=""):
     return value
 
 app = Flask(__name__)
-frontend_origins = [
-    origin.strip()
+
+
+def normalize_origin_value(origin):
+    raw_origin = str(origin or "").strip().rstrip("/")
+
+    if not raw_origin:
+        return ""
+
+    parsed = urlparse(raw_origin)
+
+    if not parsed.scheme or not parsed.netloc:
+        return ""
+
+    return f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+
+
+def origin_variants(origin):
+    normalized_origin = normalize_origin_value(origin)
+
+    if not normalized_origin:
+        return []
+
+    parsed = urlparse(normalized_origin)
+    host = parsed.hostname or ""
+
+    if host in {"localhost", "127.0.0.1"} or not host:
+        return [normalized_origin]
+
+    if host.startswith("www."):
+        alternate_host = host[4:]
+    elif host.count(".") == 1:
+        alternate_host = f"www.{host}"
+    else:
+        return [normalized_origin]
+
+    if parsed.port:
+        alternate_netloc = f"{alternate_host}:{parsed.port}"
+    else:
+        alternate_netloc = alternate_host
+
+    return [
+        normalized_origin,
+        f"{parsed.scheme}://{alternate_netloc}".rstrip("/"),
+    ]
+
+
+def get_frontend_origins():
+    configured_origins = []
+
     for origin in os.environ.get(
         "FRONTEND_ORIGINS",
         "http://localhost:3000,http://127.0.0.1:3000",
-    ).split(",")
-    if origin.strip()
-]
+    ).split(","):
+        configured_origins.extend(origin_variants(origin))
+
+    configured_origins.extend(origin_variants(os.environ.get("FRONTEND_PUBLIC_URL", "")))
+    origins = [origin for origin in configured_origins if origin]
+
+    return list(dict.fromkeys(origins))
+
+
+frontend_origins = get_frontend_origins()
 CORS(app, resources={r"/*": {"origins": frontend_origins}})
 
 database_url = os.environ.get("DATABASE_URL", "").strip()
@@ -878,7 +932,7 @@ def is_trusted_browser_origin(origin):
 
     parsed = urlparse(origin)
     origin_host = parsed.hostname or ""
-    normalized_origin = f"{parsed.scheme}://{parsed.netloc}".rstrip("/")
+    normalized_origin = normalize_origin_value(origin)
 
     if normalized_origin in frontend_origins:
         return True

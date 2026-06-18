@@ -29,9 +29,9 @@ services:
       - key: PAYMENT_PROVIDER
         value: stripe
       - key: FRONTEND_PUBLIC_URL
-        value: https://ce-aleg.vercel.app
+        value: https://www.cealeg.shop
       - key: FRONTEND_ORIGINS
-        value: https://ce-aleg.vercel.app
+        value: https://www.cealeg.shop,https://cealeg.shop,https://ce-aleg.vercel.app
       - key: SUPABASE_PRODUCT_IMAGES_BUCKET
         value: product-images
       - key: SUPABASE_SUBMISSIONS_BUCKET

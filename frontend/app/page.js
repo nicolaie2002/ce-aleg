@@ -106,9 +106,6 @@ export default function Home() {
       <section className="ce-home-hero relative overflow-hidden border-b border-white/10">
         <CarbonVaporBackground variant="hero" />
         <div className="ce-hero-carbon-shell absolute inset-0" />
-        <div className="ce-hero-vapor-wordmark absolute inset-0" aria-hidden="true">
-          <span>Ce aleg?</span>
-        </div>
 
         <div className="ce-shell relative z-10 pb-14 pt-5 md:pb-20 md:pt-7">
           <nav className="ce-glass-nav ce-reveal flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3 backdrop-blur-xl">
@@ -117,8 +114,8 @@ export default function Home() {
                 <ShoppingCart size={22} strokeWidth={2.5} />
               </span>
               <span>
-                <span className="block text-lg font-black leading-none">Ce aleg?</span>
-                <span className="text-xs font-semibold text-cyan-100/80">
+                <span className="block text-lg font-black leading-none text-white">Ce aleg?</span>
+                <span className="text-xs font-semibold text-cyan-50/85">
                   {pick("cumparaturi mai inteligente", "smarter shopping")}
                 </span>
               </span>

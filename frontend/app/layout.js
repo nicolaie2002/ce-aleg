@@ -5,6 +5,7 @@ import { AutomaticPageTranslation } from "./components/AutomaticPageTranslation"
 import { ThemeProvider } from "./components/ThemeProvider";
 import { LegalFooter } from "./components/LegalFooter";
 import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
+import { ScrollRevealController } from "./components/ScrollRevealController";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({ children }) {
           <ThemeProvider>
             <AutomaticPageTranslation />
             <CarbonVaporBackground />
+            <ScrollRevealController />
             {children}
             <LegalFooter />
           </ThemeProvider>

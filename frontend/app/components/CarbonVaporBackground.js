@@ -98,9 +98,9 @@ export function CarbonVaporBackground({ variant = "global" }) {
       const base = context.createLinearGradient(0, 0, width, height);
 
       if (isLight) {
-        base.addColorStop(0, "rgba(236, 247, 250, 0.34)");
-        base.addColorStop(0.55, "rgba(245, 247, 241, 0.22)");
-        base.addColorStop(1, "rgba(213, 232, 238, 0.26)");
+        base.addColorStop(0, variant === "hero" ? "rgba(249, 252, 253, 0.98)" : "rgba(249, 252, 253, 0.92)");
+        base.addColorStop(0.54, variant === "hero" ? "rgba(238, 244, 246, 0.96)" : "rgba(245, 248, 249, 0.78)");
+        base.addColorStop(1, variant === "hero" ? "rgba(229, 236, 239, 0.98)" : "rgba(229, 236, 239, 0.82)");
       } else {
         base.addColorStop(0, variant === "hero" ? "rgba(2, 3, 5, 0.98)" : "rgba(3, 5, 8, 0.94)");
         base.addColorStop(0.52, variant === "hero" ? "rgba(13, 14, 16, 0.98)" : "rgba(8, 10, 13, 0.78)");
@@ -125,11 +125,9 @@ export function CarbonVaporBackground({ variant = "global" }) {
     }
 
     function drawCarbonFolds(time, isLight) {
-      if (isLight) return;
-
       const foldCount = variant === "hero" ? 9 : 7;
       context.save();
-      context.globalCompositeOperation = "screen";
+      context.globalCompositeOperation = isLight ? "multiply" : "screen";
 
       for (let index = 0; index < foldCount; index += 1) {
         const phase = time * 0.00008 + index * 0.86;
@@ -141,9 +139,14 @@ export function CarbonVaporBackground({ variant = "global" }) {
         const controlY = startY - height * (0.18 + Math.cos(phase) * 0.08);
         const gradient = context.createLinearGradient(startX, startY, endX, endY);
 
-        gradient.addColorStop(0, "rgba(255,255,255,0)");
-        gradient.addColorStop(0.44, `rgba(255,255,255,${variant === "hero" ? 0.035 : 0.026})`);
-        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        gradient.addColorStop(0, isLight ? "rgba(8,12,18,0)" : "rgba(255,255,255,0)");
+        gradient.addColorStop(
+          0.44,
+          isLight
+            ? `rgba(8,12,18,${variant === "hero" ? 0.08 : 0.052})`
+            : `rgba(255,255,255,${variant === "hero" ? 0.05 : 0.034})`
+        );
+        gradient.addColorStop(1, isLight ? "rgba(8,12,18,0)" : "rgba(255,255,255,0)");
 
         context.beginPath();
         context.moveTo(startX, startY);
@@ -166,7 +169,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       const amplitude = wisp.amplitude * height;
       const drift = time * wisp.speed + wisp.phase;
       const pulse = 0.55 + Math.sin(drift * 1.3) * 0.18;
-      const alpha = wisp.alpha * pulse * (isLight ? 0.55 : variant === "hero" ? 1.18 : 1);
+      const alpha = wisp.alpha * pulse * (isLight ? (variant === "hero" ? 1.25 : 0.95) : variant === "hero" ? 1.45 : 1.18);
       const segments = 54;
 
       context.save();
@@ -190,15 +193,15 @@ export function CarbonVaporBackground({ variant = "global" }) {
 
       const gradient = context.createLinearGradient(-length / 2, 0, length / 2, 0);
       const tone = isLight
-        ? Math.floor(34 + wisp.tone * 32)
-        : Math.floor(150 + wisp.tone * 78);
+        ? Math.floor(10 + wisp.tone * 46)
+        : Math.floor(185 + wisp.tone * 62);
       gradient.addColorStop(0, `rgba(${tone}, ${tone}, ${tone}, 0)`);
       gradient.addColorStop(0.5, `rgba(${tone}, ${tone}, ${tone}, ${alpha})`);
       gradient.addColorStop(1, `rgba(${tone}, ${tone}, ${tone}, 0)`);
 
       context.globalCompositeOperation = isLight ? "multiply" : "screen";
       context.filter = `blur(${wisp.blur}px)`;
-      context.lineWidth = Math.max(0.7, wisp.width * (height / 780));
+      context.lineWidth = Math.max(1, wisp.width * (height / 720) * (variant === "hero" ? 1.18 : 1));
       context.strokeStyle = gradient;
       context.stroke();
       context.restore();
@@ -214,7 +217,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
         const x = ((Math.sin(phase) * 0.5 + 0.5) * 1.18 - 0.09) * width;
         const y = ((Math.cos(phase * 0.72) * 0.5 + 0.5) * 1.12 - 0.06) * height;
         const lineLength = width * (0.12 + (index % 3) * 0.05);
-        const alpha = isLight ? 0.025 : variant === "hero" ? 0.12 : 0.08;
+        const alpha = isLight ? (variant === "hero" ? 0.075 : 0.05) : variant === "hero" ? 0.16 : 0.11;
         const gradient = context.createLinearGradient(x - lineLength, y, x + lineLength, y);
 
         gradient.addColorStop(0, "rgba(255,255,255,0)");
