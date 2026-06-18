@@ -42,7 +42,11 @@ services:
         sync: false
       - key: STRIPE_PRO_PRICE_ID
         sync: false
+      - key: STRIPE_PRO_YEARLY_PRICE_ID
+        sync: false
       - key: STRIPE_FAMILY_PRICE_ID
+        sync: false
+      - key: STRIPE_FAMILY_YEARLY_PRICE_ID
         sync: false
       - key: PASSWORD_MIN_LENGTH
         value: "8"

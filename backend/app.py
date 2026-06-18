@@ -293,8 +293,14 @@ PLAN_CATALOG = {
 }
 
 STRIPE_PRICE_ENV_BY_PLAN = {
-    "pro": "STRIPE_PRO_PRICE_ID",
-    "family": "STRIPE_FAMILY_PRICE_ID",
+    "pro": {
+        "monthly": "STRIPE_PRO_PRICE_ID",
+        "yearly": "STRIPE_PRO_YEARLY_PRICE_ID",
+    },
+    "family": {
+        "monthly": "STRIPE_FAMILY_PRICE_ID",
+        "yearly": "STRIPE_FAMILY_YEARLY_PRICE_ID",
+    },
 }
 
 
@@ -992,6 +998,22 @@ def get_publication_readiness():
                 blockers.append(message)
             else:
                 warnings.append(message)
+
+        missing_yearly_prices = [
+            key
+            for key in [
+                "STRIPE_PRO_YEARLY_PRICE_ID",
+                "STRIPE_FAMILY_YEARLY_PRICE_ID",
+            ]
+            if not os.environ.get(key, "").strip()
+        ]
+
+        if missing_yearly_prices:
+            warnings.append(
+                "Planurile anuale Stripe nu sunt active inca. Lipsesc: "
+                + ", ".join(missing_yearly_prices)
+                + "."
+            )
     elif payment_provider in {"", "manual", "mock", "none"}:
         warnings.append("Platile reale nu sunt conectate. Pro/Family se pot activa doar manual din admin.")
 
@@ -1046,8 +1068,20 @@ def get_or_create_subscription(user):
     return subscription
 
 
-def get_stripe_price_id(plan):
-    env_name = STRIPE_PRICE_ENV_BY_PLAN.get(plan)
+def normalize_billing_interval(interval):
+    normalized = str(interval or "monthly").strip().lower()
+    if normalized in {"yearly", "annual", "year", "an"}:
+        return "yearly"
+    return "monthly"
+
+
+def get_stripe_price_env_name(plan, interval="monthly"):
+    plan_prices = STRIPE_PRICE_ENV_BY_PLAN.get(plan) or {}
+    return plan_prices.get(normalize_billing_interval(interval), "")
+
+
+def get_stripe_price_id(plan, interval="monthly"):
+    env_name = get_stripe_price_env_name(plan, interval)
     return os.environ.get(env_name, "").strip() if env_name else ""
 
 
@@ -1055,9 +1089,10 @@ def get_plan_for_stripe_price(price_id):
     if not price_id:
         return None
 
-    for plan in STRIPE_PRICE_ENV_BY_PLAN:
-        if get_stripe_price_id(plan) == price_id:
-            return plan
+    for plan, interval_envs in STRIPE_PRICE_ENV_BY_PLAN.items():
+        for env_name in interval_envs.values():
+            if os.environ.get(env_name, "").strip() == price_id:
+                return plan
 
     return None
 
@@ -3666,12 +3701,16 @@ def delete_family_profile(profile_id):
 def start_checkout():
     data = request.get_json(silent=True) or {}
     plan = str(data.get("plan") or "pro").strip().lower()
+    billing_interval = normalize_billing_interval(
+        data.get("billingInterval") or data.get("interval")
+    )
 
     if plan not in {"pro", "family"}:
         return jsonify({"error": "Plan invalid."}), 400
 
     if PAYMENT_PROVIDER == "stripe":
-        price_id = get_stripe_price_id(plan)
+        price_id = get_stripe_price_id(plan, billing_interval)
+        price_env_name = get_stripe_price_env_name(plan, billing_interval)
 
         if not configure_stripe() or not price_id:
             return jsonify({
@@ -3679,7 +3718,7 @@ def start_checkout():
                 "code": "stripe_not_configured",
                 "required": [
                     "STRIPE_SECRET_KEY",
-                    STRIPE_PRICE_ENV_BY_PLAN[plan],
+                    price_env_name,
                     "STRIPE_WEBHOOK_SECRET",
                     "FRONTEND_PUBLIC_URL",
                 ],
@@ -3687,7 +3726,11 @@ def start_checkout():
 
         user = g.current_user
         subscription = get_or_create_subscription(user)
-        metadata = {"user_id": str(user.id), "plan": plan}
+        metadata = {
+            "user_id": str(user.id),
+            "plan": plan,
+            "billing_interval": billing_interval,
+        }
         checkout_params = {
             "mode": "subscription",
             "line_items": [{"price": price_id, "quantity": 1}],
@@ -3719,6 +3762,7 @@ def start_checkout():
         return jsonify({
             "mode": "stripe",
             "plan": plan,
+            "billingInterval": billing_interval,
             "checkoutUrl": checkout_session.url,
             "sessionId": checkout_session.id,
         })
@@ -3726,7 +3770,8 @@ def start_checkout():
     return jsonify({
         "mode": "manual",
         "plan": plan,
-        "message": "Am notat alegerea ta. Activarea online va fi disponibila la lansare, iar planul poate fi pregatit pentru contul tau.",
+        "billingInterval": billing_interval,
+        "message": "Am notat alegerea ta. Verifica datele de plata sau activeaza planul din administrare.",
         "nextStep": "prepare_plan_activation",
     })
 
@@ -6621,6 +6666,16 @@ def import_barcode_product():
 
 @app.route("/ai/identify-product-frame", methods=["POST"])
 def identify_product_frame():
+    subscription = get_or_create_subscription(g.current_user)
+
+    if not is_paid_subscription(subscription):
+        return jsonify({
+            "error": "Asistentul live este disponibil in planurile Pro si Family.",
+            "code": "paid_plan_required",
+            "plan": subscription.plan,
+            "requiredPlans": ["pro", "family"],
+        }), 402
+
     vision_enabled = os.environ.get("ENABLE_OPENAI_VISION", "false").lower() == "true"
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
 

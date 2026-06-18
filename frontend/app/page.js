@@ -81,8 +81,8 @@ export default function Home() {
       icon: Camera,
       label: pick("Asistent live", "Live assistant"),
       detail: pick(
-        "Camera ramane deschisa si te ajuta sa recunosti produsul la raft.",
-        "Keep the camera open and recognize products at the shelf."
+        "Inclus in Pro si Family pentru recunoastere live la raft.",
+        "Included in Pro and Family for live shelf recognition."
       ),
     },
     {
@@ -105,14 +105,10 @@ export default function Home() {
     <main className="min-h-screen text-white">
       <section className="ce-home-hero relative overflow-hidden border-b border-white/10">
         <CarbonVaporBackground variant="hero" />
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-70"
-          style={{
-            backgroundImage:
-              "linear-gradient(90deg, rgba(2,4,7,.99) 0%, rgba(3,5,8,.9) 42%, rgba(5,7,10,.62) 100%), url('https://images.unsplash.com/photo-1760463921956-b21cfa5cb2ac?auto=format&fit=crop&q=85&w=2400')",
-          }}
-        />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_22%,rgba(225,232,236,.12),transparent_34%),radial-gradient(circle_at_78%_18%,rgba(250,204,21,.07),transparent_30%),linear-gradient(180deg,rgba(0,0,0,.06),#070a0e_96%)]" />
+        <div className="ce-hero-carbon-shell absolute inset-0" />
+        <div className="ce-hero-vapor-wordmark absolute inset-0" aria-hidden="true">
+          <span>Ce aleg?</span>
+        </div>
 
         <div className="ce-shell relative z-10 pb-14 pt-5 md:pb-20 md:pt-7">
           <nav className="ce-glass-nav ce-reveal flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3 backdrop-blur-xl">
@@ -173,7 +169,7 @@ export default function Home() {
                   className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-4 font-black text-black shadow-[0_0_30px_rgba(103,232,249,.18)] hover:-translate-y-0.5 hover:bg-cyan-100"
                 >
                   <Camera className="h-5 w-5" />
-                  {pick("Deschide camera", "Open camera")}
+                  {pick("Asistent live Pro", "Pro live assistant")}
                 </Link>
                 <Link
                   href={barcodeHref}

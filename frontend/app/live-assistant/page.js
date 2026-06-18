@@ -9,6 +9,7 @@ import {
   Barcode,
   Camera,
   CameraIcon,
+  Crown,
   Mic,
   MicOff,
   RefreshCw,
@@ -132,6 +133,9 @@ export default function LiveAssistantPage() {
   const [candidate, setCandidate] = useState(null);
   const [error, setError] = useState("");
   const [billingGate, setBillingGate] = useState(null);
+  const [currentPlan, setCurrentPlan] = useState(null);
+  const hasLiveAssistantAccess = currentPlan === "pro" || currentPlan === "family";
+  const isCheckingBilling = currentPlan === null;
 
   const speak = useCallback((text) => {
     if (!text || typeof window === "undefined" || !window.speechSynthesis) return;
@@ -172,6 +176,35 @@ export default function LiveAssistantPage() {
         .then((response) => response.json())
         .then((data) => setCloudVision(Boolean(data.cloudVision?.enabled)))
         .catch(() => setCloudVision(false));
+
+      fetch(`${API_URL}/billing/status`)
+        .then(async (response) => {
+          if (response.status === 401) {
+            window.location.assign("/login?next=/live-assistant");
+            return null;
+          }
+
+          return response.ok ? response.json() : null;
+        })
+        .then((data) => {
+          const plan = data?.usage?.plan || "free";
+          setCurrentPlan(plan);
+
+          if (plan !== "pro" && plan !== "family") {
+            setBillingGate({
+              code: "paid_plan_required",
+              plan,
+            });
+            setMessage(pick(
+              "Asistentul live este inclus in Pro si Family. Pentru Free, foloseste scanarea codului de bare.",
+              "The live assistant is included in Pro and Family. On Free, use barcode scanning."
+            ));
+          }
+        })
+        .catch(() => {
+          setCurrentPlan("free");
+          setBillingGate({ code: "paid_plan_required", plan: "free" });
+        });
     });
   }, [pick]);
 
@@ -186,6 +219,18 @@ export default function LiveAssistantPage() {
   }, []);
 
   async function startCamera(deviceId) {
+    if (!hasLiveAssistantAccess) {
+      setBillingGate({
+        code: "paid_plan_required",
+        plan: currentPlan || "free",
+      });
+      setMessage(pick(
+        "Asistentul live este disponibil in Pro si Family. Scanarea codului de bare ramane disponibila pe Free.",
+        "The live assistant is available in Pro and Family. Barcode scanning remains available on Free."
+      ));
+      return;
+    }
+
     setError("");
     setCandidate(null);
     setBillingGate(null);
@@ -229,6 +274,14 @@ export default function LiveAssistantPage() {
   );
 
   async function switchCamera() {
+    if (!hasLiveAssistantAccess) {
+      setBillingGate({
+        code: "paid_plan_required",
+        plan: currentPlan || "free",
+      });
+      return;
+    }
+
     if (!cameraDevices.length) {
       await startCamera();
       return;
@@ -307,6 +360,18 @@ export default function LiveAssistantPage() {
   }
 
   const analyzeFrame = useCallback(async () => {
+    if (!hasLiveAssistantAccess) {
+      setBillingGate({
+        code: "paid_plan_required",
+        plan: currentPlan || "free",
+      });
+      setMessage(pick(
+        "Asistentul live este disponibil in Pro si Family. Scanarea codului de bare ramane disponibila pe Free.",
+        "The live assistant is available in Pro and Family. Barcode scanning remains available on Free."
+      ));
+      return;
+    }
+
     if (!cloudVision || !videoRef.current || analyzingRef.current) return;
 
     const video = videoRef.current;
@@ -360,7 +425,7 @@ export default function LiveAssistantPage() {
       analyzingRef.current = false;
       setIsAnalyzing(false);
     }
-  }, [cloudVision, pick, speak]);
+  }, [cloudVision, currentPlan, hasLiveAssistantAccess, pick, speak]);
 
   useEffect(() => {
     if (!isCameraOn || !cloudVision) return undefined;
@@ -534,6 +599,27 @@ export default function LiveAssistantPage() {
           <section className="overflow-hidden rounded-lg border border-white/10 bg-[#11171d]">
             <div className="relative aspect-[4/3] bg-black xl:aspect-[16/10]">
               <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
+              {!isCameraOn && !hasLiveAssistantAccess && (
+                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/82 px-6 text-center text-gray-200">
+                  <Crown className="text-yellow-200" size={38} />
+                  <p className="max-w-sm font-bold">
+                    {isCheckingBilling
+                      ? pick("Verificam planul tau...", "Checking your plan...")
+                      : pick(
+                          "Asistentul live este inclus in Pro si Family.",
+                          "The live assistant is included in Pro and Family."
+                        )}
+                  </p>
+                  {!isCheckingBilling && (
+                    <Link
+                      href="/pricing"
+                      className="mt-2 inline-flex rounded-lg bg-white px-4 py-2.5 font-black text-black hover:bg-cyan-100"
+                    >
+                      {pick("Vezi planurile", "View plans")}
+                    </Link>
+                  )}
+                </div>
+              )}
               {!isCameraOn && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-gray-300">
                   <Camera className="text-cyan-200" size={36} />
@@ -613,13 +699,20 @@ export default function LiveAssistantPage() {
             {billingGate && (
               <section className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm leading-6 text-yellow-100">
                 <p className="font-bold text-yellow-200">
-                  {pick("Limita gratuita a fost atinsa", "Free limit reached")}
+                  {billingGate.code === "paid_plan_required"
+                    ? pick("Asistent live inclus in Pro", "Live assistant included in Pro")
+                    : pick("Limita gratuita a fost atinsa", "Free limit reached")}
                 </p>
                 <p className="mt-2">
-                  {pick(
-                    "Treci la Pro pentru scanari nelimitate.",
-                    "Go Pro for unlimited scans."
-                  )}
+                  {billingGate.code === "paid_plan_required"
+                    ? pick(
+                        "Foloseste scanarea codului de bare pe Free sau treci la Pro/Family pentru camera live.",
+                        "Use barcode scanning on Free or switch to Pro/Family for the live camera."
+                      )
+                    : pick(
+                        "Treci la Pro pentru scanari nelimitate.",
+                        "Go Pro for unlimited scans."
+                      )}
                 </p>
                 <Link
                   href="/pricing"

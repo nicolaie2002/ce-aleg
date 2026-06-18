@@ -98,8 +98,10 @@ EMAIL_FROM=<expeditor verificat in Brevo>
 BREVO_API_KEY=<cheia Brevo>
 STRIPE_SECRET_KEY=<cheia Stripe>
 STRIPE_WEBHOOK_SECRET=<se completeaza dupa pasul Stripe>
-STRIPE_PRO_PRICE_ID=<price id>
-STRIPE_FAMILY_PRICE_ID=<price id>
+STRIPE_PRO_PRICE_ID=<price id lunar Pro>
+STRIPE_PRO_YEARLY_PRICE_ID=<price id anual Pro>
+STRIPE_FAMILY_PRICE_ID=<price id lunar Family>
+STRIPE_FAMILY_YEARLY_PRICE_ID=<price id anual Family>
 ```
 
 Render genereaza automat `AUTH_SECRET`. Dupa deploy verifica:
@@ -144,17 +146,31 @@ sincronizeaza la urmatorul deploy.
 ## 5. Stripe
 
 1. Cat timp testezi, pastreaza cheile Stripe test/sandbox.
-2. Stripe -> Developers -> Webhooks -> `Add endpoint`.
-3. Endpoint:
+2. In Stripe creeaza pentru fiecare produs doua preturi recurente:
+   - Pro lunar: `19.99 RON / month`
+   - Pro anual: `149 RON / year`
+   - Family lunar: `29.99 RON / month`
+   - Family anual: `249 RON / year`
+3. Copiaza ID-urile `price_...` in Render:
+   - `STRIPE_PRO_PRICE_ID`
+   - `STRIPE_PRO_YEARLY_PRICE_ID`
+   - `STRIPE_FAMILY_PRICE_ID`
+   - `STRIPE_FAMILY_YEARLY_PRICE_ID`
+4. Stripe -> Developers -> Webhooks -> `Add endpoint`.
+5. Endpoint:
 
 ```text
 https://cealeg-api.onrender.com/billing/stripe/webhook
 ```
 
-4. Copiaza signing secret-ul `whsec_...` in Render ca
+6. Copiaza signing secret-ul `whsec_...` in Render ca
    `STRIPE_WEBHOOK_SECRET`.
-5. Testeaza Checkout cu `4242 4242 4242 4242`, o data viitoare si orice CVC.
-6. Treci pe chei live numai dupa ce firma, preturile si domeniul sunt gata.
+7. Testeaza Checkout cu `4242 4242 4242 4242`, o data viitoare si orice CVC.
+8. Treci pe chei live numai dupa ce firma, preturile si domeniul sunt gata.
+
+Nota: aplicatia foloseste Stripe Checkout prin API, nu Payment Links. In Stripe
+Dashboard, daca faci manual Payment Link, produsul trebuie pus ca line item
+principal cu pret recurent, nu la `Recommended products`.
 
 ## 6. Brevo
 
@@ -307,7 +323,9 @@ SUPABASE_SERVICE_ROLE_KEY
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 STRIPE_PRO_PRICE_ID
+STRIPE_PRO_YEARLY_PRICE_ID
 STRIPE_FAMILY_PRICE_ID
+STRIPE_FAMILY_YEARLY_PRICE_ID
 BREVO_API_KEY
 EMAIL_FROM
 ADMIN_EMAIL

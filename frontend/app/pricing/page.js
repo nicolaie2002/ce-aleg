@@ -106,11 +106,16 @@ function getFeatureLabel(feature, locale) {
   return featureLabels[feature]?.[locale] || feature;
 }
 
-function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
+function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPlan }) {
   const isCurrent = currentPlan === id;
   const isFree = id === "free";
   const isPro = id === "pro";
-  const isBusy = busyPlan === id;
+  const isYearly = billingCycle === "yearly";
+  const isBusy = busyPlan === `${id}:${billingCycle}`;
+  const displayPrice = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
+  const priceSuffix = isYearly ? pick("/ an", "/ year") : pick("/ luna", "/ month");
+  const monthlyEquivalent =
+    isYearly && !isFree ? Number(plan.yearlyPrice || 0) / 12 : null;
 
   return (
     <InteractiveSurface
@@ -134,15 +139,20 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
       </div>
 
       <p className="mt-5 text-4xl font-black">
-        {Number(plan.monthlyPrice || 0).toFixed(plan.monthlyPrice ? 2 : 0)} lei
+        {Number(displayPrice || 0).toFixed(displayPrice ? 2 : 0)} lei
         <span className={`text-sm font-semibold ${isCurrent ? "text-cyan-100/70" : "text-gray-400"}`}>
           {" "}
-          / luna
+          {priceSuffix}
         </span>
       </p>
       {!isFree && (
         <p className={`mt-1 text-sm ${isCurrent ? "text-cyan-100/70" : "text-gray-400"}`}>
-          {plan.yearlyPrice} lei / an
+          {isYearly
+            ? pick(
+                `aprox. ${monthlyEquivalent.toFixed(2)} lei / luna`,
+                `about ${monthlyEquivalent.toFixed(2)} lei / month`
+              )
+            : pick(`${plan.yearlyPrice} lei / an`, `${plan.yearlyPrice} lei / year`)}
         </p>
       )}
 
@@ -156,7 +166,7 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
       </ul>
 
       <button
-        onClick={() => onChoose(id)}
+        onClick={() => onChoose(id, billingCycle)}
         disabled={isCurrent || isBusy}
         className={`mt-7 w-full rounded-lg px-4 py-3 font-black transition ${
           isCurrent
@@ -174,7 +184,9 @@ function PlanCard({ id, plan, currentPlan, onChoose, pick, busyPlan }) {
           ? pick("Planul tau actual", "Current plan")
           : isFree
             ? pick("Ramai pe Free", "Stay on Free")
-            : pick("Alege planul", "Choose plan")}
+            : isYearly
+              ? pick("Alege anual", "Choose yearly")
+              : pick("Alege lunar", "Choose monthly")}
       </button>
     </InteractiveSurface>
   );
@@ -187,6 +199,7 @@ export default function PricingPage() {
   const [messageTone, setMessageTone] = useState("info");
   const [busyPlan, setBusyPlan] = useState("");
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
+  const [billingCycle, setBillingCycle] = useState("monthly");
   const plans = billing?.plans || fallbackPlans;
   const currentPlan = billing?.usage?.plan || "free";
   const subscription = billing?.subscription;
@@ -237,17 +250,17 @@ export default function PricingPage() {
     }
   }, [pick]);
 
-  async function choosePlan(plan) {
+  async function choosePlan(plan, selectedBillingCycle = billingCycle) {
     if (plan === "free") return;
 
-    setBusyPlan(plan);
+    setBusyPlan(`${plan}:${selectedBillingCycle}`);
     setMessage("");
 
     try {
       const response = await fetch(`${API_URL}/billing/checkout`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, billingInterval: selectedBillingCycle }),
       });
       const data = await readApiJson(response);
 
@@ -270,8 +283,8 @@ export default function PricingPage() {
       setMessage(
         data.message ||
           pick(
-            "Am notat alegerea ta. Activarea online va fi disponibila la lansare.",
-            "We saved your choice. Online activation will be available at launch."
+            "Am notat alegerea ta. Verifica datele de plata sau contacteaza-ne pentru activare.",
+            "We saved your choice. Check payment settings or contact us for activation."
           )
       );
     } catch (error) {
@@ -412,6 +425,36 @@ export default function PricingPage() {
           </p>
         )}
 
+        <div className="mt-8 flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/25 p-3 sm:inline-flex sm:flex-row sm:items-center">
+          <span className="px-3 text-sm font-bold text-gray-300">
+            {pick("Alege perioada", "Choose billing")}
+          </span>
+          <div className="grid grid-cols-2 gap-2 rounded-xl bg-black/30 p-1">
+            {[
+              { id: "monthly", label: pick("Lunar", "Monthly") },
+              { id: "yearly", label: pick("Anual", "Yearly") },
+            ].map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                onClick={() => setBillingCycle(option.id)}
+                className={`rounded-lg px-4 py-2 text-sm font-black transition ${
+                  billingCycle === option.id
+                    ? "bg-white text-black"
+                    : "text-gray-300 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <span className="px-3 text-sm text-cyan-100">
+            {billingCycle === "yearly"
+              ? pick("Platesti o data pe an.", "Pay once per year.")
+              : pick("Platesti lunar.", "Pay monthly.")}
+          </span>
+        </div>
+
         <div className="mt-8 grid gap-5 md:grid-cols-3 xl:gap-8">
           {["free", "pro", "family"].map((id) => (
             <PlanCard
@@ -419,6 +462,7 @@ export default function PricingPage() {
               id={id}
               plan={plans[id]}
               currentPlan={currentPlan}
+              billingCycle={billingCycle}
               onChoose={choosePlan}
               pick={pick}
               busyPlan={busyPlan}
