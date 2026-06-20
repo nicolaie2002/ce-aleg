@@ -20,8 +20,62 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata = {
-  title: "Ce aleg?",
-  description: "Asistent pentru alegeri mai bune la cumparaturi.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://www.cealeg.shop"),
+  applicationName: "Ce aleg?",
+  title: {
+    default: "Ce aleg?",
+    template: "%s | Ce aleg?",
+  },
+  description:
+    "Scaneaza produse, compara rapid alternative si alege mai bine la cumparaturi.",
+  alternates: {
+    canonical: "/",
+  },
+  icons: {
+    icon: [
+      {
+        url: "/brand/ce-aleg-icon.png",
+        sizes: "1254x1254",
+        type: "image/png",
+      },
+    ],
+    apple: [
+      {
+        url: "/brand/ce-aleg-icon.png",
+        sizes: "1254x1254",
+        type: "image/png",
+      },
+    ],
+    shortcut: ["/brand/ce-aleg-icon.png"],
+  },
+  openGraph: {
+    type: "website",
+    locale: "ro_RO",
+    url: "/",
+    siteName: "Ce aleg?",
+    title: "Ce aleg? - cumparaturi mai inteligente",
+    description:
+      "Scaneaza produsul, vezi verdictul si primeste alternative clare pentru bugetul si preferintele tale.",
+    images: [
+      {
+        url: "/brand/ce-aleg-logo.png",
+        width: 1254,
+        height: 1254,
+        alt: "Ce aleg?",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Ce aleg? - cumparaturi mai inteligente",
+    description:
+      "Scaneaza produsul, vezi verdictul si primeste alternative clare pentru cumparaturi.",
+    images: ["/brand/ce-aleg-logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({ children }) {
