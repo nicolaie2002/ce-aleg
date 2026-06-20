@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   Barcode,
   Camera,
@@ -10,7 +11,6 @@ import {
   RotateCcwKey,
   Scale,
   ShieldCheck,
-  ShoppingBasket,
 } from "lucide-react";
 import { useLocale } from "./LocaleProvider";
 
@@ -35,8 +35,15 @@ export function LegalFooter() {
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="max-w-xl">
             <Link href="/" className="inline-flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-400 text-black shadow-[0_0_30px_rgba(52,211,153,.22)]">
-                <ShoppingBasket size={23} strokeWidth={2.5} />
+              <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl shadow-[0_0_30px_rgba(52,211,153,.22)]">
+                <Image
+                  src="/icon.png"
+                  alt="Ce aleg?"
+                  width={96}
+                  height={96}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
               </span>
               <span>
                 <span className="block text-xl font-black text-white">Ce aleg?</span>

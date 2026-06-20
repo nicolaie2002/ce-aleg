@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import {
@@ -9,7 +10,6 @@ import {
   LayoutDashboard,
   Radio,
   ScanLine,
-  ShoppingBasket,
   ShoppingCart,
   Sparkles,
 } from "lucide-react";
@@ -61,8 +61,16 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
       <header className="ce-header sticky top-0 z-40 border-b border-white/10 shadow-[0_18px_55px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <div className="ce-shell flex min-h-16 items-center justify-between gap-3 py-3">
           <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-400 text-black shadow-[0_0_24px_rgba(52,211,153,0.22)]">
-              <ShoppingBasket size={20} strokeWidth={2.5} />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-[0_0_24px_rgba(52,211,153,0.22)]">
+              <Image
+                src="/icon.png"
+                alt="Ce aleg?"
+                width={80}
+                height={80}
+                className="h-full w-full object-cover"
+                priority
+                unoptimized
+              />
             </span>
             <span className="min-w-0">
               <span className="block truncate text-base font-black text-white">

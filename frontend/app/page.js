@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -12,7 +13,6 @@ import {
   ScanLine,
   Search,
   ShieldCheck,
-  ShoppingCart,
   Sparkles,
   Star,
   TrendingDown,
@@ -110,8 +110,16 @@ export default function Home() {
         <div className="ce-shell relative z-10 pb-14 pt-5 md:pb-20 md:pt-7">
           <nav className="ce-glass-nav ce-reveal flex flex-wrap items-center justify-between gap-3 rounded-2xl p-3 backdrop-blur-xl">
             <Link href="/" className="flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-400 text-black shadow-[0_0_28px_rgba(52,211,153,.22)]">
-                <ShoppingCart size={22} strokeWidth={2.5} />
+              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg shadow-[0_0_28px_rgba(52,211,153,.22)]">
+                <Image
+                  src="/icon.png"
+                  alt="Ce aleg?"
+                  width={88}
+                  height={88}
+                  className="h-full w-full object-cover"
+                  priority
+                  unoptimized
+                />
               </span>
               <span>
                 <span className="block text-lg font-black leading-none text-white">Ce aleg?</span>

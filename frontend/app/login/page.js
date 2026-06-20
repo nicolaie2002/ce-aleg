@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Crown, LogIn, Mail, ShieldCheck, ShoppingBasket } from "lucide-react";
+import { ArrowLeft, Crown, LogIn, Mail, ShieldCheck } from "lucide-react";
 import { API_URL } from "../config";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PasswordField } from "../components/PasswordField";
@@ -139,8 +140,16 @@ export default function LoginPage() {
 
           <div className="rounded-lg border border-white/10 bg-[#0d141b]/95 p-6 shadow-2xl shadow-black/30">
             <div className="mb-5 flex items-center gap-3">
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-400 text-black">
-                <ShoppingBasket size={21} strokeWidth={2.5} />
+              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg">
+                <Image
+                  src="/icon.png"
+                  alt="Ce aleg?"
+                  width={88}
+                  height={88}
+                  className="h-full w-full object-cover"
+                  priority
+                  unoptimized
+                />
               </span>
               <span>
                 <span className="block font-black">Ce aleg?</span>

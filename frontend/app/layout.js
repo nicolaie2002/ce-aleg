@@ -34,19 +34,19 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: "/brand/ce-aleg-icon.png",
-        sizes: "1254x1254",
+        url: "/icon.png",
+        sizes: "500x500",
         type: "image/png",
       },
     ],
     apple: [
       {
-        url: "/brand/ce-aleg-icon.png",
-        sizes: "1254x1254",
+        url: "/icon.png",
+        sizes: "500x500",
         type: "image/png",
       },
     ],
-    shortcut: ["/brand/ce-aleg-icon.png"],
+    shortcut: ["/icon.png"],
   },
   openGraph: {
     type: "website",
@@ -58,9 +58,9 @@ export const metadata = {
       "Scaneaza produsul, vezi verdictul si primeste alternative clare pentru bugetul si preferintele tale.",
     images: [
       {
-        url: "/brand/ce-aleg-logo.png",
-        width: 1254,
-        height: 1254,
+        url: "/icon.png",
+        width: 500,
+        height: 500,
         alt: "Ce aleg?",
       },
     ],
@@ -70,7 +70,7 @@ export const metadata = {
     title: "Ce aleg? - cumparaturi mai inteligente",
     description:
       "Scaneaza produsul, vezi verdictul si primeste alternative clare pentru cumparaturi.",
-    images: ["/brand/ce-aleg-logo.png"],
+    images: ["/icon.png"],
   },
   robots: {
     index: true,
