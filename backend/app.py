@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import BadRequest
 from PIL import Image, ImageOps
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from sqlalchemy.exc import IntegrityError
 import base64
 import json
@@ -2789,9 +2789,40 @@ def product_label_match_score(product, label_text):
 
 
 def find_best_product_match(search_text, store_name=None):
+    expanded_query = expand_query_with_synonyms(search_text)
+    query_words = [
+        word for word in normalize_search_text(expanded_query).split()
+        if len(word) >= 3 and not word.isdigit()
+    ]
+    query_words = list(dict.fromkeys(query_words))[:8]
     products_query = Product.query
 
-    all_products = products_query.all()
+    if query_words:
+        filters = []
+
+        for word in query_words:
+            pattern = f"%{word}%"
+            filters.extend([
+                Product.name.ilike(pattern),
+                Product.category.ilike(pattern),
+                Product.store.ilike(pattern),
+                Product.ingredients.ilike(pattern),
+            ])
+
+        products_query = products_query.filter(or_(*filters))
+
+    if store_name and store_name != "Fără magazin ales":
+        store_candidates = products_query.filter(Product.store == store_name)
+        all_products = store_candidates.limit(700).all()
+
+        if len(all_products) < 80:
+            fallback_products = products_query.limit(700).all()
+            seen_ids = {product.id for product in all_products}
+            all_products.extend(
+                product for product in fallback_products if product.id not in seen_ids
+            )
+    else:
+        all_products = products_query.limit(900).all()
 
     scored_products = []
 
@@ -3405,6 +3436,68 @@ def ensure_database_columns():
     add_column_if_missing("product_submissions", "barcode", "VARCHAR(80)")
 
 
+def execute_schema_statement(statement, label):
+    try:
+        db.session.execute(text(statement))
+        db.session.commit()
+    except Exception as error:
+        db.session.rollback()
+        app.logger.warning("Database schema update skipped for %s: %s", label, error)
+
+
+def ensure_database_indexes():
+    common_indexes = [
+        (
+            "products barcode",
+            "CREATE INDEX IF NOT EXISTS ix_products_barcode ON products (barcode)",
+        ),
+        (
+            "products category",
+            "CREATE INDEX IF NOT EXISTS ix_products_category ON products (category)",
+        ),
+        (
+            "products store",
+            "CREATE INDEX IF NOT EXISTS ix_products_store ON products (store)",
+        ),
+        (
+            "products score",
+            "CREATE INDEX IF NOT EXISTS ix_products_score ON products (score)",
+        ),
+        (
+            "scan history user date",
+            "CREATE INDEX IF NOT EXISTS ix_scan_history_user_scanned_at "
+            "ON scan_history (user_id, scanned_at)",
+        ),
+        (
+            "favorites user",
+            "CREATE INDEX IF NOT EXISTS ix_favorites_user_id ON favorites (user_id)",
+        ),
+        (
+            "cart user",
+            "CREATE INDEX IF NOT EXISTS ix_cart_items_user_id ON cart_items (user_id)",
+        ),
+        (
+            "price observations barcode",
+            "CREATE INDEX IF NOT EXISTS ix_price_observations_barcode "
+            "ON price_observations (product_barcode)",
+        ),
+    ]
+
+    for label, statement in common_indexes:
+        execute_schema_statement(statement, label)
+
+    if db.engine.dialect.name == "postgresql":
+        execute_schema_statement(
+            "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+            "postgres trigram extension",
+        )
+        execute_schema_statement(
+            "CREATE INDEX IF NOT EXISTS ix_products_name_trgm "
+            "ON products USING gin (name gin_trgm_ops)",
+            "products name trigram",
+        )
+
+
 def ensure_configured_admin():
     admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
 
@@ -3539,6 +3632,8 @@ def get_ai_status():
 @app.route("/init-db", methods=["GET"])
 def init_db():
     db.create_all()
+    ensure_database_columns()
+    ensure_database_indexes()
 
     return jsonify({
         "message": "Baza de date a fost creată cu succes."
@@ -7198,6 +7293,7 @@ def lookup_barcode(barcode):
 with app.app_context():
     db.create_all()
     ensure_database_columns()
+    ensure_database_indexes()
     ensure_configured_admin()
 
 
