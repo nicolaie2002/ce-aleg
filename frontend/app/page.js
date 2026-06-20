@@ -301,11 +301,11 @@ export default function Home() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              {capabilities.map(({ icon: Icon, label, detail }) => (
+              {capabilities.map(({ icon: Icon, label, detail }, index) => (
                 <InteractiveSurface
                   as="article"
                   key={label}
-                  className="rounded-2xl border border-white/10 bg-[#0d141b] p-5 shadow-xl transition hover:-translate-y-1 hover:border-cyan-300/35"
+                  className={`ce-reveal ce-reveal-delay-${Math.min(index + 1, 3)} rounded-2xl border border-white/10 bg-white/[0.035] p-5 shadow-xl backdrop-blur transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.055]`}
                 >
                   <Icon className="h-6 w-6 text-cyan-200" />
                   <h3 className="mt-5 text-lg font-black">{label}</h3>

@@ -22,6 +22,7 @@ import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { FamilyProfiles } from "../components/FamilyProfiles";
 import { useLocale } from "../components/LocaleProvider";
+import { getActiveProfile } from "../utils/profilePreferences";
 
 const ACTION_TONES = {
   emerald: {
@@ -72,10 +73,11 @@ export default function DashboardPage() {
     { href: "/submit-product", title: pick("Contribuie produs", "Contribute product"), description: pick("Completeaza catalogul cand un produs lipseste.", "Complete the catalog when a product is missing."), icon: ListPlus, tone: "cyan" },
   ];
 
-  const loadDashboardData = useCallback(async (userId) => {
+  const loadDashboardData = useCallback(async (userId, profile = null) => {
     try {
+      const profileQuery = profile?.id ? `?profile_id=${encodeURIComponent(profile.id)}` : "";
       const responses = await Promise.all([
-        fetch(`${API_URL}/cart/${userId}`),
+        fetch(`${API_URL}/cart/${userId}${profileQuery}`),
         fetch(`${API_URL}/history/${userId}`),
         fetch(`${API_URL}/favorites/${userId}`),
         fetch(`${API_URL}/billing/status`),
@@ -103,6 +105,16 @@ export default function DashboardPage() {
   }, [pick]);
 
   useEffect(() => {
+    let isMounted = true;
+    let currentUserId = null;
+
+    function handleProfileChange(event) {
+      if (!isMounted || !currentUserId) return;
+      loadDashboardData(currentUserId, event.detail || getActiveProfile());
+    }
+
+    window.addEventListener("cealeg:profile-change", handleProfileChange);
+
     queueMicrotask(async () => {
       const response = await fetch(`${API_URL}/auth/me`);
       if (!response.ok) {
@@ -112,6 +124,7 @@ export default function DashboardPage() {
       }
       const data = await response.json();
       localStorage.setItem("cealeg_user", JSON.stringify(data.user));
+      currentUserId = data.user.id;
       setUser(data.user);
 
       const savedEmailStatus = localStorage.getItem("cealeg_email_status");
@@ -141,8 +154,13 @@ export default function DashboardPage() {
         }
       }
 
-      loadDashboardData(data.user.id);
+      loadDashboardData(data.user.id, getActiveProfile());
     });
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("cealeg:profile-change", handleProfileChange);
+    };
   }, [loadDashboardData, pick]);
 
   async function logout() {

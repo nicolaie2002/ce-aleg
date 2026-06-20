@@ -11,6 +11,8 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    email_verified = db.Column(db.Boolean, default=True, nullable=False)
+    email_verified_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -124,6 +126,12 @@ class CartItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    family_profile_id = db.Column(
+        db.Integer,
+        db.ForeignKey("family_profiles.id"),
+        nullable=True,
+        index=True,
+    )
     product_name = db.Column(db.String(150), nullable=False)
 
     store = db.Column(db.String(100), nullable=False)
@@ -138,6 +146,7 @@ class CartItem(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     user = db.relationship("User", backref="cart_items")
+    family_profile = db.relationship("FamilyProfile")
 
 
 class PriceObservation(db.Model):

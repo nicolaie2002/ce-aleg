@@ -12,6 +12,15 @@ export function getActiveProfile() {
   }
 }
 
+export function getActiveProfileId() {
+  return getActiveProfile()?.id || null;
+}
+
+export function getActiveProfilePayload() {
+  const profileId = getActiveProfileId();
+  return profileId ? { family_profile_id: profileId } : {};
+}
+
 export function setActiveProfile(profile) {
   if (typeof window === "undefined" || !profile) return;
 

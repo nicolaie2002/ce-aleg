@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, FileClock, Heart, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
+import { getActiveProfilePayload } from "../utils/profilePreferences";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { ConfirmModal } from "../components/ConfirmModal";
@@ -112,6 +113,7 @@ export default function HistoryPage() {
           image: item.image,
           reason: item.verdict || item.shortAdvice,
           quantity: 1,
+          ...getActiveProfilePayload(),
         }),
       });
 

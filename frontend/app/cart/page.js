@@ -4,10 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
+import { getActiveProfile } from "../utils/profilePreferences";
 import { ProductImage } from "../components/ProductImage";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { InlineNotice } from "../components/InlineNotice";
 import { AppHeader } from "../components/AppHeader";
+import { FamilyProfiles } from "../components/FamilyProfiles";
 import { TranslatedText } from "../components/TranslatedText";
 
 function getImageUrl(path) {
@@ -29,6 +31,7 @@ export default function CartPage() {
   const [cartItems, setCartItems] = useState([]);
   const [newStoreName, setNewStoreName] = useState("");
   const [stores, setStores] = useState([]);
+  const [activeProfile, setActiveProfileState] = useState(null);
   const [expandedReasons, setExpandedReasons] = useState({});
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState("success");
@@ -39,9 +42,11 @@ export default function CartPage() {
     setMessage(messageText);
   }, []);
 
-  const loadCart = useCallback(async (userId) => {
+  const loadCart = useCallback(async (userId, profile = null) => {
     try {
-      const response = await fetch(`${API_URL}/cart/${userId}`);
+      const profileId = profile?.id;
+      const profileQuery = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : "";
+      const response = await fetch(`${API_URL}/cart/${userId}${profileQuery}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -56,6 +61,16 @@ export default function CartPage() {
 
   useEffect(() => {
     let isMounted = true;
+    let currentUserId = null;
+
+    function handleProfileChange(event) {
+      if (!isMounted || !currentUserId) return;
+      const nextProfile = event.detail || getActiveProfile();
+      setActiveProfileState(nextProfile);
+      loadCart(currentUserId, nextProfile);
+    }
+
+    window.addEventListener("cealeg:profile-change", handleProfileChange);
 
     queueMicrotask(() => {
       if (!isMounted) return;
@@ -68,7 +83,10 @@ export default function CartPage() {
       }
 
       const parsedUser = JSON.parse(savedUser);
+      currentUserId = parsedUser.id;
       setUser(parsedUser);
+      const profile = getActiveProfile();
+      setActiveProfileState(profile);
 
       const savedStores = localStorage.getItem("cealeg_stores");
 
@@ -89,11 +107,12 @@ export default function CartPage() {
         localStorage.setItem("cealeg_stores", JSON.stringify(defaultStores));
       }
 
-      loadCart(parsedUser.id);
+      loadCart(parsedUser.id, profile);
     });
 
     return () => {
       isMounted = false;
+      window.removeEventListener("cealeg:profile-change", handleProfileChange);
     };
   }, [loadCart]);
 
@@ -235,7 +254,10 @@ export default function CartPage() {
     if (!user) return;
 
     try {
-      const response = await fetch(`${API_URL}/cart/clear/${user.id}`, {
+      const profileQuery = activeProfile?.id
+        ? `?profile_id=${encodeURIComponent(activeProfile.id)}`
+        : "";
+      const response = await fetch(`${API_URL}/cart/clear/${user.id}${profileQuery}`, {
         method: "DELETE",
       });
 
@@ -254,6 +276,8 @@ export default function CartPage() {
       showError(error.message);
     }
   }
+
+  const activeProfileName = activeProfile?.name || user?.name || "";
 
   const groupedCart = cartItems.reduce((groups, item) => {
     const store = item.store || "Fără magazin";
@@ -311,13 +335,17 @@ export default function CartPage() {
           </p>
 
           <h1 className="text-4xl font-bold md:text-5xl">
-            Lista de cumpărături a lui {user.name}
+            Lista de cumpărături a lui {activeProfileName}
           </h1>
 
           <p className="mt-4 max-w-2xl text-gray-300">
             Organizează produsele pe magazine și bifează-le pe măsură ce le
             adaugi în coș.
           </p>
+
+          <div className="mt-6">
+            <FamilyProfiles compact />
+          </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">

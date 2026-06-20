@@ -33,11 +33,16 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [verificationNotice, setVerificationNotice] = useState("");
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
 
   async function handleLogin(event) {
     event.preventDefault();
     setIsLoading(true);
     setErrorMessage("");
+    setVerificationNotice("");
+    setNeedsVerification(false);
 
     try {
       const response = await fetch(`${API_URL}/login`, {
@@ -48,6 +53,9 @@ export default function LoginPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
+        if (data.code === "email_not_verified") {
+          setNeedsVerification(true);
+        }
         throw new Error(data.error || pick("Autentificare esuata.", "Sign-in failed."));
       }
 
@@ -71,6 +79,31 @@ export default function LoginPage() {
       );
     } finally {
       setIsLoading(false);
+    }
+  }
+
+  async function resendVerificationEmail() {
+    setIsResendingVerification(true);
+    setVerificationNotice("");
+    setErrorMessage("");
+
+    try {
+      const response = await fetch(`${API_URL}/auth/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || pick("Emailul nu a putut fi retrimis.", "The email could not be resent."));
+      }
+
+      setVerificationNotice(data.message || pick("Am trimis un nou link de confirmare.", "We sent a new confirmation link."));
+    } catch (error) {
+      setErrorMessage(error.message || pick("Emailul nu a putut fi retrimis.", "The email could not be resent."));
+    } finally {
+      setIsResendingVerification(false);
     }
   }
 
@@ -152,7 +185,25 @@ export default function LoginPage() {
 
               {errorMessage && (
                 <div className="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-red-300">
-                  {errorMessage}
+                  <p>{errorMessage}</p>
+                  {needsVerification && (
+                    <button
+                      type="button"
+                      onClick={resendVerificationEmail}
+                      disabled={isResendingVerification || !email.trim()}
+                      className="mt-3 inline-flex rounded-lg bg-white px-4 py-2 text-sm font-black text-black hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isResendingVerification
+                        ? pick("Se trimite...", "Sending...")
+                        : pick("Retrimite emailul", "Resend email")}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {verificationNotice && (
+                <div className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 p-4 text-cyan-100">
+                  {verificationNotice}
                 </div>
               )}
 

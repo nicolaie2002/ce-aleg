@@ -18,6 +18,7 @@ from io import BytesIO
 from uuid import uuid4
 from difflib import SequenceMatcher
 from email.message import EmailMessage
+from html import escape
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict, deque
@@ -240,7 +241,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = (
         "pool_recycle": 240,
         "connect_args": {"sslmode": "require"},
     }
-    if database_url
+    if database_url.startswith("postgresql+psycopg://")
     else {}
 )
 app.config["MAX_CONTENT_LENGTH"] = int(
@@ -302,6 +303,9 @@ EMAIL_USE_SSL = os.environ.get("EMAIL_USE_SSL", "false").strip().lower() in {
     "on",
 }
 PASSWORD_RESET_MAX_AGE = int(os.environ.get("PASSWORD_RESET_MAX_AGE", "3600"))
+EMAIL_VERIFICATION_MAX_AGE = int(
+    os.environ.get("EMAIL_VERIFICATION_MAX_AGE", str(48 * 60 * 60))
+)
 ACCOUNT_DELETE_MAX_AGE = int(os.environ.get("ACCOUNT_DELETE_MAX_AGE", str(24 * 60 * 60)))
 
 PLAN_CATALOG = {
@@ -367,6 +371,13 @@ def get_password_reset_serializer():
     return URLSafeTimedSerializer(
         app.config["AUTH_SECRET"],
         salt="cealeg-password-reset",
+    )
+
+
+def get_email_verification_serializer():
+    return URLSafeTimedSerializer(
+        app.config["AUTH_SECRET"],
+        salt="cealeg-email-verification",
     )
 
 
@@ -573,6 +584,102 @@ def send_transactional_email(to_email, subject, text_body, html_body=None):
     return send_smtp_email(to_email, subject, text_body, html_body)
 
 
+def brand_logo_url():
+    return f"{FRONTEND_PUBLIC_URL}/brand/ce-aleg-logo.png"
+
+
+def render_brand_email(preheader, title, intro, button_label=None, button_url=None, details=None, tone="standard"):
+    safe_preheader = escape(preheader or "")
+    safe_title = escape(title or "")
+    safe_intro = escape(intro or "")
+    safe_button_label = escape(button_label or "")
+    safe_button_url = escape(button_url or "")
+    safe_logo_url = escape(brand_logo_url())
+    detail_items = "".join(
+        f"""
+        <tr>
+          <td style="padding:10px 0;border-top:1px solid rgba(148,163,184,0.18);">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:999px;background:#22d3ee;margin-right:10px;"></span>
+            <span style="color:#cbd5e1;font-size:14px;line-height:22px;">{escape(str(item))}</span>
+          </td>
+        </tr>
+        """
+        for item in (details or [])
+    )
+    button_html = (
+        f"""
+        <tr>
+          <td style="padding:24px 0 8px;">
+            <a href="{safe_button_url}" style="display:inline-block;background:#ffffff;color:#020617;text-decoration:none;font-weight:800;font-size:15px;padding:14px 22px;border-radius:12px;">
+              {safe_button_label}
+            </a>
+          </td>
+        </tr>
+        """
+        if button_label and button_url
+        else ""
+    )
+    accent_color = "#facc15" if tone == "danger" else "#22d3ee"
+
+    return f"""
+    <!doctype html>
+    <html>
+      <body style="margin:0;padding:0;background:#020617;font-family:Inter,Arial,sans-serif;color:#f8fafc;">
+        <div style="display:none;max-height:0;overflow:hidden;color:transparent;opacity:0;">{safe_preheader}</div>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#020617;padding:28px 14px;">
+          <tr>
+            <td align="center">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:620px;overflow:hidden;border-radius:26px;border:1px solid rgba(148,163,184,0.22);background:linear-gradient(145deg,#07111f,#0b1220 54%,#111827);box-shadow:0 30px 90px rgba(0,0,0,0.45);">
+                <tr>
+                  <td style="padding:28px 28px 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="vertical-align:middle;">
+                          <img src="{safe_logo_url}" width="54" height="54" alt="Ce aleg?" style="display:inline-block;border-radius:14px;vertical-align:middle;margin-right:12px;">
+                          <span style="display:inline-block;vertical-align:middle;">
+                            <span style="display:block;color:#ffffff;font-size:18px;font-weight:900;line-height:22px;">Ce aleg?</span>
+                            <span style="display:block;color:#a5f3fc;font-size:12px;font-weight:700;">cumparaturi mai inteligente</span>
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:22px 28px 6px;">
+                    <div style="display:inline-block;border:1px solid {accent_color};background:rgba(34,211,238,0.08);color:#cffafe;border-radius:999px;padding:7px 12px;font-size:12px;font-weight:800;letter-spacing:.02em;">
+                      {safe_preheader}
+                    </div>
+                    <h1 style="margin:18px 0 12px;color:#ffffff;font-size:34px;line-height:40px;font-weight:900;letter-spacing:-0.02em;">
+                      {safe_title}
+                    </h1>
+                    <p style="margin:0;color:#cbd5e1;font-size:16px;line-height:26px;">
+                      {safe_intro}
+                    </p>
+                  </td>
+                </tr>
+                {button_html}
+                <tr>
+                  <td style="padding:4px 28px 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px;">
+                      {detail_items}
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding:18px 28px 26px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:12px;line-height:20px;">
+                    Daca nu ai cerut acest email, il poti ignora. Pentru siguranta, nu trimitem niciodata parola ta prin email.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+    """
+
+
 def send_welcome_email(user):
     dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
     text_body = (
@@ -581,18 +688,87 @@ def send_welcome_email(user):
         "Poti scana produse, salva cosul si primi alternative mai bune.\n\n"
         f"Intra aici: {dashboard_url}\n"
     )
-    html_body = f"""
-    <p>Salut, {user.name}!</p>
-    <p>Contul tau <strong>Ce aleg?</strong> este pregatit.</p>
-    <p>Poti scana produse, salva cosul si primi alternative mai bune.</p>
-    <p><a href="{dashboard_url}">Deschide dashboardul</a></p>
-    """
+    html_body = render_brand_email(
+        "Cont activ",
+        f"Salut, {user.name}.",
+        "Contul tau este pregatit. Poti scana produse, salva cosul si compara alternative potrivite pentru tine.",
+        "Deschide dashboardul",
+        dashboard_url,
+        [
+            "Scaneaza produse direct cu telefonul.",
+            "Pastreaza istoricul, favoritele si cosul de cumparaturi.",
+            "Compara rapid alternative mai potrivite.",
+        ],
+    )
     return send_transactional_email(
         user.email,
         "Bine ai venit in Ce aleg?",
         text_body,
         html_body,
     )
+
+
+def create_email_verification_token(user):
+    payload = {
+        "action": "verify_email",
+        "user_id": user.id,
+        "email": user.email,
+        "password_hash": user.password_hash,
+    }
+    return get_email_verification_serializer().dumps(payload)
+
+
+def verify_email_verification_token(token):
+    try:
+        payload = get_email_verification_serializer().loads(
+            token,
+            max_age=EMAIL_VERIFICATION_MAX_AGE,
+        )
+    except (BadSignature, SignatureExpired):
+        return None
+
+    if payload.get("action") != "verify_email":
+        return None
+
+    user = db.session.get(User, payload.get("user_id"))
+
+    if not user:
+        return None
+
+    if user.email != payload.get("email") or user.password_hash != payload.get("password_hash"):
+        return None
+
+    return user
+
+
+def send_email_verification_email(user):
+    token = create_email_verification_token(user)
+    verification_url = f"{FRONTEND_PUBLIC_URL}/verify-email?token={token}"
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        "Confirma adresa de email pentru contul Ce aleg?.\n"
+        f"Confirma aici: {verification_url}\n\n"
+        "Linkul expira in 48 de ore.\n"
+    )
+    html_body = render_brand_email(
+        "Confirma emailul",
+        "Verifica adresa de email.",
+        "Apasa pe buton pentru a activa contul si pentru a pastra aplicatia curata de conturi false.",
+        "Confirma emailul",
+        verification_url,
+        [
+            "Confirmarea dureaza cateva secunde.",
+            "Dupa confirmare poti intra in cont si scana produse.",
+            "Linkul expira in 48 de ore.",
+        ],
+    )
+    sent = send_transactional_email(
+        user.email,
+        "Confirma emailul pentru Ce aleg?",
+        text_body,
+        html_body,
+    )
+    return sent, verification_url
 
 
 def create_password_reset_token(user):
@@ -629,12 +805,18 @@ def send_password_reset_email(user):
         f"Schimba parola aici: {reset_url}\n\n"
         "Linkul expira in 60 de minute. Daca nu ai cerut resetarea, ignora acest email.\n"
     )
-    html_body = f"""
-    <p>Salut, {user.name}!</p>
-    <p>Ai cerut resetarea parolei pentru contul <strong>Ce aleg?</strong>.</p>
-    <p><a href="{reset_url}">Schimba parola</a></p>
-    <p>Linkul expira in 60 de minute. Daca nu ai cerut resetarea, ignora acest email.</p>
-    """
+    html_body = render_brand_email(
+        "Securitate cont",
+        "Schimba parola in siguranta.",
+        "Am primit o cerere de resetare pentru contul tau. Foloseste linkul de mai jos daca tu ai cerut schimbarea parolei.",
+        "Schimba parola",
+        reset_url,
+        [
+            "Linkul expira in 60 de minute.",
+            "Daca nu ai cerut resetarea, ignora acest email.",
+            "Parola ta veche nu este trimisa si nu poate fi vazuta.",
+        ],
+    )
     sent = send_transactional_email(
         user.email,
         "Resetare parola Ce aleg?",
@@ -688,13 +870,19 @@ def send_account_deletion_email(user):
         "Linkul expira in 24 de ore. Daca nu ai cerut stergerea, ignora acest email "
         "si contul tau ramane activ.\n"
     )
-    html_body = f"""
-    <p>Salut, {user.name}!</p>
-    <p>Ai cerut stergerea contului <strong>Ce aleg?</strong>.</p>
-    <p>Daca tu ai facut cererea, confirma stergerea aici:</p>
-    <p><a href="{deletion_url}">Sterge contul meu</a></p>
-    <p>Linkul expira in 24 de ore. Daca nu ai cerut stergerea, ignora acest email si contul tau ramane activ.</p>
-    """
+    html_body = render_brand_email(
+        "Confirmare necesara",
+        "Confirma stergerea contului.",
+        "Stergerea contului elimina istoricul, cosul, favoritele si contributiile tale dupa confirmare.",
+        "Sterge contul meu",
+        deletion_url,
+        [
+            "Linkul expira in 24 de ore.",
+            "Daca nu ai cerut stergerea, ignora acest email.",
+            "Contul ramane activ pana confirmi din email.",
+        ],
+        tone="danger",
+    )
     sent = send_transactional_email(
         user.email,
         "Confirmare stergere cont Ce aleg?",
@@ -814,6 +1002,7 @@ def user_to_dict(user):
         "name": user.name,
         "email": user.email,
         "isAdmin": bool(user.is_admin),
+        "emailVerified": bool(getattr(user, "email_verified", True)),
         "plan": subscription.plan,
         "subscriptionStatus": subscription.status,
     }
@@ -1545,6 +1734,62 @@ def sanitize_family_profile_name(name):
     return name[:80]
 
 
+def parse_profile_id(value):
+    if value in {None, "", "null", "undefined"}:
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_requested_family_profile_id(data=None):
+    payload = data or {}
+    return parse_profile_id(
+        request.args.get("profile_id")
+        or request.args.get("family_profile_id")
+        or payload.get("profile_id")
+        or payload.get("family_profile_id")
+    )
+
+
+def resolve_cart_profile(user, requested_profile_id=None):
+    subscription = get_or_create_subscription(user)
+
+    if not is_family_subscription(subscription):
+        return None
+
+    primary_profile = get_or_create_primary_family_profile(user)
+
+    if requested_profile_id:
+        profile = FamilyProfile.query.filter_by(
+            id=requested_profile_id,
+            user_id=user.id,
+        ).first()
+        if profile:
+            return profile
+
+    return primary_profile
+
+
+def cart_query_for_profile(user, profile=None):
+    query = CartItem.query.filter_by(user_id=user.id)
+
+    if not profile:
+        return query.filter(CartItem.family_profile_id.is_(None))
+
+    if profile.is_primary:
+        return query.filter(
+            or_(
+                CartItem.family_profile_id == profile.id,
+                CartItem.family_profile_id.is_(None),
+            )
+        )
+
+    return query.filter(CartItem.family_profile_id == profile.id)
+
+
 def get_weekly_scan_count(user_id):
     week_start = get_week_start()
     return UsageEvent.query.filter(
@@ -1722,6 +1967,8 @@ def enforce_access_controls():
     if endpoint in {
         "login",
         "register",
+        "verify_email",
+        "resend_email_verification",
         "forgot_password",
         "reset_password",
         "request_account_deletion",
@@ -1800,6 +2047,8 @@ def add_security_headers(response):
         in {
             "login",
             "register",
+            "verify_email",
+            "resend_email_verification",
             "forgot_password",
             "reset_password",
             "get_authenticated_user",
@@ -2052,6 +2301,7 @@ def cart_item_to_dict(item):
     return {
         "id": item.id,
         "user_id": item.user_id,
+        "familyProfileId": item.family_profile_id,
         "name": item.product_name,
         "store": item.store,
         "score": item.score,
@@ -3421,19 +3671,41 @@ def add_column_if_missing(table_name, column_name, column_definition):
 
 def ensure_database_columns():
     if db.engine.dialect.name != "sqlite":
-        db.session.execute(
-            text(
+        statements = [
+            (
+                "users is_admin",
                 "ALTER TABLE users "
-                "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE"
-            )
-        )
-        db.session.commit()
+                "ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE",
+            ),
+            (
+                "users email_verified",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS email_verified BOOLEAN NOT NULL DEFAULT TRUE",
+            ),
+            (
+                "users email_verified_at",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP NULL",
+            ),
+            (
+                "cart family_profile_id",
+                "ALTER TABLE cart_items "
+                "ADD COLUMN IF NOT EXISTS family_profile_id INTEGER REFERENCES family_profiles(id)",
+            ),
+        ]
+
+        for label, statement in statements:
+            execute_schema_statement(statement, label)
+
         return
 
     add_column_if_missing("users", "is_admin", "BOOLEAN NOT NULL DEFAULT 0")
+    add_column_if_missing("users", "email_verified", "BOOLEAN NOT NULL DEFAULT 1")
+    add_column_if_missing("users", "email_verified_at", "DATETIME")
     add_column_if_missing("products", "barcode", "VARCHAR(80)")
     add_column_if_missing("products", "ingredients", "TEXT")
     add_column_if_missing("product_submissions", "barcode", "VARCHAR(80)")
+    add_column_if_missing("cart_items", "family_profile_id", "INTEGER")
 
 
 def execute_schema_statement(statement, label):
@@ -3475,6 +3747,16 @@ def ensure_database_indexes():
         (
             "cart user",
             "CREATE INDEX IF NOT EXISTS ix_cart_items_user_id ON cart_items (user_id)",
+        ),
+        (
+            "cart user profile",
+            "CREATE INDEX IF NOT EXISTS ix_cart_items_user_profile "
+            "ON cart_items (user_id, family_profile_id)",
+        ),
+        (
+            "cart user profile product store",
+            "CREATE INDEX IF NOT EXISTS ix_cart_items_user_profile_product_store "
+            "ON cart_items (user_id, family_profile_id, product_name, store)",
         ),
         (
             "price observations barcode",
@@ -3684,26 +3966,88 @@ def register():
         name=name,
         email=email,
         password_hash=generate_password_hash(password),
+        email_verified=False,
+        email_verified_at=None,
     )
 
     db.session.add(new_user)
     db.session.commit()
-    welcome_email_sent = send_welcome_email(new_user)
+    verification_sent, verification_url = send_email_verification_email(new_user)
     email_status = {
-        "welcomeSent": welcome_email_sent,
+        "verificationSent": verification_sent,
         "configured": is_email_configured(),
         "provider": EMAIL_PROVIDER,
     }
 
-    if not welcome_email_sent:
-        app.logger.warning("Welcome email was not sent for user %s", new_user.id)
+    if not verification_sent:
+        app.logger.warning("Verification email was not sent for user %s", new_user.id)
+
+    if not verification_sent and not PRODUCTION_MODE:
+        email_status["devVerificationLink"] = verification_url
 
     response = jsonify({
-        "message": "Cont creat cu succes.",
+        "message": "Cont creat. Verifica emailul ca sa activezi contul.",
         "user": user_to_dict(new_user),
         "emailStatus": email_status,
     })
-    return set_auth_cookie(response, new_user), 201
+    return response, 201
+
+
+@app.route("/auth/verify-email", methods=["POST"])
+def verify_email():
+    data = request.get_json(silent=True) or {}
+    token = data.get("token", "").strip()
+
+    if not token:
+        return jsonify({"error": "Linkul de confirmare lipseste."}), 400
+
+    user = verify_email_verification_token(token)
+
+    if not user:
+        return jsonify({"error": "Linkul de confirmare este invalid sau a expirat."}), 400
+
+    was_already_verified = bool(user.email_verified)
+    user.email_verified = True
+    user.email_verified_at = datetime.utcnow()
+    db.session.commit()
+
+    welcome_sent = True if was_already_verified else send_welcome_email(user)
+    response = jsonify({
+        "message": "Email confirmat. Contul este activ.",
+        "user": user_to_dict(user),
+        "emailStatus": {
+            "welcomeSent": welcome_sent,
+            "configured": is_email_configured(),
+            "provider": EMAIL_PROVIDER,
+        },
+    })
+    return set_auth_cookie(response, user)
+
+
+@app.route("/auth/resend-verification", methods=["POST"])
+def resend_email_verification():
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip().lower()
+
+    if not email:
+        return jsonify({"error": "Emailul este obligatoriu."}), 400
+
+    user = User.query.filter_by(email=email).first()
+    dev_verification_link = None
+
+    if user and not user.email_verified:
+        sent, verification_url = send_email_verification_email(user)
+        if not sent and not PRODUCTION_MODE:
+            dev_verification_link = verification_url
+
+    response = {
+        "message": "Daca exista un cont neconfirmat cu acest email, trimitem un nou link de confirmare.",
+    }
+
+    if dev_verification_link:
+        response["devVerificationLink"] = dev_verification_link
+
+    return jsonify(response)
 
 
 @app.route("/login", methods=["POST"])
@@ -3720,6 +4064,12 @@ def login():
 
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({"error": "Email sau parola gresita."}), 401
+
+    if not user.email_verified:
+        return jsonify({
+            "error": "Confirma emailul inainte sa intri in cont.",
+            "code": "email_not_verified",
+        }), 403
 
     return jsonify({
         "message": "Autentificare reusita.",
@@ -3783,6 +4133,9 @@ def reset_password():
         }), 400
 
     user.password_hash = generate_password_hash(password)
+    if not user.email_verified:
+        user.email_verified = True
+        user.email_verified_at = datetime.utcnow()
     db.session.commit()
 
     response = jsonify({
@@ -3892,6 +4245,7 @@ def get_users():
             "name": user.name,
             "email": user.email,
             "is_admin": bool(user.is_admin),
+            "email_verified": bool(user.email_verified),
             "plan": get_or_create_subscription(user).plan,
             "subscription_status": get_or_create_subscription(user).status,
             "created_at": user.created_at.isoformat(),
@@ -4022,6 +4376,10 @@ def delete_family_profile(profile_id):
     if profile.is_primary:
         return jsonify({"error": "Profilul principal nu poate fi sters."}), 400
 
+    CartItem.query.filter_by(
+        user_id=user.id,
+        family_profile_id=profile.id,
+    ).delete(synchronize_session=False)
     db.session.delete(profile)
     db.session.commit()
     return jsonify({"deleted": True})
@@ -4711,7 +5069,9 @@ def get_cart(user_id):
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
 
-    items = CartItem.query.filter_by(user_id=user_id).order_by(
+    requested_profile_id = get_requested_family_profile_id()
+    profile = resolve_cart_profile(user, requested_profile_id)
+    items = cart_query_for_profile(user, profile).order_by(
         CartItem.created_at.desc()
     ).all()
 
@@ -4737,13 +5097,18 @@ def add_to_cart():
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
 
-    existing_item = CartItem.query.filter_by(
-        user_id=user_id,
+    requested_profile_id = get_requested_family_profile_id(data)
+    profile = resolve_cart_profile(user, requested_profile_id)
+    profile_id = profile.id if profile else None
+
+    existing_item = cart_query_for_profile(user, profile).filter_by(
         product_name=product_name,
-        store=store
+        store=store,
     ).first()
 
     if existing_item:
+        if profile_id and existing_item.family_profile_id is None:
+            existing_item.family_profile_id = profile_id
         existing_item.quantity += 1
         db.session.commit()
 
@@ -4754,6 +5119,7 @@ def add_to_cart():
 
     new_item = CartItem(
         user_id=user_id,
+        family_profile_id=profile_id,
         product_name=product_name,
         store=store,
         score=data.get("score"),
@@ -4826,7 +5192,9 @@ def clear_cart(user_id):
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
 
-    CartItem.query.filter_by(user_id=user_id).delete()
+    requested_profile_id = get_requested_family_profile_id()
+    profile = resolve_cart_profile(user, requested_profile_id)
+    cart_query_for_profile(user, profile).delete(synchronize_session=False)
     db.session.commit()
 
     return jsonify({"message": "Coșul a fost golit."})

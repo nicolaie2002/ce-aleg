@@ -9,7 +9,7 @@ import { getImageUrl } from "../utils/getImageUrl";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
-import { getActiveProfile, readProfilePreferences } from "../utils/profilePreferences";
+import { getActiveProfile, getActiveProfilePayload, readProfilePreferences } from "../utils/profilePreferences";
 
 const criteriaLabels = {
   cheap: "mai ieftin",
@@ -729,6 +729,7 @@ function AlternativesPageContent() {
           image: product.image || "",
           reason: product.reason || "Produs recomandat ca alternativă.",
           quantity: 1,
+          ...getActiveProfilePayload(),
         }),
       });
 

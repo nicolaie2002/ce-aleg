@@ -8,6 +8,7 @@ import { ArrowLeft, Search, SwitchCamera } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+import { getActiveProfilePayload } from "../utils/profilePreferences";
 
 function getImageUrl(path) {
   if (!path) return "";
@@ -1056,6 +1057,7 @@ export default function BarcodeScanPage() {
           image: product.image,
           reason: product.reason || "Produs identificat după codul de bare.",
           quantity: 1,
+          ...getActiveProfilePayload(),
         }),
       });
 

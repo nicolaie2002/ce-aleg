@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Crown, UserPlus } from "lucide-react";
+import { ArrowLeft, Crown, MailCheck, UserPlus } from "lucide-react";
 import { API_URL } from "../config";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PasswordField } from "../components/PasswordField";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
+import { readApiJson } from "../utils/apiResponse";
 import {
   PASSWORD_MIN_LENGTH,
   getPasswordStrength,
@@ -23,12 +24,16 @@ export default function RegisterPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [devVerificationLink, setDevVerificationLink] = useState("");
   const strength = useMemo(() => getPasswordStrength(password), [password]);
 
   async function handleRegister(event) {
     event.preventDefault();
     setIsLoading(true);
     setErrorMessage("");
+    setSuccessMessage("");
+    setDevVerificationLink("");
 
     try {
       const response = await fetch(`${API_URL}/register`, {
@@ -42,7 +47,7 @@ export default function RegisterPage() {
           acceptedTerms,
         }),
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         throw new Error(
@@ -51,14 +56,15 @@ export default function RegisterPage() {
         );
       }
 
-      localStorage.setItem("cealeg_user", JSON.stringify(data.user));
-      if (data.emailStatus) {
-        localStorage.setItem(
-          "cealeg_email_status",
-          JSON.stringify(data.emailStatus)
-        );
-      }
-      window.location.assign("/dashboard");
+      setSuccessMessage(
+        data.message ||
+          pick(
+            "Cont creat. Verifica emailul ca sa il activezi.",
+            "Account created. Check your email to activate it."
+          )
+      );
+      setDevVerificationLink(data.emailStatus?.devVerificationLink || "");
+      setPassword("");
     } catch (error) {
       setErrorMessage(
         error.message ||
@@ -165,6 +171,29 @@ export default function RegisterPage() {
               {errorMessage && (
                 <div className="rounded-lg border border-red-400/30 bg-red-400/10 p-4 text-red-300">
                   {errorMessage}
+                </div>
+              )}
+
+              {successMessage && (
+                <div className="rounded-lg border border-cyan-300/30 bg-cyan-300/10 p-4 text-cyan-100">
+                  <p className="flex items-center gap-2 font-black">
+                    <MailCheck size={18} />
+                    {successMessage}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-cyan-50/80">
+                    {pick(
+                      "Dupa confirmare te vom trimite automat in cont.",
+                      "After confirmation we will send you into your account automatically."
+                    )}
+                  </p>
+                  {devVerificationLink && (
+                    <Link
+                      href={devVerificationLink}
+                      className="mt-3 inline-flex rounded-lg bg-white px-4 py-2 text-sm font-black text-black hover:bg-cyan-100"
+                    >
+                      {pick("Deschide linkul local de confirmare", "Open local confirmation link")}
+                    </Link>
+                  )}
                 </div>
               )}
 

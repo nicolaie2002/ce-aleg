@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
-import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
+import { getActiveProfile, getActiveProfilePayload, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
@@ -225,6 +225,7 @@ function ResultPageContent() {
           image: scannedProduct.image,
           reason: scannedProduct.verdict,
           quantity: 1,
+          ...getActiveProfilePayload(),
         }),
       });
 
