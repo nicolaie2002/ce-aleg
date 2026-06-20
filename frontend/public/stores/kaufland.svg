@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title desc">
+  <title id="title">Kaufland</title>
+  <desc id="desc">Kaufland store logo</desc>
+  <rect width="640" height="420" rx="34" fill="#ffffff"/>
+  <rect x="16" y="16" width="608" height="388" rx="24" fill="#ffffff" stroke="#e30613" stroke-width="28"/>
+  <path d="M236 88h74v86h92L334 216l78 118h-86l-54-86-36 34v52h-74V88h74v118l116-118z" fill="#e30613"/>
+  <text x="320" y="374" text-anchor="middle" font-family="Arial, sans-serif" font-size="58" font-weight="800" fill="#e30613">Kaufland</text>
+</svg>

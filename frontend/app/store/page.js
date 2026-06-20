@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, Check, MapPin, Store } from "lucide-react";
 import { AppHeader } from "../components/AppHeader";
@@ -12,41 +13,50 @@ const stores = [
     id: "lidl",
     name: "Lidl",
     tagline: "Calitate la pret bun",
+    logo: "/stores/lidl.svg",
   },
   {
     id: "kaufland",
     name: "Kaufland",
     tagline: "Totul pentru cumparaturi mari",
+    logo: "/stores/kaufland.svg",
   },
   {
     id: "carrefour",
     name: "Carrefour",
     tagline: "Alternative pentru fiecare buget",
+    logo: "/stores/carrefour.svg",
   },
   {
     id: "mega",
     name: "Mega Image",
     tagline: "Alegeri rapide de zi cu zi",
+    logo: "/stores/mega-image.svg",
   },
   {
     id: "profi",
     name: "Profi",
     tagline: "Optiuni aproape de tine",
+    logo: "/stores/profi.svg",
   },
   {
     id: "penny",
     name: "Penny",
     tagline: "Preturi mici, comparatii clare",
+    logo: "/stores/penny.svg",
   },
   {
     id: "local",
     name: "Market local",
     tagline: "Magazine independente",
+    logo: "/stores/market-local.svg",
+    imageStyle: "cover",
   },
   {
     id: "any",
     name: "Orice magazin",
     tagline: "Recomandari generale",
+    logo: "/stores/any-store.svg",
   },
 ];
 
@@ -84,26 +94,41 @@ export default function StorePage() {
                 key={store.id}
                 type="button"
                 onClick={() => setSelectedStore(store.id)}
-                className={`ce-store-card ce-store-card-${store.id} group relative min-h-44 overflow-hidden rounded-2xl border text-left shadow-xl transition hover:-translate-y-1 xl:min-h-56 ${
+                className={`ce-store-card ce-store-logo-card group relative flex min-h-[17rem] flex-col overflow-hidden rounded-2xl border p-4 text-center shadow-xl transition hover:-translate-y-1 ${
                   selectedStore === store.id
                     ? "border-cyan-200 ring-2 ring-cyan-200/30"
                     : "border-white/10 hover:border-cyan-300/50"
                 }`}
               >
-                <span className={`ce-store-brand-visual ce-store-brand-${store.id}`} />
-                <span className="absolute inset-0 bg-gradient-to-t from-black/88 via-black/30 to-transparent" />
                 {selectedStore === store.id && (
-                  <span className="absolute right-4 top-4 rounded-full bg-cyan-200 p-2 text-black">
+                  <span className="absolute right-4 top-4 z-10 rounded-full bg-cyan-200 p-2 text-black shadow-lg">
                     <Check className="h-4 w-4" />
                   </span>
                 )}
-                <span className="absolute inset-x-4 top-4">
-                  <span className="ce-store-wordmark">{store.name}</span>
+                <span
+                  className={`ce-store-logo-frame ${
+                    store.imageStyle === "cover" ? "ce-store-logo-frame-cover" : ""
+                  }`}
+                >
+                  <Image
+                    src={store.logo}
+                    alt={`${store.name} logo`}
+                    width={420}
+                    height={250}
+                    className="ce-store-logo"
+                    loading="lazy"
+                    unoptimized
+                  />
                 </span>
-                <span className="absolute bottom-4 left-4 right-4">
-                  <span className="block text-2xl font-black text-white">{store.name}</span>
-                  <span className="mt-1 block text-sm text-gray-200">
-                    {pick(store.tagline, store.id === "any" ? "General recommendations" : "Store-based recommendations")}
+                <span className="mt-4 flex flex-1 flex-col items-center justify-center">
+                  <span className="ce-store-title">{store.name}</span>
+                  <span className="ce-store-tagline">
+                    {pick(
+                      store.tagline,
+                      store.id === "any"
+                        ? "General recommendations"
+                        : "Store-based recommendations"
+                    )}
                   </span>
                 </span>
               </InteractiveSurface>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 420" role="img" aria-labelledby="title desc">
+  <title id="title">Market local</title>
+  <desc id="desc">Local market illustration</desc>
+  <defs>
+    <linearGradient id="sky" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#f9c74f"/>
+      <stop offset="0.48" stop-color="#2ec4b6"/>
+      <stop offset="1" stop-color="#1d3557"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="420" rx="34" fill="url(#sky)"/>
+  <path d="M0 112h640v76H0z" fill="#ffffff" opacity=".88"/>
+  <path d="M0 112h80v76H0zm160 0h80v76h-80zm320 0h80v76h-80z" fill="#0a9396"/>
+  <path d="M80 112h80v76H80zm160 0h80v76h-80zm160 0h80v76h-80zm160 0h80v76h-80z" fill="#f94144"/>
+  <rect x="58" y="198" width="524" height="150" rx="20" fill="#2b2d42" opacity=".8"/>
+  <g>
+    <circle cx="142" cy="268" r="24" fill="#f77f00"/>
+    <circle cx="190" cy="268" r="24" fill="#f77f00"/>
+    <circle cx="238" cy="268" r="24" fill="#f77f00"/>
+    <circle cx="364" cy="268" r="24" fill="#43aa8b"/>
+    <circle cx="412" cy="268" r="24" fill="#43aa8b"/>
+    <circle cx="460" cy="268" r="24" fill="#43aa8b"/>
+    <circle cx="508" cy="268" r="24" fill="#f94144"/>
+  </g>
+  <text x="320" y="377" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="42" font-weight="900" fill="#ffffff">Market local</text>
+</svg>
