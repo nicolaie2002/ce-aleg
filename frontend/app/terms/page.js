@@ -16,6 +16,8 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 
+const CONTACT_EMAIL = "cealegshop@gmail.com";
+
 export default function TermsPage() {
   const { pick } = useLocale();
 
@@ -136,6 +138,20 @@ export default function TermsPage() {
                 "Datele din surse publice pot fi incomplete, traduse gresit sau invechite. Folosesti recomandarile pe propria raspundere si trebuie sa verifici produsul real inainte de cumparare.",
                 "Public-source data may be incomplete, mistranslated or outdated. You use recommendations at your own discretion and must verify the real product before purchase."
               )}
+            </p>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-white/10 bg-black/25 p-5">
+            <h2 className="font-black">{pick("Contact", "Contact")}</h2>
+            <p className="mt-2 leading-7 text-gray-300">
+              {pick(
+                "Pentru probleme legate de cont, plati, date sau continut, scrie-ne la",
+                "For account, billing, data or content issues, contact us at"
+              )}{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className="font-bold text-cyan-200 hover:text-white">
+                {CONTACT_EMAIL}
+              </a>
+              .
             </p>
           </div>
         </div>

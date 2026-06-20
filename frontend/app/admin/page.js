@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Mail, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import { CheckCircle2, Mail, RefreshCw, SearchX, ShieldCheck, Trash2 } from "lucide-react";
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { readApiJson } from "../utils/apiResponse";
@@ -19,14 +19,16 @@ const statLabels = {
 export default function AdminPage() {
   const [overview, setOverview] = useState({});
   const [submissions, setSubmissions] = useState([]);
+  const [misses, setMisses] = useState([]);
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
 
   async function loadAdmin() {
-    const [overviewResponse, submissionsResponse, usersResponse] = await Promise.all([
+    const [overviewResponse, submissionsResponse, missesResponse, usersResponse] = await Promise.all([
       fetch(`${API_URL}/admin/overview`),
       fetch(`${API_URL}/admin/submissions`),
+      fetch(`${API_URL}/admin/search-misses?days=30&limit=40`),
       fetch(`${API_URL}/users`),
     ]);
 
@@ -42,6 +44,7 @@ export default function AdminPage() {
 
     setOverview(await overviewResponse.json());
     setSubmissions(await submissionsResponse.json());
+    setMisses(missesResponse.ok ? await missesResponse.json() : []);
     setUsers(await usersResponse.json());
   }
 
@@ -194,6 +197,55 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </section>
+
+        <section className="mt-8 rounded-lg border border-white/10 bg-[#11171d] p-5">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-bold text-amber-200">
+                <SearchX size={16} /> Produse negasite
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Ce cauta oamenii si lipseste</h2>
+              <p className="mt-2 text-sm text-gray-400">
+                Interogari cu zero rezultate in ultimele 30 de zile. Prioritizeaza-le pentru import sau verificare manuala.
+              </p>
+            </div>
+            <button onClick={loadAdmin} title="Reincarca lipsurile" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-bold hover:bg-white/10">
+              <RefreshCw size={16} /> Reincarca
+            </button>
+          </div>
+
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="text-gray-400">
+                <tr>
+                  <th className="border-b border-white/10 py-3">Cautare</th>
+                  <th className="border-b border-white/10 py-3">Magazin</th>
+                  <th className="border-b border-white/10 py-3">Sursa</th>
+                  <th className="border-b border-white/10 py-3">Aparitii</th>
+                  <th className="border-b border-white/10 py-3">Ultima data</th>
+                </tr>
+              </thead>
+              <tbody>
+                {misses.map((item) => (
+                  <tr key={`${item.query}-${item.store}-${item.source}`}>
+                    <td className="border-b border-white/5 py-3 font-bold text-white">{item.query}</td>
+                    <td className="border-b border-white/5 py-3 text-gray-300">{item.store}</td>
+                    <td className="border-b border-white/5 py-3 text-gray-400">{item.source}</td>
+                    <td className="border-b border-white/5 py-3 font-black text-amber-200">{item.count}</td>
+                    <td className="border-b border-white/5 py-3 text-gray-400">
+                      {item.lastSeen ? new Date(item.lastSeen).toLocaleString("ro-RO") : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!misses.length && (
+              <p className="mt-4 rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-gray-400">
+                Nu exista inca produse negasite in perioada selectata.
+              </p>
+            )}
           </div>
         </section>
 

@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import BadRequest
 from PIL import Image, ImageOps
-from sqlalchemy import or_, text
+from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 import base64
 import json
@@ -52,6 +52,8 @@ OPEN_FOOD_FACTS_ALTERNATIVES_CACHE = {}
 OPEN_FOOD_FACTS_PRODUCT_CACHE = {}
 OPEN_FOOD_FACTS_ALTERNATIVES_CACHE_TTL = 10 * 60
 OPEN_FOOD_FACTS_PRODUCT_CACHE_TTL = 60 * 60
+PRODUCT_SEARCH_RESULT_CACHE = {}
+PRODUCT_SEARCH_RESULT_CACHE_TTL = int(os.environ.get("PRODUCT_SEARCH_RESULT_CACHE_TTL", "900"))
 OPEN_PRICES_CACHE = {}
 OPEN_PRICES_CACHE_TTL = 30 * 60
 AI_STATUS_CACHE = {"created_at": 0, "data": None}
@@ -1220,6 +1222,7 @@ def get_publication_readiness():
         blockers.append("FRONTEND_ORIGINS nu trebuie sa contina localhost/IP local in productie.")
 
     if payment_provider == "stripe":
+        stripe_secret_key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
         missing_stripe_settings = [
             key
             for key in [
@@ -1258,6 +1261,16 @@ def get_publication_readiness():
                 + ", ".join(missing_yearly_prices)
                 + "."
             )
+
+        if PRODUCTION_MODE and stripe_secret_key.startswith("sk_test_"):
+            blockers.append(
+                "Stripe este in modul test. Pentru lansare publica foloseste STRIPE_SECRET_KEY live si price id-uri live."
+            )
+
+        if PRODUCTION_MODE and "cealeg.shop" not in FRONTEND_PUBLIC_URL:
+            warnings.append(
+                "FRONTEND_PUBLIC_URL nu pare sa fie domeniul public cealeg.shop. Verifica linkurile din emailuri si Stripe."
+            )
     elif payment_provider in {"", "manual", "mock", "none"}:
         warnings.append("Platile reale nu sunt conectate. Pro/Family se pot activa doar manual din admin.")
 
@@ -1270,6 +1283,10 @@ def get_publication_readiness():
     if not is_email_configured():
         warnings.append(
             "Emailurile tranzactionale nu sunt configurate; welcome/reset vor merge doar in mod local de test."
+        )
+    elif PRODUCTION_MODE and EMAIL_PROVIDER == "brevo" and str(os.environ.get("EMAIL_FROM", "")).lower().endswith("@gmail.com"):
+        warnings.append(
+            "Brevo este configurat, dar pentru lansare este recomandat un sender pe domeniul cealeg.shop cu SPF/DKIM."
         )
 
     return {
@@ -1877,6 +1894,7 @@ ADMIN_ENDPOINTS = {
     "approve_product_submission",
     "get_admin_overview",
     "get_admin_submissions",
+    "get_admin_search_misses",
     "delete_admin_product",
     "admin_update_user_plan",
     "get_readiness",
@@ -2405,6 +2423,41 @@ def get_store_name_from_id(store_id):
     }
 
     return stores.get(store_id, "Fără magazin ales")
+
+
+def record_search_event(search_text, store=None, result_count=0, source="search", user_id=None):
+    normalized_text = str(search_text or "").strip()
+
+    if not normalized_text:
+        return
+
+    db.session.add(SearchEvent(
+        user_id=user_id if user_id and db.session.get(User, user_id) else None,
+        search_text=normalized_text[:250],
+        store=str(store or "").strip()[:100] or None,
+        result_count=max(0, int(result_count or 0)),
+        source=str(source or "search").strip()[:40],
+    ))
+
+
+def get_cached_product_search_results(cache_key):
+    cache_item = PRODUCT_SEARCH_RESULT_CACHE.get(cache_key)
+
+    if not cache_item:
+        return None
+
+    if time.time() - cache_item["created_at"] > PRODUCT_SEARCH_RESULT_CACHE_TTL:
+        PRODUCT_SEARCH_RESULT_CACHE.pop(cache_key, None)
+        return None
+
+    return [dict(item) for item in cache_item["results"]]
+
+
+def set_cached_product_search_results(cache_key, results):
+    PRODUCT_SEARCH_RESULT_CACHE[cache_key] = {
+        "created_at": time.time(),
+        "results": [dict(item) for item in results],
+    }
 
 
 def product_to_analysis_result(product, uploaded_filename):
@@ -4605,6 +4658,44 @@ def get_admin_submissions():
     return jsonify([product_submission_to_dict(item) for item in submissions])
 
 
+@app.route("/admin/search-misses", methods=["GET"])
+def get_admin_search_misses():
+    days = request.args.get("days", default=30, type=int)
+    limit = request.args.get("limit", default=50, type=int)
+    safe_days = max(1, min(days or 30, 365))
+    safe_limit = max(1, min(limit or 50, 200))
+    since = datetime.utcnow() - timedelta(days=safe_days)
+
+    rows = (
+        db.session.query(
+            SearchEvent.search_text.label("search_text"),
+            SearchEvent.store.label("store"),
+            SearchEvent.source.label("source"),
+            func.count(SearchEvent.id).label("count"),
+            func.max(SearchEvent.created_at).label("last_seen"),
+        )
+        .filter(
+            SearchEvent.result_count == 0,
+            SearchEvent.created_at >= since,
+        )
+        .group_by(SearchEvent.search_text, SearchEvent.store, SearchEvent.source)
+        .order_by(func.count(SearchEvent.id).desc(), func.max(SearchEvent.created_at).desc())
+        .limit(safe_limit)
+        .all()
+    )
+
+    return jsonify([
+        {
+            "query": row.search_text,
+            "store": row.store or "Fără magazin ales",
+            "source": row.source or "search",
+            "count": int(row.count or 0),
+            "lastSeen": row.last_seen.isoformat() + "Z" if row.last_seen else None,
+        }
+        for row in rows
+    ])
+
+
 @app.route("/admin/products/<int:product_id>", methods=["DELETE"])
 def delete_admin_product(product_id):
     product = db.session.get(Product, product_id)
@@ -4726,8 +4817,14 @@ def search_products():
     results = []
     seen_keys = set()
     seen_names = set()
+    cache_key = f"product-search:{normalize_search_text(query_text)}:{normalize_search_text(store_name or '')}"
+    cached_results = get_cached_product_search_results(cache_key)
+    source = "openfoodfacts"
 
-    if len(query_text) >= 3:
+    if cached_results is not None:
+        results = cached_results
+        source = "openfoodfacts-cache"
+    elif len(query_text) >= 3:
         try:
             for off_product in fetch_off_text_search_products(query_text):
                 product_data = build_off_search_result(off_product, query_text, store_name)
@@ -4756,20 +4853,21 @@ def search_products():
                 "source": "openfoodfacts",
             }), 502
 
-    results.sort(key=lambda item: item.get("matchScore", 0), reverse=True)
-    results = results[:10]
+        results.sort(key=lambda item: item.get("matchScore", 0), reverse=True)
+        results = results[:10]
+        set_cached_product_search_results(cache_key, results)
 
-    db.session.add(SearchEvent(
-        user_id=user_id if user_id and User.query.get(user_id) else None,
-        search_text=query_text[:250],
+    record_search_event(
+        query_text,
         store=store_name,
         result_count=len(results),
-        source="openfoodfacts",
-    ))
+        source=source,
+        user_id=user_id,
+    )
     db.session.commit()
 
     response = jsonify(results)
-    response.headers["X-Product-Source"] = "openfoodfacts"
+    response.headers["X-Product-Source"] = source
     return response
 
 
@@ -4800,6 +4898,12 @@ def search_products_by_label():
             results.append(product_data)
 
     results.sort(key=lambda item: item.get("matchScore", 0), reverse=True)
+    record_search_event(
+        label_text,
+        result_count=len(results),
+        source="label_search",
+    )
+    db.session.commit()
     return jsonify(results[:5])
 
 
@@ -4814,13 +4918,20 @@ def get_open_food_facts_alternatives():
         if str(item).strip()
     ]
     category_tag = get_off_alternative_category(scanned_product)
+    scanned_family = get_product_recommendation_family(scanned_product)
 
     off_products = []
     lookup_errors = []
+    seen_off_codes = set()
 
     if category_tag:
         try:
-            off_products.extend(fetch_off_category_products(category_tag))
+            category_products = fetch_off_category_products(category_tag)
+            off_products.extend(category_products)
+            seen_off_codes.update(
+                str(product.get("code") or "").strip()
+                for product in category_products
+            )
         except requests.RequestException as error:
             lookup_errors.append(str(error))
             app.logger.warning(
@@ -4828,6 +4939,26 @@ def get_open_food_facts_alternatives():
                 category_tag,
                 error,
             )
+
+    if "caffeine" in criteria and scanned_family in {"coffee_drink", "energy_drink", "caffeinated_beverage", "cola"}:
+        for extra_category_tag in ["en:energy-drinks", "en:iced-coffees"]:
+            if extra_category_tag == category_tag:
+                continue
+
+            try:
+                for product in fetch_off_category_products(extra_category_tag):
+                    code = str(product.get("code") or "").strip()
+
+                    if code and code not in seen_off_codes:
+                        off_products.append(product)
+                        seen_off_codes.add(code)
+            except requests.RequestException as error:
+                lookup_errors.append(str(error))
+                app.logger.warning(
+                    "Open Food Facts caffeine alternatives failed for %s: %s",
+                    extra_category_tag,
+                    error,
+                )
 
     if len(off_products) < 8:
         try:
@@ -4897,7 +5028,7 @@ def get_open_food_facts_alternatives():
         if not is_compatible_alternative(scanned_product, candidate):
             continue
 
-        if "caffeine" in criteria and not is_high_caffeine_candidate(candidate):
+        if "caffeine" in criteria and not is_caffeine_relevant_candidate(candidate):
             continue
 
         alternatives.append(candidate)
@@ -5030,6 +5161,14 @@ def analyze_product():
         selected_product = db.session.get(Product, int(demo_product_id))
 
     if selected_product is None and product_query:
+        record_search_event(
+            product_query,
+            store=store_name,
+            result_count=0,
+            source="analysis_not_found",
+            user_id=getattr(getattr(g, "current_user", None), "id", None),
+        )
+        db.session.commit()
         return jsonify({
             "product_not_found": True,
             "message": (
@@ -6432,11 +6571,11 @@ def get_product_recommendation_family(product_data):
     if any(word in text_value for word in energy_words):
         return "energy_drink"
 
-    if any(word in text_value for word in caffeine_words):
-        return "caffeinated_beverage"
-
     if any(word in text_value for word in cola_words):
         return "cola"
+
+    if any(word in text_value for word in caffeine_words):
+        return "caffeinated_beverage"
 
     if any(word in text_value for word in dairy_dessert_words):
         return "dairy_dessert"
@@ -6457,18 +6596,17 @@ def is_compatible_alternative(scanned_product, candidate):
     if candidate_family == "water" and scanned_family != "water":
         return False
 
-    if scanned_family in {
-        "coffee_drink",
-        "energy_drink",
-        "caffeinated_beverage",
-        "cola",
-    }:
-        return candidate_family in {
-            "coffee_drink",
-            "energy_drink",
-            "caffeinated_beverage",
-            "cola",
-        }
+    if scanned_family == "energy_drink":
+        return candidate_family in {"energy_drink", "caffeinated_beverage"}
+
+    if scanned_family == "coffee_drink":
+        return candidate_family in {"coffee_drink", "energy_drink", "caffeinated_beverage"}
+
+    if scanned_family == "caffeinated_beverage":
+        return candidate_family in {"coffee_drink", "energy_drink", "caffeinated_beverage"}
+
+    if scanned_family == "cola":
+        return candidate_family in {"cola", "energy_drink", "caffeinated_beverage"}
 
     if scanned_family == "dairy_dessert":
         return candidate_family in {"dairy_dessert", "lactate", "general"} or (
@@ -6585,6 +6723,15 @@ def is_high_caffeine_candidate(product):
     )
 
 
+def is_caffeine_relevant_candidate(product):
+    product_family = get_product_recommendation_family(product)
+
+    if product_family in {"water", "cola"}:
+        return False
+
+    return product_family in {"energy_drink", "coffee_drink", "caffeinated_beverage"}
+
+
 def score_off_alternative(products, product, criteria, scanned_product=None):
     score = float(product.get("score") or 0)
     reasons = []
@@ -6648,7 +6795,9 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
             score += 10
             reasons.append("conține cafeină")
         elif candidate_family == "cola":
-            score -= 8
+            score -= 30
+        elif candidate_family == "water":
+            score -= 60
 
         if any(token in candidate_text for token in ["taurina", "taurine", "caffeine", "cafeina", "cofeina"]):
             score += 4
@@ -7183,7 +7332,7 @@ def get_known_catalog_alternatives(scanned_product, criteria):
         if not is_compatible_alternative(scanned_product, product_data):
             continue
 
-        if "caffeine" in criteria and not is_high_caffeine_candidate(product_data):
+        if "caffeine" in criteria and not is_caffeine_relevant_candidate(product_data):
             continue
 
         alternatives.append(product_data)

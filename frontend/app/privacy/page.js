@@ -15,6 +15,8 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 
+const CONTACT_EMAIL = "cealegshop@gmail.com";
+
 export default function PrivacyPage() {
   const { pick } = useLocale();
 
@@ -127,6 +129,20 @@ export default function PrivacyPage() {
                 "Ce aleg? ofera informatii orientative despre produse alimentare. Verifica mereu eticheta produsului, alergeni, pretul real si recomandarile medicului daca ai restrictii alimentare.",
                 "Ce aleg? provides informational guidance about food products. Always check the product label, allergens, real shelf price and medical advice if you have dietary restrictions."
               )}
+            </p>
+          </div>
+
+          <div className="mt-5 rounded-xl border border-white/10 bg-black/25 p-5">
+            <h2 className="font-black">{pick("Contact pentru date personale", "Personal data contact")}</h2>
+            <p className="mt-2 leading-7 text-gray-300">
+              {pick(
+                "Pentru intrebari despre date, stergere cont sau export, scrie-ne la",
+                "For questions about data, account deletion or export, contact us at"
+              )}{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className="font-bold text-cyan-200 hover:text-white">
+                {CONTACT_EMAIL}
+              </a>
+              .
             </p>
           </div>
         </div>

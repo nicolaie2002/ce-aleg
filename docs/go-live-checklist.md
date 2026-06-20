@@ -272,6 +272,12 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Profiluri Family v1: creare membru, selectare profil si preferinte separate
 - [x] Footer global profesional si header mai curat
 - [x] Accente UI rafinate: verde pastrat pentru brand/scor, cyan/amber pentru navigatie si actiuni
+- [x] Admin: panou pentru produse negasite/cautari fara rezultat
+- [x] Recomandari: filtru anti-alternative gresite pentru apa/cola la bauturi cu cafeina
+- [x] Recomandari: ranking mai strict dupa familie produs + cerinta utilizatorului
+- [x] Cache server pentru cautari populare dupa text
+- [x] Sitemap si robots pentru Google Search Console
+- [x] Suport optional Google Analytics prin `NEXT_PUBLIC_GA_ID`
 
 ### De facut de tine
 
@@ -286,16 +292,23 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Testeaza emailurile din admin
 - [x] Testeaza inregistrare, login, scanare, cos, plata si stergere cont
 - [x] Cumpara si conecteaza domeniul
-- [ ] Verifica textele legale si datele de contact
+- [x] Verifica textele legale si datele de contact de baza
+- [ ] Creeaza produsele/preturile Stripe live si pune cheile `sk_live_` + price ID-urile live in Render
+- [ ] Configureaza webhook Stripe live catre `https://cealeg-api.onrender.com/billing/stripe/webhook`
+- [ ] Verifica sender/domeniu Brevo pentru `cealeg.shop` cu SPF/DKIM
+- [ ] Adauga `https://www.cealeg.shop/sitemap.xml` in Google Search Console
+- [ ] Optional: creeaza GA4 si seteaza `NEXT_PUBLIC_GA_ID` in Vercel
+- [ ] Test final pe telefon pe domeniul public: cont nou, confirmare email, login, scanare, alternative, cos, favorite, plata, resetare parola, stergere cont
 
 ### Blocante pentru lansare
 
-- [x] `/readiness` nu raporteaza blocante
+- [ ] `/readiness` nu raporteaza blocante cu Stripe live, nu test
 - [x] `APP_ENV=production`
 - [x] `COOKIE_SECURE=true`
 - [x] Niciun URL localhost in variabilele de productie
 - [x] Buildul frontend trece
 - [x] Stripe test functioneaza si webhookul actualizeaza planurile
+- [ ] Stripe live functioneaza si webhookul actualizeaza planurile
 - [x] Emailurile ajung in inbox
 - [x] Scanarea este testata pe telefon prin HTTPS
 

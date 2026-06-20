@@ -16,6 +16,7 @@ const scriptSources = [
   "'unsafe-inline'",
   "'wasm-unsafe-eval'",
   "https://cdn.jsdelivr.net",
+  "https://www.googletagmanager.com",
   ...(isProduction ? [] : ["'unsafe-eval'"]),
 ].join(" ");
 const contentSecurityPolicy = [
@@ -31,12 +32,17 @@ const contentSecurityPolicy = [
     "img-src 'self' data: blob:",
     "https://images.openfoodfacts.org",
     "https://images.unsplash.com",
+    "https://www.google-analytics.com",
+    "https://www.googletagmanager.com",
     "https://*.supabase.co",
   ].join(" "),
   [
     "connect-src 'self' blob:",
     "https://cdn.jsdelivr.net",
     "https://tessdata.projectnaptha.com",
+    "https://www.google-analytics.com",
+    "https://region1.google-analytics.com",
+    "https://www.googletagmanager.com",
     "https://*.supabase.co",
     publicApiOrigin,
   ].join(" "),
