@@ -43,7 +43,7 @@ function createBarcodeReader() {
 }
 
 function normalizeDetectedBarcode(value) {
-  return String(value || "").replace(/\s+/g, "").trim();
+  return String(value || "").replace(/[^\d]/g, "").trim();
 }
 
 function hasValidGs1Checksum(barcode) {
@@ -100,15 +100,20 @@ function createEnhancedCanvas(sourceCanvas, contrast = 1.7) {
 }
 
 function buildScanAttempts(canvas) {
+  const wideCenterCrop = createCroppedCanvas(canvas, 0.98, 0.64);
   const centerCrop = createCroppedCanvas(canvas, 0.92, 0.74);
-  const narrowCenterCrop = createCroppedCanvas(canvas, 0.94, 0.52);
+  const narrowCenterCrop = createCroppedCanvas(canvas, 0.96, 0.42);
+  const verticalCenterCrop = createCroppedCanvas(canvas, 0.64, 0.96);
 
   return [
     canvas,
+    wideCenterCrop,
     centerCrop,
     narrowCenterCrop,
-    createEnhancedCanvas(centerCrop),
-    createEnhancedCanvas(narrowCenterCrop, 2),
+    verticalCenterCrop,
+    createEnhancedCanvas(wideCenterCrop),
+    createEnhancedCanvas(narrowCenterCrop, 2.1),
+    createEnhancedCanvas(verticalCenterCrop, 2),
   ];
 }
 
@@ -420,7 +425,7 @@ export default function BarcodeScanPage() {
             const detectedCode = codes[0].rawValue;
 
             if (detectedCode && !detectedRef.current) {
-              const detectionState = await handleDetectedBarcode(detectedCode);
+              const detectionState = await handleDetectedBarcode(detectedCode, 2);
 
               if (detectionState === "confirmed") return;
             }
@@ -462,7 +467,7 @@ export default function BarcodeScanPage() {
           if (result && !detectedRef.current) {
             const detectedCode = result.getText();
 
-            await handleDetectedBarcode(detectedCode);
+            await handleDetectedBarcode(detectedCode, 2);
           } else if (!detectedRef.current) {
             setScanStatus(
               "Caut codul... ține codul drept, clar și bine luminat."
@@ -546,9 +551,9 @@ export default function BarcodeScanPage() {
       await scanRotatedBarcodeFrame();
 
       if (!detectedRef.current && videoRef.current?.srcObject) {
-        rotatedBarcodeTimerRef.current = setTimeout(scanNextFrame, 650);
+        rotatedBarcodeTimerRef.current = setTimeout(scanNextFrame, 420);
       }
-    }, 500);
+    }, 250);
   }
 
   async function handleDetectedBarcode(detectedCode, confirmationWeight = 1) {
@@ -572,6 +577,7 @@ export default function BarcodeScanPage() {
       previousCandidate && now - previousCandidate.lastSeen < 1800
         ? previousCandidate.count + confirmationWeight
         : confirmationWeight;
+    const requiredConfirmations = confirmationWeight >= 2 ? 2 : 3;
 
     barcodeCandidatesRef.current.set(normalizedCode, {
       count,
@@ -586,7 +592,7 @@ export default function BarcodeScanPage() {
 
     setBarcode(normalizedCode);
 
-    if (count < 3) {
+    if (count < requiredConfirmations) {
       setScanStatus("Am găsit codul. Confirm produsul...");
       return "pending";
     }
@@ -622,7 +628,7 @@ export default function BarcodeScanPage() {
 
         const radians = (angle * Math.PI) / 180;
         const swapsDimensions = angle === 90 || angle === 270;
-        const maxWidth = 1280;
+        const maxWidth = 1080;
         const scale = Math.min(1, maxWidth / video.videoWidth);
         const frameWidth = Math.round(video.videoWidth * scale);
         const frameHeight = Math.round(video.videoHeight * scale);
@@ -646,7 +652,7 @@ export default function BarcodeScanPage() {
         for (const attemptCanvas of attempts) {
           try {
             const result = reader.decodeFromCanvas(attemptCanvas);
-            const detectionState = await handleDetectedBarcode(result.getText());
+            const detectionState = await handleDetectedBarcode(result.getText(), 2);
 
             if (detectionState !== "invalid") {
               return;
@@ -693,7 +699,7 @@ export default function BarcodeScanPage() {
       ) {
         ocrTimerRef.current = setTimeout(analyzeNextOcrFrame, 3200);
       }
-    }, 2600);
+    }, 5200);
   }
 
   async function analyzeBarcodeNumbersWithOcr() {
@@ -724,7 +730,7 @@ export default function BarcodeScanPage() {
       const candidates = extractValidOcrBarcodes(result.data.text);
 
       for (const candidate of candidates) {
-        const detectionState = await handleDetectedBarcode(candidate, 2);
+        const detectionState = await handleDetectedBarcode(candidate, 1);
 
         if (detectionState !== "invalid") {
           setScanStatus("Verific codul identificat...");
@@ -906,11 +912,14 @@ export default function BarcodeScanPage() {
   }
 
   async function lookupBarcode(code) {
-    if (!code.trim()) {
+    const lookupCode = normalizeDetectedBarcode(code);
+
+    if (!lookupCode) {
       setMessage("Introdu sau scanează un cod de bare.");
       return;
     }
 
+    setBarcode(lookupCode);
     setIsLookingUp(true);
     setMessage("");
     setFoundProduct(null);
@@ -918,7 +927,7 @@ export default function BarcodeScanPage() {
     setBillingGate(null);
 
     try {
-      const response = await fetch(`${API_URL}/barcode/lookup/${code.trim()}`);
+      const response = await fetch(`${API_URL}/barcode/lookup/${lookupCode}`);
       const data = await response.json();
 
       if (!response.ok) {

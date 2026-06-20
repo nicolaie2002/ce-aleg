@@ -2290,6 +2290,25 @@ def has_valid_gs1_checksum(barcode):
     return (10 - weighted_sum % 10) % 10 == check_digit
 
 
+def get_barcode_lookup_candidates(barcode):
+    barcode = str(barcode or "").strip()
+    candidates = [barcode] if barcode else []
+
+    if len(barcode) == 13 and barcode.startswith("0"):
+        upc_candidate = barcode[1:]
+
+        if has_valid_gs1_checksum(upc_candidate):
+            candidates.append(upc_candidate)
+
+    if len(barcode) == 12:
+        ean_candidate = f"0{barcode}"
+
+        if has_valid_gs1_checksum(ean_candidate):
+            candidates.append(ean_candidate)
+
+    return list(dict.fromkeys(candidates))
+
+
 def validate_text_length(value, label, max_length, min_length=0):
     value = str(value or "").strip()
 
@@ -6811,7 +6830,7 @@ def save_product_to_local_database(product_data):
         store=product_data["store"],
         category=product_data["category"],
         barcode=product_data["barcode"],
-        score=product_data["score"],
+        score=product_data["score"] if product_data["score"] is not None else 5.0,
         tag=product_data["tag"],
         image=product_data["image"],
         price=product_data["price"],
@@ -7088,51 +7107,55 @@ def lookup_barcode(barcode):
     if not scan_gate["allowed"]:
         return respond_scan_limit(scan_gate)
 
-    local_product = Product.query.filter_by(barcode=barcode).first()
+    barcode_candidates = get_barcode_lookup_candidates(barcode)
+    matched_barcode = barcode
+    local_product = None
+
+    for candidate_barcode in barcode_candidates:
+        local_product = Product.query.filter_by(barcode=candidate_barcode).first()
+
+        if local_product:
+            matched_barcode = candidate_barcode
+            break
 
     if local_product:
         return jsonify({
             "found": True,
             "source": "local",
+            "matchedBarcode": matched_barcode,
             "product": product_to_dict_with_open_price(local_product),
             "usage": scan_gate["usage"],
         })
 
-    try:
-        url = f"https://world.openfoodfacts.org/api/v2/product/{barcode}"
+    off_product = None
+    last_lookup_error = None
 
-        headers = {
-            "User-Agent": "CeAlegApp/1.0 (contact: local-dev)",
-            "Accept": "application/json",
-        }
-
-        response = requests.get(url, headers=headers, timeout=15)
-
-        if response.status_code == 404:
-            return jsonify({
-                "found": False,
-                "source": "openfoodfacts",
-                "message": "Produsul nu a fost găsit după codul de bare.",
-                "barcode": barcode,
-            }), 404
-
-        if response.status_code != 200:
+    for candidate_barcode in barcode_candidates:
+        try:
+            candidate_product = fetch_off_product_by_barcode(candidate_barcode)
+        except requests.RequestException as error:
+            last_lookup_error = error
             app.logger.warning(
-                "Open Food Facts barcode lookup returned status %s: %s",
-                response.status_code,
-                response.text[:300],
+                "Open Food Facts barcode lookup failed for %s: %s",
+                candidate_barcode,
+                error,
             )
-            return jsonify({
-                "found": False,
-                "source": "openfoodfacts",
-                "message": "Open Food Facts a răspuns cu eroare.",
-                "status_code": response.status_code,
-            }), 502
+            continue
+        except Exception as error:
+            last_lookup_error = error
+            app.logger.warning(
+                "Open Food Facts barcode lookup failed for %s: %s",
+                candidate_barcode,
+                error,
+            )
+            continue
 
-        data = response.json()
+        if candidate_product:
+            off_product = candidate_product
+            matched_barcode = candidate_barcode
+            break
 
-    except Exception as error:
-        app.logger.warning("Open Food Facts barcode lookup failed: %s", error)
+    if not off_product and last_lookup_error:
         return jsonify({
             "found": False,
             "source": "openfoodfacts",
@@ -7140,16 +7163,23 @@ def lookup_barcode(barcode):
             "message": "Open Food Facts nu este disponibil momentan. Poți încerca din nou sau contribui produsul manual.",
         }), 503
 
-    if data.get("status") != 1 or not data.get("product"):
+    if not off_product:
         return jsonify({
             "found": False,
             "source": "openfoodfacts",
             "message": "Produsul nu a fost găsit după codul de bare.",
             "barcode": barcode,
+            "barcodeCandidates": barcode_candidates,
         }), 404
 
-    product_data = build_product_from_open_food_facts(barcode, data["product"])
-    price_summary = get_open_prices_summary(barcode)
+    product_data = build_product_from_open_food_facts(matched_barcode, off_product)
+    price_summary = None
+
+    for candidate_barcode in list(dict.fromkeys([matched_barcode, *barcode_candidates])):
+        price_summary = get_open_prices_summary(candidate_barcode)
+
+        if price_summary:
+            break
 
     if price_summary:
         product_data.update(price_summary)
@@ -7160,6 +7190,7 @@ def lookup_barcode(barcode):
         "found": True,
         "source": "openfoodfacts",
         "cached": True,
+        "matchedBarcode": matched_barcode,
         "product": product_to_dict_with_open_price(local_product),
         "usage": scan_gate["usage"],
     })                                    
