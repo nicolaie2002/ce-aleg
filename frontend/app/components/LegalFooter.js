@@ -19,12 +19,13 @@ export function LegalFooter() {
 
   const productLinks = [
     { href: "/barcode-scan", label: pick("Scanare cod", "Barcode scan"), icon: Barcode },
-    { href: "/live-assistant", label: pick("Asistent live", "Live assistant"), icon: Camera },
+    { href: "/live-assistant", label: pick("AI preview", "AI preview"), icon: Camera },
     { href: "/pricing", label: pick("Planuri", "Plans"), icon: Crown },
   ];
 
   const accountLinks = [
     { href: "/forgot-password", label: pick("Resetare parola", "Reset password"), icon: RotateCcwKey },
+    { href: "/support", label: pick("Suport", "Support"), icon: Mail },
     { href: "/privacy", label: pick("Confidentialitate", "Privacy"), icon: LockKeyhole },
     { href: "/terms", label: pick("Termeni", "Terms"), icon: Scale },
   ];

@@ -34,10 +34,16 @@ function shouldReveal(element) {
 export function ScrollRevealController() {
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const lowPowerDevice =
+      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+      (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+      connection?.saveData;
 
-    if (reducedMotion.matches) return undefined;
+    if (reducedMotion.matches || lowPowerDevice) return undefined;
 
     const seen = new WeakSet();
+    let collectFrame = 0;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -68,7 +74,11 @@ export function ScrollRevealController() {
 
     collect();
     const mutationObserver = new MutationObserver(() => {
-      window.requestAnimationFrame(collect);
+      if (collectFrame) return;
+      collectFrame = window.requestAnimationFrame(() => {
+        collectFrame = 0;
+        collect();
+      });
     });
 
     mutationObserver.observe(document.body, {
@@ -79,6 +89,7 @@ export function ScrollRevealController() {
     return () => {
       observer.disconnect();
       mutationObserver.disconnect();
+      if (collectFrame) window.cancelAnimationFrame(collectFrame);
     };
   }, []);
 

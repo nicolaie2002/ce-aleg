@@ -65,12 +65,16 @@ const featureLabels = {
     en: "unlimited scans",
   },
   "asistent live la raft": {
-    ro: "asistent live la raft",
-    en: "live shelf assistant",
+    ro: "AI preview in dezvoltare",
+    en: "AI preview in development",
   },
   "asistent smart live": {
-    ro: "asistent live la raft",
-    en: "live shelf assistant",
+    ro: "AI preview in dezvoltare",
+    en: "AI preview in development",
+  },
+  "AI preview in dezvoltare": {
+    ro: "AI preview in dezvoltare",
+    en: "AI preview in development",
   },
   "3 alternative imediat + afiseaza mai multe": {
     ro: "3 alternative imediat + afiseaza mai multe",

@@ -144,7 +144,7 @@ export default function PreferencesPage() {
 
   return (
     <main className="min-h-screen text-white">
-      <AppHeader actionHref="/live-assistant" actionLabel={pick("Asistent live", "Live assistant")} />
+      <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scaneaza codul", "Scan barcode")} />
       <section className="ce-shell ce-page">
         <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white">
           <ArrowLeft size={16} /> {pick("Inapoi la dashboard", "Back to dashboard")}

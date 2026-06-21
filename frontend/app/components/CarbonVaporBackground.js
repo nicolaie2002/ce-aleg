@@ -64,8 +64,18 @@ export function CarbonVaporBackground({ variant = "global" }) {
 
     const container = canvas.parentElement || document.body;
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const lowPowerDevice =
+      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+      (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+      connection?.saveData ||
+      window.innerWidth < 768;
+    const shouldAnimate = !reducedMotion.matches && !lowPowerDevice;
     const noise = createNoiseTexture(112);
-    const wisps = makeWisps(variant === "hero" ? 30 : 34, variant === "hero" ? 17 : 41);
+    const wisps = makeWisps(
+      lowPowerDevice ? (variant === "hero" ? 14 : 10) : variant === "hero" ? 30 : 26,
+      variant === "hero" ? 17 : 41
+    );
     const pointer = {
       x: 0.5,
       y: 0.5,
@@ -81,7 +91,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       const rect = container.getBoundingClientRect();
       const nextWidth = Math.max(1, Math.floor(rect.width || window.innerWidth));
       const nextHeight = Math.max(1, Math.floor(rect.height || window.innerHeight));
-      const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, lowPowerDevice ? 1.1 : 1.6);
 
       width = nextWidth;
       height = nextHeight;
@@ -125,7 +135,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
     }
 
     function drawCarbonFolds(time, isLight) {
-      const foldCount = variant === "hero" ? 9 : 7;
+      const foldCount = lowPowerDevice ? (variant === "hero" ? 5 : 4) : variant === "hero" ? 9 : 7;
       context.save();
       context.globalCompositeOperation = isLight ? "multiply" : "screen";
 
@@ -170,7 +180,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       const drift = time * wisp.speed + wisp.phase;
       const pulse = 0.55 + Math.sin(drift * 1.3) * 0.18;
       const alpha = wisp.alpha * pulse * (isLight ? (variant === "hero" ? 1.25 : 0.95) : variant === "hero" ? 1.45 : 1.18);
-      const segments = 54;
+      const segments = lowPowerDevice ? 28 : 54;
 
       context.save();
       context.translate(centerX, centerY);
@@ -208,7 +218,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
     }
 
     function drawMetalHighlights(time, isLight) {
-      const count = variant === "hero" ? 12 : 8;
+      const count = lowPowerDevice ? (variant === "hero" ? 6 : 4) : variant === "hero" ? 12 : 8;
       context.save();
       context.globalCompositeOperation = isLight ? "multiply" : "screen";
 
@@ -256,7 +266,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       context.filter = "none";
       context.globalCompositeOperation = "source-over";
 
-      if (shouldContinue && !reducedMotion.matches) {
+      if (shouldContinue && shouldAnimate && document.visibilityState === "visible") {
         animationFrame = window.requestAnimationFrame((nextTime) => {
           renderFrame(nextTime, true);
         });
@@ -272,7 +282,9 @@ export function CarbonVaporBackground({ variant = "global" }) {
       pointer.targetY = (event.clientY - rect.top) / rect.height;
     }
 
-    container.addEventListener("pointermove", handlePointerMove, { passive: true });
+    if (!lowPowerDevice) {
+      container.addEventListener("pointermove", handlePointerMove, { passive: true });
+    }
 
     const resizeObserver = new ResizeObserver(() => {
       resize();
@@ -280,7 +292,13 @@ export function CarbonVaporBackground({ variant = "global" }) {
     });
     resizeObserver.observe(container);
 
-    renderFrame(0, !reducedMotion.matches);
+    function handleVisibilityChange() {
+      window.cancelAnimationFrame(animationFrame);
+      renderFrame(performance.now(), shouldAnimate && document.visibilityState === "visible");
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    renderFrame(0, shouldAnimate);
 
     const themeObserver = new MutationObserver(() => {
       renderFrame(performance.now(), false);
@@ -294,6 +312,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       running = false;
       window.cancelAnimationFrame(animationFrame);
       container.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       resizeObserver.disconnect();
       themeObserver.disconnect();
     };

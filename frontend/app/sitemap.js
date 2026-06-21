@@ -5,6 +5,7 @@ const publicRoutes = [
   "/pricing",
   "/login",
   "/register",
+  "/support",
   "/privacy",
   "/terms",
 ];

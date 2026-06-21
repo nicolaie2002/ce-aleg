@@ -331,7 +331,7 @@ PLAN_CATALOG = {
         "weeklyScanLimit": None,
         "features": [
             "scanari nelimitate",
-            "asistent live la raft",
+            "AI preview in dezvoltare",
             "3 alternative imediat + afiseaza mai multe",
             "cautare dupa preferintele tale",
             "istoric complet",
@@ -4737,8 +4737,8 @@ def start_checkout():
         checkout_params = {
             "mode": "subscription",
             "line_items": [{"price": price_id, "quantity": 1}],
-            "success_url": f"{FRONTEND_PUBLIC_URL}/pricing?checkout=success",
-            "cancel_url": f"{FRONTEND_PUBLIC_URL}/pricing?checkout=cancelled",
+            "success_url": f"{FRONTEND_PUBLIC_URL}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+            "cancel_url": f"{FRONTEND_PUBLIC_URL}/billing/cancel",
             "client_reference_id": str(user.id),
             "metadata": metadata,
             "subscription_data": {"metadata": metadata},
