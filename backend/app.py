@@ -1834,22 +1834,20 @@ def get_usage_summary(user):
     }
 
 
-def reserve_scan_usage(user, source, metadata=None):
+def get_scan_limit_error():
+    return {
+        "code": "scan_limit_reached",
+        "message": "Ai folosit cele 5 scanari gratuite din aceasta saptamana. Treci la Pro pentru scanari nelimitate.",
+    }
+
+
+def check_scan_usage_allowed(user):
     if user.is_admin:
         return {"allowed": True, "usage": get_usage_summary(user)}
 
     subscription = get_or_create_subscription(user)
 
     if is_paid_subscription(subscription):
-        db.session.add(
-            UsageEvent(
-                user_id=user.id,
-                event_type="scan",
-                source=source,
-                metadata_json=json.dumps(metadata or {}),
-            )
-        )
-        db.session.commit()
         return {"allowed": True, "usage": get_usage_summary(user)}
 
     used = get_weekly_scan_count(user.id)
@@ -1858,11 +1856,17 @@ def reserve_scan_usage(user, source, metadata=None):
         return {
             "allowed": False,
             "usage": get_usage_summary(user),
-            "error": {
-                "code": "scan_limit_reached",
-                "message": "Ai folosit cele 5 scanari gratuite din aceasta saptamana. Treci la Pro pentru scanari nelimitate.",
-            },
+            "error": get_scan_limit_error(),
         }
+
+    return {"allowed": True, "usage": get_usage_summary(user)}
+
+
+def consume_scan_usage(user, source, metadata=None):
+    scan_gate = check_scan_usage_allowed(user)
+
+    if not scan_gate["allowed"] or user.is_admin:
+        return scan_gate
 
     db.session.add(
         UsageEvent(
@@ -1874,6 +1878,10 @@ def reserve_scan_usage(user, source, metadata=None):
     )
     db.session.commit()
     return {"allowed": True, "usage": get_usage_summary(user)}
+
+
+def reserve_scan_usage(user, source, metadata=None):
+    return consume_scan_usage(user, source, metadata)
 
 
 def respond_scan_limit(scan_gate):
@@ -2802,6 +2810,12 @@ def detect_query_brand(search_text):
     if "gelatelli" in words:
         return "gelatelli"
 
+    if "zuzu" in words:
+        return "zuzu"
+
+    if "samyang" in words:
+        return "samyang"
+
     if "redbull" in text or "red bull" in text or {"red", "bull"}.issubset(words):
         return "redbull"
 
@@ -2813,6 +2827,7 @@ def detect_query_brand(search_text):
         "pepsi": {"pepsi"},
         "coca-cola": {"coca", "cola", "coca-cola", "cocacola"},
         "mountain dew": {"mountain", "dew", "mountaindew"},
+        "buldak": {"buldak"},
     }
 
     for brand, aliases in brand_aliases.items():
@@ -2849,7 +2864,21 @@ def detect_product_type(search_text):
             {
                 "iaurt",
                 "yogurt",
+                "yoghurt",
                 "skyr",
+            },
+        ),
+        (
+            "instant_noodles",
+            {
+                "buldak",
+                "samyang",
+                "ramen",
+                "noodle",
+                "noodles",
+                "taitei",
+                "cup noodles",
+                "instant noodles",
             },
         ),
         (
@@ -2888,7 +2917,17 @@ def product_matches_query_type(product_text, product_type):
     type_tokens = {
         "ice_cream": {"inghetata", "gelato", "ice cream", "icecream", "sorbet"},
         "spread": {"crema tartinabila", "spread", "nutella"},
-        "yogurt": {"iaurt", "yogurt", "skyr"},
+        "yogurt": {"iaurt", "yogurt", "yoghurt", "skyr", "zuzu"},
+        "instant_noodles": {
+            "buldak",
+            "samyang",
+            "ramen",
+            "noodle",
+            "noodles",
+            "taitei",
+            "cup noodles",
+            "instant noodles",
+        },
         "cheese": {"branza", "cheese", "cascaval", "mozzarella"},
         "energy_drink": {
             "energizant",
@@ -6573,6 +6612,43 @@ def get_product_recommendation_family(product_data):
         "desert lactat",
         "dairy dessert",
     ]
+    instant_noodle_words = [
+        "buldak",
+        "samyang",
+        "ramen",
+        "noodle",
+        "noodles",
+        "taitei",
+        "taitel",
+        "taietei",
+        "instant noodles",
+        "cup noodles",
+        "nongshim",
+        "yakisoba",
+        "udon",
+        "soba",
+    ]
+    yogurt_words = ["iaurt", "yogurt", "yoghurt", "skyr", "zuzu", "activia", "danone"]
+    fruit_words = [
+        "fruct",
+        "fructe",
+        "capsuni",
+        "capsuna",
+        "strawberry",
+        "berries",
+        "padure",
+        "piersici",
+        "peach",
+        "visine",
+        "cherry",
+        "afine",
+        "blueberry",
+        "zmeura",
+        "raspberry",
+    ]
+
+    if any(word in text_value for word in instant_noodle_words):
+        return "instant_noodles"
 
     if any(word in text_value for word in water_words) and not any(
         word in text_value
@@ -6595,7 +6671,12 @@ def get_product_recommendation_family(product_data):
     if any(word in text_value for word in dairy_dessert_words):
         return "dairy_dessert"
 
-    if any(word in text_value for word in ["lactate", "dairy", "iaurt", "yogurt", "skyr", "lapte", "milk"]):
+    if any(word in text_value for word in yogurt_words) and any(
+        word in text_value for word in fruit_words
+    ):
+        return "fruit_yogurt"
+
+    if any(word in text_value for word in ["lactate", "dairy", "iaurt", "yogurt", "yoghurt", "skyr", "lapte", "milk"]):
         return "lactate"
 
     if "bauturi" in text_value or "beverage" in text_value or "drink" in text_value:
@@ -6607,8 +6688,45 @@ def get_product_recommendation_family(product_data):
 def is_compatible_alternative(scanned_product, candidate):
     scanned_family = get_product_recommendation_family(scanned_product)
     candidate_family = get_product_recommendation_family(candidate)
+    scanned_text = product_text_for_recommendation(scanned_product)
+    candidate_text = product_text_for_recommendation(candidate)
+    beverage_families = {
+        "water",
+        "cola",
+        "beverage",
+        "energy_drink",
+        "coffee_drink",
+        "caffeinated_beverage",
+    }
+    lactate_families = {"lactate", "fruit_yogurt", "dairy_dessert"}
 
     if candidate_family == "water" and scanned_family != "water":
+        return False
+
+    if scanned_family == "water":
+        return candidate_family == "water"
+
+    if scanned_family not in beverage_families and candidate_family in beverage_families:
+        return False
+
+    if scanned_family in beverage_families and candidate_family not in beverage_families:
+        return False
+
+    if scanned_family == "instant_noodles":
+        return candidate_family == "instant_noodles"
+
+    if candidate_family == "instant_noodles":
+        return scanned_family == "instant_noodles"
+
+    if scanned_family == "fruit_yogurt":
+        if candidate_family not in {"fruit_yogurt", "lactate"}:
+            return False
+        return any(token in candidate_text for token in ["iaurt", "yogurt", "yoghurt", "skyr", "zuzu", "fruct"])
+
+    if scanned_family == "lactate":
+        return candidate_family in lactate_families
+
+    if candidate_family in lactate_families and scanned_family not in lactate_families:
         return False
 
     if scanned_family == "energy_drink":
@@ -6624,9 +6742,17 @@ def is_compatible_alternative(scanned_product, candidate):
         return candidate_family in {"cola", "energy_drink", "caffeinated_beverage"}
 
     if scanned_family == "dairy_dessert":
-        return candidate_family in {"dairy_dessert", "lactate", "general"} or (
+        return candidate_family in {"dairy_dessert", "lactate", "fruit_yogurt"} or (
             normalize_search_text(candidate.get("category")) in {"lactate", "deserturi lactate"}
         )
+
+    if scanned_family == "general" and (
+        "ramen" in scanned_text
+        or "buldak" in scanned_text
+        or "iaurt" in scanned_text
+        or "yogurt" in scanned_text
+    ):
+        return candidate_family != "general"
 
     return True
 
@@ -6653,7 +6779,14 @@ def get_off_alternative_category(product_data):
         "panificatie": "en:breads",
         "fructe si legume": "en:fruits-and-vegetables",
         "sosuri si condimente": "en:condiments",
+        "taitei instant": "en:instant-noodles",
+        "noodles": "en:instant-noodles",
+        "ramen": "en:instant-noodles",
+        "inghetata": "en:ice-creams",
     }
+
+    if any(word in product_text for word in ["iaurt", "yogurt", "yoghurt", "skyr", "zuzu"]) and any(word in product_text for word in ["fruct", "fructe", "capsuni", "strawberry", "piersici", "visine", "afine", "zmeura", "padure"]):
+        return "en:fruit-yogurts"
 
     if category in category_map:
         return category_map[category]
@@ -6661,14 +6794,20 @@ def get_off_alternative_category(product_data):
     if any(word in product_text for word in ["hell", "red bull", "redbull", "monster", "energiz", "energy", "taurina", "taurine"]):
         return "en:energy-drinks"
 
+    if any(word in product_text for word in ["buldak", "samyang", "ramen", "noodle", "noodles", "taitei", "nongshim", "yakisoba", "udon"]):
+        return "en:instant-noodles"
+
     if any(word in product_text for word in ["coffee", "cafea", "cafe", "cappuccino", "capuccino", "latte", "mocha", "espresso", "iced coffee", "ice coffee", "cold brew", "frappe", "cafeina", "cofeina", "caffeine"]):
         return "en:iced-coffees"
 
     if any(word in product_text for word in ["danette", "budinca", "pudding", "custard", "desert lactat"]):
         return "en:dairy-desserts"
 
-    if any(word in product_text for word in ["iaurt", "yogurt", "skyr", "lapte", "milk"]):
+    if any(word in product_text for word in ["iaurt", "yogurt", "yoghurt", "skyr", "lapte", "milk"]):
         return "en:dairies"
+
+    if any(word in product_text for word in ["inghetata", "ice cream", "gelatelli", "gelato"]):
+        return "en:ice-creams"
 
     if any(word in product_text for word in ["sos", "mustar", "ketchup", "salsa"]):
         return "en:condiments"
@@ -6741,7 +6880,7 @@ def is_high_caffeine_candidate(product):
 def is_caffeine_relevant_candidate(product):
     product_family = get_product_recommendation_family(product)
 
-    if product_family in {"water", "cola"}:
+    if product_family in {"water", "cola", "instant_noodles", "lactate", "fruit_yogurt", "dairy_dessert"}:
         return False
 
     return product_family in {"energy_drink", "coffee_drink", "caffeinated_beverage"}
@@ -6755,10 +6894,27 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
 
     if scanned_product:
         scanned_family = get_product_recommendation_family(scanned_product)
+        beverage_families = {
+            "water",
+            "cola",
+            "beverage",
+            "energy_drink",
+            "coffee_drink",
+            "caffeinated_beverage",
+        }
 
         if candidate_family == scanned_family:
-            score += 8
+            family_bonus = 18 if scanned_family in {"instant_noodles", "fruit_yogurt"} else 8
+            score += family_bonus
             reasons.append("aceeași categorie de produs")
+        elif scanned_family == "instant_noodles":
+            score -= 80
+        elif scanned_family == "fruit_yogurt" and candidate_family not in {"fruit_yogurt", "lactate"}:
+            score -= 60
+        elif scanned_family not in beverage_families and candidate_family in beverage_families:
+            score -= 70
+        elif scanned_family in beverage_families and candidate_family not in beverage_families:
+            score -= 45
         elif scanned_family in {
             "coffee_drink",
             "energy_drink",
@@ -6952,6 +7108,23 @@ def get_off_search_terms(product_data):
     if any(word in text for word in ["danette", "budinca", "pudding", "custard"]):
         return "dairy dessert pudding"
 
+    if any(word in text for word in ["buldak", "samyang", "ramen", "noodle", "noodles", "taitei", "nongshim", "yakisoba"]):
+        if "buldak" in text or "samyang" in text:
+            return "samyang buldak ramen instant noodles"
+        return "ramen instant noodles"
+
+    if any(word in text for word in ["iaurt", "yogurt", "yoghurt", "zuzu", "skyr"]) and any(
+        word in text for word in ["fruct", "fructe", "capsuni", "strawberry", "piersici", "visine", "afine", "zmeura"]
+    ):
+        if "zuzu" in text:
+            return "zuzu iaurt fructe"
+        return "fruit yogurt"
+
+    if any(word in text for word in ["inghetata", "gelatelli", "ice cream", "gelato"]):
+        if "gelatelli" in text:
+            return "gelatelli ice cream"
+        return "ice cream"
+
     if any(word in text for word in ["hell", "red bull", "redbull", "monster", "energiz", "energy"]):
         return "zero sugar energy drink"
 
@@ -7004,6 +7177,18 @@ def get_off_text_search_terms(query_text):
 
         brand_terms = "gelatelli " if "gelatelli" in text else ""
         return f"{brand_terms}{' '.join(flavor_terms)} ice cream".strip()
+
+    if any(word in text for word in ["buldak", "samyang", "ramen", "noodle", "noodles", "taitei", "nongshim", "yakisoba"]):
+        if "buldak" in text or "samyang" in text:
+            return "samyang buldak ramen instant noodles"
+        return "ramen instant noodles"
+
+    if any(word in text for word in ["iaurt", "yogurt", "yoghurt", "zuzu", "skyr"]) and any(
+        word in text for word in ["fruct", "fructe", "capsuni", "strawberry", "piersici", "visine", "afine", "zmeura"]
+    ):
+        if "zuzu" in text:
+            return "zuzu iaurt fructe"
+        return "fruit yogurt"
 
     if has_red_bull:
         return "red bull zero sugar" if has_zero else "red bull"
@@ -7725,11 +7910,7 @@ def lookup_barcode(barcode):
     if barcode_error:
         return jsonify({"error": barcode_error}), 400
 
-    scan_gate = reserve_scan_usage(
-        g.current_user,
-        "barcode",
-        {"barcode": barcode},
-    )
+    scan_gate = check_scan_usage_allowed(g.current_user)
 
     if not scan_gate["allowed"]:
         return respond_scan_limit(scan_gate)
@@ -7746,6 +7927,15 @@ def lookup_barcode(barcode):
             break
 
     if local_product:
+        scan_gate = consume_scan_usage(
+            g.current_user,
+            "barcode",
+            {"barcode": matched_barcode, "source": "local"},
+        )
+
+        if not scan_gate["allowed"]:
+            return respond_scan_limit(scan_gate)
+
         return jsonify({
             "found": True,
             "source": "local",
@@ -7794,6 +7984,7 @@ def lookup_barcode(barcode):
         return jsonify({
             "found": False,
             "source": "openfoodfacts",
+            "code": "external_product_not_found",
             "message": "Produsul nu a fost găsit după codul de bare.",
             "barcode": barcode,
             "barcodeCandidates": barcode_candidates,
@@ -7812,6 +8003,14 @@ def lookup_barcode(barcode):
         product_data.update(price_summary)
 
     local_product = save_product_to_local_database(product_data)
+    scan_gate = consume_scan_usage(
+        g.current_user,
+        "barcode",
+        {"barcode": matched_barcode, "source": "openfoodfacts"},
+    )
+
+    if not scan_gate["allowed"]:
+        return respond_scan_limit(scan_gate)
 
     return jsonify({
         "found": True,

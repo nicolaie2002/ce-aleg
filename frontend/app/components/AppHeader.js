@@ -23,26 +23,26 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
   const navigation = [
     {
       href: "/dashboard",
-      label: pick("Acasa", "Home"),
-      desktopLabel: "Dashboard",
+      label: pick("Acasă", "Home"),
+      desktopLabel: pick("Panou", "Dashboard"),
       icon: LayoutDashboard,
     },
     {
       href: "/barcode-scan",
-      label: pick("Scaneaza", "Scan"),
-      desktopLabel: pick("Scanner", "Scanner"),
+      label: pick("Scanează", "Scan"),
+      desktopLabel: pick("Scanare", "Scanner"),
       icon: Barcode,
     },
     {
       href: "/live-assistant",
-      label: "Live",
+      label: pick("Asistent", "Live"),
       desktopLabel: pick("Asistent live", "Live assistant"),
       icon: Radio,
     },
     {
       href: "/cart",
-      label: pick("Cos", "Cart"),
-      desktopLabel: pick("Cos", "Cart"),
+      label: pick("Coș", "Cart"),
+      desktopLabel: pick("Coș", "Cart"),
       icon: ShoppingCart,
     },
   ];
@@ -78,12 +78,12 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
               </span>
               <span className="hidden items-center gap-1 text-xs text-cyan-100/75 sm:flex">
                 <Sparkles size={12} />
-                {pick("cumparaturi mai inteligente", "smarter shopping")}
+                {pick("cumpărături mai inteligente", "smarter shopping")}
               </span>
             </span>
           </Link>
 
-          <nav className="hidden items-center gap-1 lg:flex" aria-label={pick("Navigare principala", "Main navigation")}>
+          <nav className="hidden items-center gap-1 lg:flex" aria-label={pick("Navigare principală", "Main navigation")}>
             {navigation.map(({ href, desktopLabel, icon: Icon }) => (
               <Link
                 key={href}
@@ -118,7 +118,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
                 className="hidden shrink-0 items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100 xl:inline-flex"
               >
                 <ScanLine size={17} />
-                {actionLabel || pick("Scaneaza", "Scan")}
+                {actionLabel || pick("Scanează", "Scan")}
               </Link>
             )}
           </div>
@@ -127,7 +127,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
 
       <nav
         className="ce-mobile-dock fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 border border-white/12 bg-[#0b1118]/94 p-1.5 shadow-2xl backdrop-blur-xl lg:hidden"
-        aria-label={pick("Navigare mobila", "Mobile navigation")}
+        aria-label={pick("Navigare mobilă", "Mobile navigation")}
       >
         {navigation.map(({ href, label, icon: Icon }) => (
           <Link

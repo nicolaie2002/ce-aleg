@@ -63,14 +63,14 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState("");
 
   const actions = [
-    { href: "/live-assistant", title: pick("Asistent live", "Live assistant"), description: pick("Arata produsul si primesti recomandari dupa preferintele tale.", "Show the product and get recommendations based on your preferences."), icon: ScanLine, tone: "emerald" },
-    { href: "/barcode-scan", title: pick("Scanare cod de bare", "Barcode scanner"), description: pick("Identifica rapid produsul direct cu telefonul.", "Identify products quickly with your phone."), icon: Barcode, tone: "cyan" },
-    { href: "/store", title: pick("Cauta produs", "Search products"), description: pick("Gaseste un produs dupa nume si magazin.", "Find a product by name and store."), icon: ScanLine, tone: "violet" },
-    { href: "/cart", title: pick("Cosul meu", "My cart"), description: pick("Produse grupate pentru urmatoarea cumparatura.", "Products grouped for your next shopping trip."), icon: ShoppingCart, tone: "amber" },
-    { href: "/preferences", title: pick("Preferinte", "Preferences"), description: pick("Seteaza cum alegi alternativele.", "Set how alternatives should be chosen."), icon: SlidersHorizontal, tone: "violet" },
-    { href: "/history", title: pick("Istoric", "History"), description: pick("Revino la scanarile si analizele recente.", "Return to your recent scans and analyses."), icon: Clock3, tone: "cyan" },
-    { href: "/favorites", title: pick("Favorite", "Favorites"), description: pick("Pastreaza alternativele care merita repetate.", "Keep the alternatives worth buying again."), icon: Heart, tone: "amber" },
-    { href: "/submit-product", title: pick("Contribuie produs", "Contribute product"), description: pick("Completeaza catalogul cand un produs lipseste.", "Complete the catalog when a product is missing."), icon: ListPlus, tone: "cyan" },
+    { href: "/live-assistant", title: pick("Asistent live", "Live assistant"), description: pick("Arată produsul și primești recomandări după preferințele tale.", "Show the product and get recommendations based on your preferences."), icon: ScanLine, tone: "emerald" },
+    { href: "/barcode-scan", title: pick("Scanare cod de bare", "Barcode scanner"), description: pick("Identifică rapid produsul direct cu telefonul.", "Identify products quickly with your phone."), icon: Barcode, tone: "cyan" },
+    { href: "/store", title: pick("Caută produs", "Search products"), description: pick("Găsește un produs după nume și magazin.", "Find a product by name and store."), icon: ScanLine, tone: "violet" },
+    { href: "/cart", title: pick("Coșul meu", "My cart"), description: pick("Produse grupate pentru următoarea cumpărătură.", "Products grouped for your next shopping trip."), icon: ShoppingCart, tone: "amber" },
+    { href: "/preferences", title: pick("Preferințe", "Preferences"), description: pick("Setează cum alegi alternativele.", "Set how alternatives should be chosen."), icon: SlidersHorizontal, tone: "violet" },
+    { href: "/history", title: pick("Istoric", "History"), description: pick("Revino la scanările și analizele recente.", "Return to your recent scans and analyses."), icon: Clock3, tone: "cyan" },
+    { href: "/favorites", title: pick("Favorite", "Favorites"), description: pick("Păstrează alternativele care merită repetate.", "Keep the alternatives worth buying again."), icon: Heart, tone: "amber" },
+    { href: "/submit-product", title: pick("Contribuie produs", "Contribute product"), description: pick("Completează catalogul când un produs lipsește.", "Complete the catalog when a product is missing."), icon: ListPlus, tone: "cyan" },
   ];
 
   const loadDashboardData = useCallback(async (userId, profile = null) => {
@@ -87,7 +87,7 @@ export default function DashboardPage() {
       );
 
       if (responses.slice(0, 3).some((response) => !response.ok)) {
-        throw new Error(pick("Datele nu au putut fi incarcate momentan.", "Your data could not be loaded right now."));
+        throw new Error(pick("Datele nu au putut fi încărcate momentan.", "Your data could not be loaded right now."));
       }
 
       setCounts({
@@ -147,7 +147,7 @@ export default function DashboardPage() {
                   "The account is ready, but the welcome email could not be sent right now."
                 )
               : pick(
-                  "Contul este creat. Emailurile nu sunt conectate inca pe server.",
+                  "Contul este creat. Emailurile nu sunt conectate încă pe server.",
                   "The account is ready. Email delivery is not connected on the server yet."
                 )
           );
@@ -211,7 +211,7 @@ export default function DashboardPage() {
   if (!user || isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">{pick("Se incarca dashboard-ul...", "Loading dashboard...")}</p>
+        <p className="text-gray-300">{pick("Se încarcă panoul...", "Loading dashboard...")}</p>
       </main>
     );
   }
@@ -222,7 +222,7 @@ export default function DashboardPage() {
       <section className="ce-shell ce-page">
         <div className="mb-8 flex items-center justify-between gap-4">
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white">
-            <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
+            <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
           </Link>
           <button onClick={logout} className="inline-flex items-center gap-2 rounded-lg border border-red-400/30 px-4 py-2.5 text-sm font-semibold text-red-300 hover:bg-red-400/10">
             <LogOut size={16} /> {pick("Deconectare", "Sign out")}
@@ -230,10 +230,10 @@ export default function DashboardPage() {
         </div>
 
         <div className="ce-panel ce-lifted-shell ce-reveal p-6 md:p-8">
-          <p className="text-sm font-bold text-cyan-200">{pick("Spatiul tau", "Your space")}</p>
+          <p className="text-sm font-bold text-cyan-200">{pick("Spațiul tău", "Your space")}</p>
           <h1 className="mt-3 text-4xl font-bold md:text-5xl">{pick("Salut", "Hello")}, {user.name}</h1>
           <p className="mt-4 max-w-2xl text-gray-300">
-            {pick("Continua cumparaturile sau scaneaza un produs nou pentru recomandari potrivite preferintelor tale.", "Continue shopping or scan a new product for recommendations matched to your preferences.")}
+            {pick("Continuă cumpărăturile sau scanează un produs nou pentru recomandări potrivite preferințelor tale.", "Continue shopping or scan a new product for recommendations matched to your preferences.")}
           </p>
 
           <InlineNotice message={loadError} tone="warning" className="mt-6" />
@@ -246,9 +246,9 @@ export default function DashboardPage() {
                 <p className="text-sm font-bold uppercase tracking-wide text-cyan-200">{billing.usage.plan}</p>
                 <p className="mt-1 text-sm">
                   {billing.usage.isUnlimited
-                    ? pick("Ai scanari nelimitate active.", "Unlimited scans are active.")
+                    ? pick("Ai scanări nelimitate active.", "Unlimited scans are active.")
                     : pick(
-                        `Mai ai ${billing.usage.weeklyScansRemaining}/${billing.usage.weeklyScanLimit} scanari gratuite saptamana aceasta.`,
+                        `Mai ai ${billing.usage.weeklyScansRemaining}/${billing.usage.weeklyScanLimit} scanări gratuite săptămâna aceasta.`,
                         `${billing.usage.weeklyScansRemaining}/${billing.usage.weeklyScanLimit} free scans left this week.`
                       )}
                 </p>
@@ -265,8 +265,8 @@ export default function DashboardPage() {
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[
-              [pick("Produse in cos", "Cart products"), counts.cart, "ce-stat-cyan", "text-cyan-200"],
-              [pick("Scanari salvate", "Saved scans"), counts.history, "ce-stat-cyan", "text-cyan-200"],
+              [pick("Produse în coș", "Cart products"), counts.cart, "ce-stat-cyan", "text-cyan-200"],
+              [pick("Scanări salvate", "Saved scans"), counts.history, "ce-stat-cyan", "text-cyan-200"],
               [pick("Favorite", "Favorites"), counts.favorites, "ce-stat-violet", "text-violet-200"],
               [pick("Ultima scanare", "Latest scan"), lastScannedProduct, "ce-stat-amber", "text-yellow-200"],
             ].map(([label, value, tone, valueClass]) => (
@@ -280,7 +280,7 @@ export default function DashboardPage() {
           <div className="mt-9 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black text-cyan-200">
-                {pick("Actiuni rapide", "Quick actions")}
+                {pick("Acțiuni rapide", "Quick actions")}
               </p>
               <h2 className="mt-1 text-2xl font-black">
                 {pick("Ce vrei sa faci acum?", "What do you want to do now?")}
@@ -288,7 +288,7 @@ export default function DashboardPage() {
             </div>
             <p className="max-w-xl text-sm leading-6 text-gray-400">
               {pick(
-                "Scaneaza la raft, cauta un produs sau continua lista de cumparaturi.",
+                "Scanează la raft, caută un produs sau continuă lista de cumpărături.",
                 "Scan at the shelf, search for a product or continue your shopping list."
               )}
             </p>
@@ -328,12 +328,12 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
                 <p className="flex items-center gap-2 text-sm font-black text-red-300">
-                  <Trash2 size={16} /> {pick("Stergere cont", "Delete account")}
+                  <Trash2 size={16} /> {pick("Ștergere cont", "Delete account")}
                 </p>
-                <h2 className="mt-2 text-2xl font-black">{pick("Vrei sa inchizi contul?", "Want to close your account?")}</h2>
+                <h2 className="mt-2 text-2xl font-black">{pick("Vrei să închizi contul?", "Want to close your account?")}</h2>
                 <p className="mt-2 leading-7 text-gray-300">
                   {pick(
-                    "Iti trimitem un email de confirmare. Contul, istoricul, cosul, favoritele si contributiile tale se sterg doar dupa confirmarea din email.",
+                    "Îți trimitem un email de confirmare. Contul, istoricul, coșul, favoritele și contribuțiile tale se șterg doar după confirmarea din email.",
                     "We send a confirmation email. Your account, history, cart, favorites and contributions are deleted only after email confirmation."
                   )}
                 </p>
@@ -351,13 +351,13 @@ export default function DashboardPage() {
                   className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-red-400/35 px-5 py-3 font-black text-red-200 hover:bg-red-400/10"
                 >
                   <Trash2 size={18} />
-                  {pick("Sterge contul", "Delete account")}
+                  {pick("Șterge contul", "Delete account")}
                 </button>
               ) : (
                 <div className="shrink-0 space-y-3 rounded-xl border border-red-400/25 bg-black/25 p-4">
                   <p className="max-w-xs text-sm leading-6 text-red-100">
                     {pick(
-                      "Confirmarea vine pe email. Dupa apasare, verifica inboxul.",
+                      "Confirmarea vine pe email. După apăsare, verifică inboxul.",
                       "The confirmation arrives by email. After pressing, check your inbox."
                     )}
                   </p>
@@ -379,7 +379,7 @@ export default function DashboardPage() {
                       onClick={() => setIsDeleteConfirmVisible(false)}
                       className="rounded-lg border border-white/10 px-4 py-3 font-bold text-gray-200 hover:bg-white/10"
                     >
-                      {pick("Anuleaza", "Cancel")}
+                      {pick("Anulează", "Cancel")}
                     </button>
                   </div>
                 </div>

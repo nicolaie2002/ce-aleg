@@ -174,7 +174,17 @@ export default function LiveAssistantPage() {
 
       fetch(`${API_URL}/ai/status`)
         .then((response) => response.json())
-        .then((data) => setCloudVision(Boolean(data.cloudVision?.enabled)))
+        .then((data) => {
+          const enabled = Boolean(data.cloudVision?.enabled);
+          setCloudVision(enabled);
+
+          if (!enabled) {
+            setMessage(pick(
+              "Recunoașterea după ambalaj nu este activă pe server. Asistentul folosește momentan codul de bare.",
+              "Package recognition is not active on the server. The assistant currently uses barcode scanning."
+            ));
+          }
+        })
         .catch(() => setCloudVision(false));
 
       fetch(`${API_URL}/billing/status`)
@@ -234,10 +244,17 @@ export default function LiveAssistantPage() {
     setError("");
     setCandidate(null);
     setBillingGate(null);
-    setMessage(pick(
-      "Caut codul de bare. Tine produsul aproape, cu codul clar si luminat.",
-      "Looking for the barcode. Keep the product close, clear and well lit."
-    ));
+    setMessage(
+      cloudVision
+        ? pick(
+            "Caut codul de bare si verific ambalajul. Tine produsul aproape, clar si bine luminat.",
+            "Looking for the barcode and checking the package. Keep the product close, clear and well lit."
+          )
+        : pick(
+            "Caut codul de bare. Recunoasterea dupa ambalaj nu este activa pe server.",
+            "Looking for the barcode. Package recognition is not active on the server."
+          )
+    );
     scannerControlsRef.current?.stop?.();
     scannerControlsRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -314,7 +331,7 @@ export default function LiveAssistantPage() {
       `Code detected: ${normalizedCode}. Confirming product...`
     ));
 
-    if (count < 2) return;
+    if (count < 3) return;
 
     detectedBarcodeRef.current = true;
     scannerControlsRef.current?.stop?.();
@@ -356,7 +373,15 @@ export default function LiveAssistantPage() {
       return;
     }
 
-    setMessage("Am citit codul, dar produsul nu este încă în catalog. Îl poți adăuga manual.");
+    detectedBarcodeRef.current = false;
+    barcodeCandidateRef.current = { code: "", count: 0 };
+    setMessage(
+      data.message ||
+        pick(
+          "Am citit un cod, dar nu am gasit produsul. Reincadrez camera si incerc din nou.",
+          "I read a code, but could not find the product. I will keep looking."
+        )
+    );
   }
 
   const analyzeFrame = useCallback(async () => {
@@ -685,7 +710,10 @@ export default function LiveAssistantPage() {
 
             {!cloudVision && (
               <section className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm leading-6 text-yellow-100">
-                {pick("Pentru rezultate bune, tine codul aproape, drept si bine luminat. Daca produsul nu apare, il poti adauga rapid in catalog.", "For better results, keep the barcode close, straight and well lit. If the product does not appear, you can quickly add it to the catalog.")}
+                {pick(
+                  "Recunoașterea după ambalaj nu este activă pe server. Momentan camera caută codul de bare; pentru identificare vizuală reală trebuie activat serviciul de vision.",
+                  "Package recognition is not active on the server. The camera currently looks for barcodes; real visual identification requires the vision service to be enabled."
+                )}
               </section>
             )}
 

@@ -557,7 +557,7 @@ export default function BarcodeScanPage() {
     }, 250);
   }
 
-  async function handleDetectedBarcode(detectedCode, confirmationWeight = 1) {
+  async function handleDetectedBarcode(detectedCode) {
     if (!detectedCode || detectedRef.current) return "ignored";
 
     const normalizedCode = normalizeDetectedBarcode(detectedCode);
@@ -576,9 +576,9 @@ export default function BarcodeScanPage() {
 
     const count =
       previousCandidate && now - previousCandidate.lastSeen < 1800
-        ? previousCandidate.count + confirmationWeight
-        : confirmationWeight;
-    const requiredConfirmations = confirmationWeight >= 2 ? 2 : 3;
+        ? previousCandidate.count + 1
+        : 1;
+    const requiredConfirmations = 3;
 
     barcodeCandidatesRef.current.set(normalizedCode, {
       count,
@@ -914,6 +914,7 @@ export default function BarcodeScanPage() {
 
   async function lookupBarcode(code) {
     const lookupCode = normalizeDetectedBarcode(code);
+    let shouldRestartAfterMiss = false;
 
     if (!lookupCode) {
       setMessage("Introdu sau scanează un cod de bare.");
@@ -935,6 +936,10 @@ export default function BarcodeScanPage() {
         if (data.code === "scan_limit_reached") {
           setBillingGate(data);
           setLookupIssue("scan_limit_reached");
+        } else if (response.status === 404 || data.code === "external_product_not_found") {
+          shouldRestartAfterMiss = detectedRef.current;
+          detectedRef.current = false;
+          barcodeCandidatesRef.current.clear();
         }
         throw new Error(
           data.message || data.error || "Produsul nu a fost găsit."
@@ -953,6 +958,11 @@ export default function BarcodeScanPage() {
       setMessage(error.message);
     } finally {
       setIsLookingUp(false);
+
+      if (shouldRestartAfterMiss) {
+        setScanStatus("Produs negasit. Continui scanarea cu un cod mai clar...");
+        setTimeout(() => startScanner(), 500);
+      }
     }
   }
 
