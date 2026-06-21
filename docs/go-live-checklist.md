@@ -278,6 +278,10 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Admin: panou pentru produse negasite/cautari fara rezultat
 - [x] Recomandari: filtru anti-alternative gresite pentru apa/cola la bauturi cu cafeina
 - [x] Recomandari: ranking mai strict dupa familie produs + cerinta utilizatorului
+- [x] Recomandari: fallback din catalogul mare Supabase inainte de recomandarile generice
+- [x] Scanare: codurile negasite sunt salvate in admin si nu consuma incercare gratuita
+- [x] Scanare: confirmare mai rapida pentru citiri barcode cu incredere mare
+- [x] Family: cos separat pe profil si migrare automata a produselor vechi pe profilul principal
 - [x] Cache server pentru cautari populare dupa text
 - [x] Sitemap si robots pentru Google Search Console
 - [x] Suport optional Google Analytics prin `NEXT_PUBLIC_GA_ID`
@@ -344,6 +348,20 @@ Security headers:       OK
 Stripe webhook:         OK in modul test
 CORS frontend:          https://www.cealeg.shop, https://cealeg.shop, https://ce-aleg.vercel.app
 Email productie:        OK
+```
+
+## Stare verificata la 21 iunie 2026
+
+```text
+Ultimul commit:         8bc9194 Improve scan reliability and recommendation quality
+Backend compile:        OK
+Frontend lint:          OK
+Frontend build:         OK
+GitHub push:            OK
+Render /health:         HTTP 200
+Render /readiness:      HTTP 401 fara login, asteptat pentru detalii sensibile
+Vercel proxy readiness: HTTP 401 fara login, backendul raspunde
+Catalog Supabase:       peste 16.000 produse raportate local
 ```
 
 Brevo a blocat initial serverul Render pentru IP neautorizat. IP-ul folosit la
