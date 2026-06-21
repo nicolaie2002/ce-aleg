@@ -293,7 +293,9 @@ function filterProductsBySearch(products, requestText) {
       } else if (haystack.includes("cafea") || haystack.includes("coffee") || haystack.includes("caffeine") || haystack.includes("cafeina")) {
         score += 10;
       } else if (haystack.includes("cola")) {
-        score -= 6;
+        score -= 16;
+      } else {
+        score -= 20;
       }
     }
     if (inferredCriteria.includes("vegan") && product.vegan) score += 8;
@@ -309,7 +311,9 @@ function filterProductsBySearch(products, requestText) {
     .sort((a, b) => b.score - a.score)
     .map((item) => item.product);
 
-  return matchedProducts.length > 0 ? matchedProducts : products;
+  if (matchedProducts.length > 0) return matchedProducts;
+
+  return inferredCriteria.length > 0 ? [] : products;
 }
 
 function getNumericValue(product, field) {
@@ -497,14 +501,26 @@ function filterProductsByCriteria(
         haystack.includes("energy") ||
         haystack.includes("taurina") ||
         haystack.includes("cafea") ||
-        haystack.includes("coffee") ||
-        haystack.includes("caffeine") ||
-        haystack.includes("cafeina")
+        haystack.includes("coffee")
       );
     });
 
     if (highCaffeineProducts.length > 0) {
       filteredProducts = highCaffeineProducts;
+    } else {
+      const caffeineTaggedProducts = filteredProducts.filter((product) => {
+        const haystack = productSearchText(product);
+        return (
+          (haystack.includes("caffeine") || haystack.includes("cafeina")) &&
+          !haystack.includes("cola") &&
+          !haystack.includes("water") &&
+          !haystack.includes("apa")
+        );
+      });
+
+      if (caffeineTaggedProducts.length > 0) {
+        filteredProducts = caffeineTaggedProducts;
+      }
     }
   }
 
@@ -570,8 +586,13 @@ function AlternativesPageContent() {
   const combinedCriteriaIds = Array.from(
     new Set([...finalCriteriaIds, ...searchCriteriaIds])
   );
+  const combinedCriteriaKey = combinedCriteriaIds.join(",");
 
-  async function loadProducts(currentScannedProduct) {
+  async function loadProducts(
+    currentScannedProduct,
+    criteriaIds = finalCriteriaIds,
+    requestText = preferenceRequest
+  ) {
     let externalLookupWarning = "";
 
     try {
@@ -588,7 +609,8 @@ function AlternativesPageContent() {
               },
               body: JSON.stringify({
                 product: currentScannedProduct,
-                criteria: finalCriteriaIds,
+                criteria: criteriaIds,
+                request: requestText,
               }),
             }
           );
@@ -670,7 +692,24 @@ function AlternativesPageContent() {
         setScannedProduct(parsedResult);
       }
 
-      loadProducts(parsedResult);
+      const savedProfileCriteriaIds = Array.isArray(savedPreferences?.criteria)
+        ? savedPreferences.criteria
+        : [];
+      const savedPreferenceRequest = [
+        customRequest,
+        savedPreferences?.request || "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const savedCriteriaIds = Array.from(
+        new Set([
+          ...savedProfileCriteriaIds,
+          ...selectedCriteriaIds,
+          ...inferCriteriaFromRequest(savedPreferenceRequest),
+        ])
+      );
+
+      loadProducts(parsedResult, savedCriteriaIds, savedPreferenceRequest);
 
       fetch(`${API_URL}/billing/status`)
         .then((response) => (response.ok ? response.json() : null))
@@ -689,6 +728,26 @@ function AlternativesPageContent() {
     // Produsele se incarca o singura data din rezultatul scanarii curente.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!scannedProduct || !isPaidPlan || searchWarning) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (alternativeSearch.trim()) {
+        setLookupNotice("Actualizam alternativele dupa cererea ta...");
+        void loadProducts(scannedProduct, combinedCriteriaIds, alternativeSearch);
+      } else {
+        setLookupNotice("");
+        void loadProducts(scannedProduct, finalCriteriaIds, preferenceRequest);
+      }
+    }, 450);
+
+    return () => window.clearTimeout(timer);
+    // Backend-ul trebuie apelat din nou cand textul Pro schimba criteriile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alternativeSearch, searchWarning, scannedProduct, isPaidPlan, combinedCriteriaKey]);
 
   const rankedProducts = filterProductsByCriteria(
     products,

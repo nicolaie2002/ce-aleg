@@ -161,6 +161,18 @@ function extractValidOcrBarcodes(text) {
   return [...candidates].filter(isReliableScannedBarcode);
 }
 
+function isLowPowerScannerDevice() {
+  if (typeof navigator === "undefined") return false;
+
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+
+  return (
+    connection?.saveData ||
+    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4)
+  );
+}
+
 export default function BarcodeScanPage() {
   const videoRef = useRef(null);
   const controlsRef = useRef(null);
@@ -298,13 +310,18 @@ export default function BarcodeScanPage() {
   }
 
   function getFastCameraConstraints(deviceId = selectedDeviceId) {
+    const lowPowerDevice = isLowPowerScannerDevice();
+    const idealWidth = lowPowerDevice ? 1280 : 1920;
+    const idealHeight = lowPowerDevice ? 720 : 1080;
+    const idealFrameRate = lowPowerDevice ? 24 : 30;
+
     if (deviceId) {
       return {
         video: {
           deviceId: { exact: deviceId },
-          width: { ideal: 1920 },
-          height: { ideal: 1080 },
-          frameRate: { ideal: 30 },
+          width: { ideal: idealWidth },
+          height: { ideal: idealHeight },
+          frameRate: { ideal: idealFrameRate },
         },
         audio: false,
       };
@@ -313,9 +330,9 @@ export default function BarcodeScanPage() {
     return {
       video: {
         facingMode: { ideal: "environment" },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
-        frameRate: { ideal: 30 },
+        width: { ideal: idealWidth },
+        height: { ideal: idealHeight },
+        frameRate: { ideal: idealFrameRate },
       },
       audio: false,
     };
@@ -557,7 +574,7 @@ export default function BarcodeScanPage() {
     }, 250);
   }
 
-  async function handleDetectedBarcode(detectedCode) {
+  async function handleDetectedBarcode(detectedCode, confidenceWeight = 1) {
     if (!detectedCode || detectedRef.current) return "ignored";
 
     const normalizedCode = normalizeDetectedBarcode(detectedCode);
@@ -569,6 +586,7 @@ export default function BarcodeScanPage() {
 
     const now = Date.now();
     const previousCandidate = barcodeCandidatesRef.current.get(normalizedCode);
+    const weight = Math.max(1, Math.min(2, Number(confidenceWeight) || 1));
 
     if (previousCandidate && now - previousCandidate.lastSeen < 120) {
       return "pending";
@@ -578,10 +596,20 @@ export default function BarcodeScanPage() {
       previousCandidate && now - previousCandidate.lastSeen < 1800
         ? previousCandidate.count + 1
         : 1;
-    const requiredConfirmations = 3;
+    const score =
+      previousCandidate && now - previousCandidate.lastSeen < 1800
+        ? previousCandidate.score + weight
+        : weight;
+    const firstSeen =
+      previousCandidate && now - previousCandidate.lastSeen < 1800
+        ? previousCandidate.firstSeen
+        : now;
+    const requiredScore = 4;
 
     barcodeCandidatesRef.current.set(normalizedCode, {
       count,
+      score,
+      firstSeen,
       lastSeen: now,
     });
 
@@ -593,7 +621,7 @@ export default function BarcodeScanPage() {
 
     setBarcode(normalizedCode);
 
-    if (count < requiredConfirmations) {
+    if (score < requiredScore) {
       setScanStatus("Am găsit codul. Confirm produsul...");
       return "pending";
     }

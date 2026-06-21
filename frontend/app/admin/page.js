@@ -12,6 +12,7 @@ const statLabels = {
   products: "Produse in catalog",
   pendingSubmissions: "Propuneri de verificat",
   searches: "Cautari salvate",
+  missingProducts: "Produse negasite",
   priceObservations: "Preturi raportate",
   proUsers: "Utilizatori Pro",
 };
@@ -129,7 +130,7 @@ export default function AdminPage() {
           Verifica propunerile comunitatii, planurile utilizatorilor si serviciile esentiale inainte de publicare.
         </p>
 
-        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {Object.entries(statLabels).map(([key, label]) => (
             <div key={key} className="rounded-lg border border-white/10 bg-[#11171d] p-4">
               <p className="text-sm text-gray-400">{label}</p>

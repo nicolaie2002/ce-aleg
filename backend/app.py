@@ -125,6 +125,32 @@ OFF_FALLBACK_BARCODES_BY_CATEGORY = {
     "en:condiments": [
         "8715700110622",
     ],
+    "en:instant-noodles": [
+        "8801073110502",
+        "8801073141384",
+        "8801073210776",
+        "8801073211391",
+        "8801043014830",
+        "8801052062228",
+    ],
+    "en:fruit-yogurts": [
+        "5941352001855",
+        "5941352001886",
+        "5941352001848",
+        "5941238013309",
+    ],
+    "en:ice-creams": [
+        "4056489122095",
+        "4056489122101",
+        "20636267",
+    ],
+    "en:pizzas": [
+        "4001724819806",
+        "5941194001888",
+    ],
+    "en:ready-meals": [
+        "5941194002328",
+    ],
 }
 
 
@@ -1778,6 +1804,7 @@ def resolve_cart_profile(user, requested_profile_id=None):
         return None
 
     primary_profile = get_or_create_primary_family_profile(user)
+    assign_unprofiled_cart_items_to_profile(user, primary_profile)
 
     if requested_profile_id:
         profile = FamilyProfile.query.filter_by(
@@ -1790,19 +1817,27 @@ def resolve_cart_profile(user, requested_profile_id=None):
     return primary_profile
 
 
+def assign_unprofiled_cart_items_to_profile(user, profile):
+    if not profile:
+        return
+
+    updated = CartItem.query.filter(
+        CartItem.user_id == user.id,
+        CartItem.family_profile_id.is_(None),
+    ).update(
+        {"family_profile_id": profile.id},
+        synchronize_session=False,
+    )
+
+    if updated:
+        db.session.commit()
+
+
 def cart_query_for_profile(user, profile=None):
     query = CartItem.query.filter_by(user_id=user.id)
 
     if not profile:
         return query.filter(CartItem.family_profile_id.is_(None))
-
-    if profile.is_primary:
-        return query.filter(
-            or_(
-                CartItem.family_profile_id == profile.id,
-                CartItem.family_profile_id.is_(None),
-            )
-        )
 
     return query.filter(CartItem.family_profile_id == profile.id)
 
@@ -2446,6 +2481,40 @@ def record_search_event(search_text, store=None, result_count=0, source="search"
         result_count=max(0, int(result_count or 0)),
         source=str(source or "search").strip()[:40],
     ))
+
+
+def infer_alternative_criteria_from_request(request_text):
+    text_value = normalize_search_text(request_text)
+    criteria = []
+
+    if not text_value:
+        return criteria
+
+    if any(token in text_value for token in ["ieftin", "pret mic", "mai ieftin", "sub "]):
+        criteria.append("cheap")
+
+    if any(token in text_value for token in ["proteina", "protein", "proteic"]):
+        criteria.append("protein")
+
+    if any(token in text_value for token in ["zahar", "zero sugar", "fara zahar", "no sugar"]):
+        criteria.append("low_sugar")
+
+    if any(token in text_value for token in ["calorii", "slabit", "dieta", "low calorie"]):
+        criteria.append("low_calorie")
+
+    if any(token in text_value for token in ["cafeina", "cofeina", "caffeine", "taurina", "energiz", "energie"]):
+        criteria.append("caffeine")
+
+    if any(token in text_value for token in ["vegan", "post", "vegetal"]):
+        criteria.append("vegan")
+
+    if any(token in text_value for token in ["lactoza", "lactose"]):
+        criteria.append("lactose_free")
+
+    if any(token in text_value for token in ["curat", "natural", "ingrediente simple", "fara aditivi"]):
+        criteria.append("natural")
+
+    return list(dict.fromkeys(criteria))
 
 
 def get_cached_product_search_results(cache_key):
@@ -4889,6 +4958,7 @@ def get_admin_overview():
             ProductSubmission.status != "approved"
         ).count(),
         "searches": SearchEvent.query.count(),
+        "missingProducts": SearchEvent.query.filter(SearchEvent.result_count == 0).count(),
         "priceObservations": PriceObservation.query.count(),
         "proUsers": Subscription.query.filter(
             Subscription.plan.in_(["pro", "family"]),
@@ -5164,6 +5234,10 @@ def get_open_food_facts_alternatives():
         for item in data.get("criteria", [])
         if str(item).strip()
     ]
+    criteria = list(dict.fromkeys([
+        *criteria,
+        *infer_alternative_criteria_from_request(data.get("request") or ""),
+    ]))
     category_tag = get_off_alternative_category(scanned_product)
     scanned_family = get_product_recommendation_family(scanned_product)
 
@@ -5285,7 +5359,10 @@ def get_open_food_facts_alternatives():
         for item in alternatives
     }
 
-    for candidate in get_known_catalog_alternatives(scanned_product, criteria):
+    for candidate in [
+        *get_local_catalog_alternatives(scanned_product, criteria),
+        *get_known_catalog_alternatives(scanned_product, criteria),
+    ]:
         candidate_key = normalize_search_text(
             f"{candidate.get('barcode') or ''} {candidate.get('name') or ''}"
         )
@@ -5312,6 +5389,11 @@ def get_open_food_facts_alternatives():
         key=lambda product: product["recommendationScore"],
         reverse=True,
     )
+    alternatives = [
+        product
+        for product in alternatives
+        if product.get("recommendationScore", 0) > -20
+    ]
     photographed_alternatives = [
         product for product in alternatives if product.get("image")
     ]
@@ -6843,6 +6925,14 @@ def get_product_recommendation_family(product_data):
         "desert lactat",
         "dairy dessert",
     ]
+    ice_cream_words = [
+        "inghetata",
+        "ice cream",
+        "icecream",
+        "gelato",
+        "sorbet",
+        "gelatelli",
+    ]
     instant_noodle_words = [
         "buldak",
         "samyang",
@@ -6892,6 +6982,9 @@ def get_product_recommendation_family(product_data):
 
     if any(word in text_value for word in instant_noodle_words):
         return "instant_noodles"
+
+    if any(word in text_value for word in ice_cream_words):
+        return "ice_cream"
 
     if any(word in text_value for word in water_words) and not any(
         word in text_value
@@ -6987,6 +7080,7 @@ def is_compatible_alternative(scanned_product, candidate):
         "sweet_snack",
         "cereal",
         "sauce",
+        "ice_cream",
         "pizza",
         "frozen",
         "ready_meal",
@@ -7891,6 +7985,86 @@ def get_known_catalog_alternatives(scanned_product, criteria):
     return alternatives
 
 
+def get_local_catalog_alternatives(scanned_product, criteria):
+    scanned_family = get_product_recommendation_family(scanned_product)
+    category = str(scanned_product.get("category") or "").strip()
+    category_family = get_product_recommendation_family({"category": category})
+    query = Product.query
+    used_category_filter = False
+
+    if (
+        category
+        and normalize_search_text(category) not in {"altele", "other"}
+        and category_family == scanned_family
+    ):
+        query = query.filter(Product.category == category)
+        used_category_filter = True
+
+    if not used_category_filter:
+        family_keywords = {
+            "energy_drink": ["energy", "energiz", "red bull", "redbull", "monster", "hell"],
+            "coffee_drink": ["coffee", "cafea", "cappuccino", "latte", "espresso"],
+            "caffeinated_beverage": ["caffeine", "cafeina", "taurina"],
+            "instant_noodles": ["buldak", "samyang", "ramen", "noodle", "taitei"],
+            "fruit_yogurt": ["iaurt", "yogurt", "zuzu", "fruct"],
+            "lactate": ["iaurt", "yogurt", "lapte", "dairy"],
+            "dairy_dessert": ["danette", "budinca", "pudding", "desert"],
+            "ice_cream": ["inghetata", "ice cream", "gelato", "gelatelli"],
+            "sauce": ["sos", "mustar", "ketchup", "salsa"],
+            "salty_snack": ["chips", "crisps", "snack", "pufule"],
+            "sweet_snack": ["ciocolata", "chocolate", "biscuit", "wafer"],
+            "cereal": ["cereale", "cereal", "granola", "muesli"],
+            "water": ["apa", "water", "mineral"],
+            "cola": ["cola", "pepsi", "coca"],
+        }.get(scanned_family, [])
+
+        if family_keywords:
+            query = query.filter(or_(*[
+                or_(
+                    Product.name.ilike(f"%{keyword}%"),
+                    Product.category.ilike(f"%{keyword}%"),
+                    Product.ingredients.ilike(f"%{keyword}%"),
+                )
+                for keyword in family_keywords
+            ]))
+
+    products = query.order_by(Product.score.desc()).limit(180).all()
+    alternatives = []
+    seen_keys = set()
+
+    for product in products:
+        product_data = product_to_dict(product)
+        candidate_family = get_product_recommendation_family(product_data)
+
+        if is_same_catalog_product(scanned_product, product_data):
+            continue
+
+        if candidate_family != scanned_family and scanned_family not in {
+            "beverage",
+            "caffeinated_beverage",
+            "lactate",
+        }:
+            continue
+
+        if not is_compatible_alternative(scanned_product, product_data):
+            continue
+
+        if "caffeine" in criteria and not is_caffeine_relevant_candidate(product_data):
+            continue
+
+        key = normalize_search_text(
+            f"{product_data.get('barcode') or ''} {product_data.get('name') or ''}"
+        )
+
+        if key in seen_keys:
+            continue
+
+        alternatives.append(product_data)
+        seen_keys.add(key)
+
+    return alternatives[:40]
+
+
 def build_off_search_result(off_product, query_text, store_name=None):
     barcode = str(off_product.get("code") or off_product.get("_id") or "").strip()
 
@@ -8138,15 +8312,6 @@ def identify_product_frame():
     if mime_type not in {"image/jpeg", "image/png", "image/webp"}:
         return jsonify({"error": "Formatul cadrului video nu este acceptat."}), 400
 
-    scan_gate = reserve_scan_usage(
-        g.current_user,
-        "live_vision",
-        {"endpoint": "ai_identify_product_frame"},
-    )
-
-    if not scan_gate["allowed"]:
-        return respond_scan_limit(scan_gate)
-
     image_base64 = base64.b64encode(frame_bytes).decode("ascii")
     model = os.environ.get("OPENAI_VISION_MODEL", "gpt-4.1-mini").strip()
 
@@ -8233,6 +8398,20 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
 
     if not local_product and product_name:
         local_product, match_score = find_best_product_match(product_name)
+
+    scan_gate = consume_scan_usage(
+        g.current_user,
+        "live_vision",
+        {
+            "endpoint": "ai_identify_product_frame",
+            "product_name": product_name,
+            "barcode": barcode,
+            "local_match_score": match_score,
+        },
+    )
+
+    if not scan_gate["allowed"]:
+        return respond_scan_limit(scan_gate)
 
     return jsonify({
         "identified": True,
@@ -8332,6 +8511,13 @@ def lookup_barcode(barcode):
         }), 503
 
     if not off_product:
+        record_search_event(
+            barcode,
+            result_count=0,
+            source="barcode_not_found",
+            user_id=getattr(g.current_user, "id", None),
+        )
+        db.session.commit()
         return jsonify({
             "found": False,
             "source": "openfoodfacts",
