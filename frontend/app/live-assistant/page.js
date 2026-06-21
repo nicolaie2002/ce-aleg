@@ -180,8 +180,8 @@ export default function LiveAssistantPage() {
 
           if (!enabled) {
             setMessage(pick(
-              "Recunoașterea după ambalaj nu este activă pe server. Asistentul folosește momentan codul de bare.",
-              "Package recognition is not active on the server. The assistant currently uses barcode scanning."
+              "AI-ul vizual este în dezvoltare. Momentan folosim scanarea codului de bare.",
+              "Visual AI is in development. For now, we use barcode scanning."
             ));
           }
         })
@@ -206,8 +206,8 @@ export default function LiveAssistantPage() {
               plan,
             });
             setMessage(pick(
-              "Asistentul live este inclus in Pro si Family. Pentru Free, foloseste scanarea codului de bare.",
-              "The live assistant is included in Pro and Family. On Free, use barcode scanning."
+              "AI preview este inclus în Pro și Family. Pentru Free, folosește scanarea codului de bare.",
+              "AI preview is included in Pro and Family. On Free, use barcode scanning."
             ));
           }
         })
@@ -247,12 +247,12 @@ export default function LiveAssistantPage() {
     setMessage(
       cloudVision
         ? pick(
-            "Caut codul de bare si verific ambalajul. Tine produsul aproape, clar si bine luminat.",
+            "Caut codul de bare. Identificarea vizuală după ambalaj este în dezvoltare.",
             "Looking for the barcode and checking the package. Keep the product close, clear and well lit."
           )
         : pick(
-            "Caut codul de bare. Recunoasterea dupa ambalaj nu este activa pe server.",
-            "Looking for the barcode. Package recognition is not active on the server."
+            "Caut codul de bare. AI-ul vizual este în dezvoltare.",
+            "Looking for the barcode. Visual AI is in development."
           )
     );
     scannerControlsRef.current?.stop?.();
@@ -609,13 +609,13 @@ export default function LiveAssistantPage() {
         <div className="flex flex-col gap-4 border-b border-white/10 pb-7 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="flex items-center gap-2 text-sm font-bold text-cyan-200">
-              <Sparkles size={16} /> {pick("Asistent live la raft", "Live shelf assistant")}
+              <Sparkles size={16} /> {pick("AI vizual în dezvoltare", "Visual AI in development")}
             </p>
             <h1 className="mt-3 max-w-3xl text-4xl font-black md:text-5xl">
-              {pick("Scaneaza produsul. Vezi imediat daca merita.", "Scan the product. See instantly if it is worth it.")}
+              {pick("Preview pentru recunoașterea după ambalaj.", "Preview for package recognition.")}
             </h1>
             <p className="mt-3 max-w-2xl text-gray-300">
-              {pick("Arata codul de bare sau eticheta. Spune ce cauti, iar recomandarile se adapteaza preferintelor tale.", "Show the barcode or label. Tell us what you want, and recommendations adapt to your preferences.")}
+              {pick("Momentan fluxul principal rămâne codul de bare. Pregătim identificarea vizuală reală pentru produsele fără cod vizibil.", "For now, the main flow remains barcode scanning. Real visual identification is being prepared for products without a visible barcode.")}
             </p>
           </div>
         </div>
@@ -631,8 +631,8 @@ export default function LiveAssistantPage() {
                     {isCheckingBilling
                       ? pick("Verificam planul tau...", "Checking your plan...")
                       : pick(
-                          "Asistentul live este inclus in Pro si Family.",
-                          "The live assistant is included in Pro and Family."
+                          "AI preview este inclus în Pro și Family.",
+                          "AI preview is included in Pro and Family."
                         )}
                   </p>
                   {!isCheckingBilling && (
@@ -711,8 +711,8 @@ export default function LiveAssistantPage() {
             {!cloudVision && (
               <section className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm leading-6 text-yellow-100">
                 {pick(
-                  "Recunoașterea după ambalaj nu este activă pe server. Momentan camera caută codul de bare; pentru identificare vizuală reală trebuie activat serviciul de vision.",
-                  "Package recognition is not active on the server. The camera currently looks for barcodes; real visual identification requires the vision service to be enabled."
+                  "AI-ul vizual este în dezvoltare. Momentan camera caută codul de bare, iar recomandările se bazează pe catalogul de produse.",
+                  "Visual AI is in development. The camera currently looks for barcodes and recommendations are based on the product catalog."
                 )}
               </section>
             )}
@@ -728,7 +728,7 @@ export default function LiveAssistantPage() {
               <section className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm leading-6 text-yellow-100">
                 <p className="font-bold text-yellow-200">
                   {billingGate.code === "paid_plan_required"
-                    ? pick("Asistent live inclus in Pro", "Live assistant included in Pro")
+                    ? pick("AI preview inclus în Pro", "AI preview included in Pro")
                     : pick("Limita gratuita a fost atinsa", "Free limit reached")}
                 </p>
                 <p className="mt-2">

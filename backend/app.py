@@ -2524,11 +2524,26 @@ def infer_category_from_query(search_text):
     product_type = detect_product_type(search_text)
 
     category_map = {
+        "water": "Apă",
+        "juice": "Sucuri",
+        "soft_drink": "Băuturi răcoritoare",
+        "coffee_drink": "Băuturi cu cafea",
         "ice_cream": "Înghețată",
         "spread": "Creme tartinabile",
+        "fruit_yogurt": "Iaurturi cu fructe",
         "yogurt": "Lactate",
         "cheese": "Lactate și brânzeturi",
         "energy_drink": "Băuturi energizante",
+        "instant_noodles": "Tăiței instant",
+        "chips": "Snacks sărate",
+        "cereal": "Cereale",
+        "protein": "Proteine și fitness",
+        "sauce": "Sosuri și condimente",
+        "bread": "Panificație",
+        "pizza": "Pizza",
+        "ready_meal": "Mese gata preparate",
+        "meat": "Carne",
+        "fish": "Pește și fructe de mare",
     }
 
     return category_map.get(product_type, "Categorie neconfirmată")
@@ -2840,7 +2855,77 @@ def detect_query_brand(search_text):
 def detect_product_type(search_text):
     text = normalize_search_text(search_text)
 
+    yogurt_tokens = {"iaurt", "yogurt", "yoghurt", "skyr", "zuzu"}
+    fruit_tokens = {
+        "fruct",
+        "fructe",
+        "capsuni",
+        "strawberry",
+        "piersici",
+        "peach",
+        "visine",
+        "cherry",
+        "afine",
+        "blueberry",
+        "zmeura",
+        "raspberry",
+        "padure",
+        "berries",
+    }
+
+    if any(token in text for token in yogurt_tokens) and any(
+        token in text for token in fruit_tokens
+    ):
+        return "fruit_yogurt"
+
     product_types = [
+        (
+            "water",
+            {
+                "apa",
+                "water",
+                "mineral",
+                "minerala",
+                "spring water",
+            },
+        ),
+        (
+            "juice",
+            {
+                "suc",
+                "juice",
+                "nectar",
+                "fresh",
+            },
+        ),
+        (
+            "soft_drink",
+            {
+                "cola",
+                "pepsi",
+                "coca cola",
+                "cocacola",
+                "soda",
+                "soft drink",
+                "bautura racoritoare",
+            },
+        ),
+        (
+            "coffee_drink",
+            {
+                "coffee",
+                "cafea",
+                "cappuccino",
+                "capuccino",
+                "latte",
+                "mocha",
+                "espresso",
+                "iced coffee",
+                "ice coffee",
+                "cold brew",
+                "frappe",
+            },
+        ),
         (
             "ice_cream",
             {
@@ -2901,6 +2986,100 @@ def detect_product_type(search_text):
                 "hell",
             },
         ),
+        (
+            "chips",
+            {
+                "chips",
+                "snack",
+                "crackers",
+                "pufule",
+                "popcorn",
+            },
+        ),
+        (
+            "cereal",
+            {
+                "cereale",
+                "cereal",
+                "muesli",
+                "granola",
+                "oatmeal",
+            },
+        ),
+        (
+            "protein",
+            {
+                "protein",
+                "proteic",
+                "proteina",
+                "whey",
+                "fitness",
+            },
+        ),
+        (
+            "sauce",
+            {
+                "sos",
+                "sauce",
+                "ketchup",
+                "mustar",
+                "mayonnaise",
+                "maioneza",
+                "salsa",
+            },
+        ),
+        (
+            "bread",
+            {
+                "paine",
+                "bread",
+                "chifla",
+                "bagheta",
+                "toast",
+            },
+        ),
+        (
+            "pizza",
+            {
+                "pizza",
+            },
+        ),
+        (
+            "ready_meal",
+            {
+                "ready meal",
+                "meal",
+                "sandwich",
+                "salata",
+                "supa",
+                "soup",
+                "frozen meal",
+            },
+        ),
+        (
+            "meat",
+            {
+                "carne",
+                "meat",
+                "salam",
+                "sausage",
+                "carnati",
+                "ham",
+                "prosciutto",
+            },
+        ),
+        (
+            "fish",
+            {
+                "peste",
+                "fish",
+                "ton",
+                "tuna",
+                "somon",
+                "salmon",
+                "seafood",
+            },
+        ),
     ]
 
     for product_type, tokens in product_types:
@@ -2915,8 +3094,13 @@ def product_matches_query_type(product_text, product_type):
         return True
 
     type_tokens = {
+        "water": {"apa", "water", "mineral", "minerala", "spring water"},
+        "juice": {"suc", "juice", "nectar"},
+        "soft_drink": {"cola", "pepsi", "coca cola", "cocacola", "soda", "soft drink"},
+        "coffee_drink": {"coffee", "cafea", "cappuccino", "capuccino", "latte", "mocha", "espresso", "iced coffee", "ice coffee"},
         "ice_cream": {"inghetata", "gelato", "ice cream", "icecream", "sorbet"},
         "spread": {"crema tartinabila", "spread", "nutella"},
+        "fruit_yogurt": {"iaurt", "yogurt", "yoghurt", "skyr", "zuzu", "fruct", "fructe"},
         "yogurt": {"iaurt", "yogurt", "yoghurt", "skyr", "zuzu"},
         "instant_noodles": {
             "buldak",
@@ -2939,6 +3123,15 @@ def product_matches_query_type(product_text, product_type):
             "taurina",
             "taurine",
         },
+        "chips": {"chips", "snack", "crackers", "pufule", "popcorn"},
+        "cereal": {"cereale", "cereal", "muesli", "granola", "oatmeal"},
+        "protein": {"protein", "proteic", "proteina", "whey", "fitness"},
+        "sauce": {"sos", "sauce", "ketchup", "mustar", "mayonnaise", "maioneza", "salsa"},
+        "bread": {"paine", "bread", "chifla", "bagheta", "toast"},
+        "pizza": {"pizza"},
+        "ready_meal": {"ready meal", "meal", "sandwich", "salata", "supa", "soup", "frozen meal"},
+        "meat": {"carne", "meat", "salam", "sausage", "carnati", "ham"},
+        "fish": {"peste", "fish", "ton", "tuna", "somon", "salmon", "seafood"},
     }
 
     return any(token in product_text for token in type_tokens.get(product_type, set()))
@@ -6188,43 +6381,81 @@ def build_product_from_open_food_facts(barcode, off_product, translate_ingredien
 
     category = "Altele"
     categories_lower = categories.lower()
+    tags_text = normalize_search_text(" ".join(str(tag) for tag in categories_tags))
     product_text = normalize_search_text(
-        " ".join([product_name, brands, categories, ingredients or ""])
+        " ".join([product_name, brands, categories, tags_text, ingredients or ""])
     )
 
-    if any(word in product_text for word in ["ice cream", "icecream", "gelato", "sorbet", "inghetata"]):
+    def has_any(tokens):
+        return any(token in product_text for token in tokens)
+
+    if has_any(["buldak", "samyang", "ramen", "instant noodles", "cup noodles", "noodle", "noodles", "taitei", "nongshim", "yakisoba", "udon"]):
+        category = "Tăiței instant"
+    elif has_any(["ice cream", "icecream", "gelato", "sorbet", "inghetata"]):
         category = "Înghețată"
-    elif any(word in product_text for word in ["coffee", "cafea", "cappuccino", "capuccino", "latte", "mocha", "espresso", "ice coffee", "iced coffee", "cold brew", "frappe"]):
-        category = "Băuturi cu cafea"
-    elif "energy drink" in categories_lower or "energ" in categories_lower:
+    elif has_any(["energy drink", "energiz", "red bull", "redbull", "monster", "hell", "burn", "rockstar", "taurina", "taurine"]) or "energy-drinks" in tags_text:
         category = "Băuturi energizante"
+    elif has_any(["coffee", "cafea", "cafe", "cappuccino", "capuccino", "latte", "mocha", "espresso", "ice coffee", "iced coffee", "cold brew", "frappe"]):
+        category = "Băuturi cu cafea"
+    elif has_any(["cola", "pepsi", "coca cola", "coca-cola", "cocacola", "soda", "soft drink", "carbonated drink"]):
+        category = "Băuturi răcoritoare"
+    elif has_any(["juice", "suc", "nectar", "smoothie"]):
+        category = "Sucuri"
+    elif has_any(["water", "apa", "mineral", "minerala", "spring water", "eau minerale"]):
+        category = "Apă"
     elif (
         "dairy dessert" in categories_lower
         or "dessert" in categories_lower
         or "pudding" in categories_lower
         or "custard" in categories_lower
         or "cream dessert" in categories_lower
-        or any(word in product_text for word in ["danette", "budinca", "desert lactat"])
+        or has_any(["danette", "budinca", "desert lactat", "dairy dessert"])
     ):
         category = "Deserturi lactate"
-    elif "yogurt" in categories_lower or "dairy" in categories_lower:
+    elif has_any(["iaurt", "yogurt", "yoghurt", "skyr", "zuzu"]) and has_any(["fruct", "fructe", "capsuni", "strawberry", "piersici", "peach", "visine", "cherry", "afine", "blueberry", "zmeura", "raspberry", "padure", "berries"]):
+        category = "Iaurturi cu fructe"
+    elif has_any(["cheese", "branza", "branzeturi", "cascaval", "mozzarella", "telemea", "feta"]):
+        category = "Lactate și brânzeturi"
+    elif "plant-based-milks" in tags_text or has_any(["lapte vegetal", "plant based milk", "oat drink", "almond drink", "soy drink"]):
+        category = "Alternative vegetale"
+    elif "yogurt" in categories_lower or "dairy" in categories_lower or has_any(["iaurt", "yogurt", "yoghurt", "skyr", "lapte", "milk"]):
         category = "Lactate"
+    elif has_any(["protein bar", "protein", "proteic", "proteina", "whey", "sports nutrition"]):
+        category = "Proteine și fitness"
+    elif has_any(["chips", "crisps", "crackers", "popcorn", "salty snack", "pufule"]):
+        category = "Snacks sărate"
+    elif "cereal" in categories_lower or has_any(["cereale", "cereal", "muesli", "granola", "oatmeal"]):
+        category = "Cereale"
+    elif "bread" in categories_lower or "bakery" in categories_lower or has_any(["paine", "bread", "toast", "bagheta", "chifla"]):
+        category = "Panificație"
+    elif has_any(["pizza"]):
+        category = "Pizza"
+    elif "frozen" in categories_lower or has_any(["frozen", "congelat", "congelata"]):
+        category = "Congelate"
+    elif "ready meal" in categories_lower or has_any(["ready meal", "meal", "sandwich", "salata", "supa", "soup"]):
+        category = "Mese gata preparate"
+    elif has_any(["sauce", "sos", "mustard", "mustar", "ketchup", "mayonnaise", "maioneza", "salsa", "condiment"]):
+        category = "Sosuri și condimente"
+    elif has_any(["pasta", "paste", "rice", "orez", "beans", "lentils", "linte", "naut", "chickpeas", "fasole"]):
+        category = "Paste, orez și leguminoase"
+    elif has_any(["canned", "conserva", "conserve", "pickles", "muraturi", "olives", "masline"]):
+        category = "Conserve și murături"
+    elif has_any(["oil", "ulei", "vinegar", "otet", "spice", "condiment"]):
+        category = "Uleiuri și condimente"
+    elif "meat" in categories_lower or has_any(["carne", "meat", "salam", "sausage", "carnati", "ham"]):
+        category = "Carne"
+    elif has_any(["fish", "peste", "tuna", "ton", "somon", "salmon", "seafood"]):
+        category = "Pește și fructe de mare"
+    elif "fruit" in categories_lower or "vegetable" in categories_lower or has_any(["fruct", "vegetable", "legume", "salata"]):
+        category = "Fructe și legume"
+    elif has_any(["spread", "crema tartinabila", "hazelnut spread", "peanut butter", "gem", "jam", "miere", "honey"]):
+        category = "Creme și gemuri"
+    elif has_any(["nuts", "nuci", "alune", "seeds", "seminte", "dried fruits"]):
+        category = "Nuci și semințe"
+    elif "sweet" in categories_lower or "candy" in categories_lower or "chocolate" in categories_lower or has_any(["ciocolata", "chocolate", "biscuit", "wafer", "napolitana", "dulce", "candy"]):
+        category = "Dulciuri"
     elif "beverage" in categories_lower or "drink" in categories_lower:
         category = "Băuturi"
-    elif "snack" in categories_lower:
-        category = "Snacks"
-    elif "sweet" in categories_lower or "candy" in categories_lower or "chocolate" in categories_lower:
-        category = "Dulciuri"
-    elif "cereal" in categories_lower:
-        category = "Cereale"
-    elif "meat" in categories_lower:
-        category = "Carne"
-    elif "bread" in categories_lower or "bakery" in categories_lower:
-        category = "Panificație"
-    elif "fruit" in categories_lower or "vegetable" in categories_lower:
-        category = "Fructe și legume"
-    elif "sauce" in categories_lower or "mustard" in categories_lower or "condiment" in categories_lower:
-        category = "Sosuri și condimente"
 
     vegan = "en:vegan" in ingredients_analysis_tags or "en:vegan" in labels_tags
     lactose_free = "en:lactose-free" in labels_tags
@@ -6646,6 +6877,18 @@ def get_product_recommendation_family(product_data):
         "zmeura",
         "raspberry",
     ]
+    protein_words = ["protein", "proteic", "proteina", "whey", "fitness"]
+    salty_snack_words = ["chips", "crisps", "crackers", "popcorn", "pufule", "salty snack"]
+    sweet_snack_words = ["ciocolata", "chocolate", "biscuit", "wafer", "napolitana", "candy", "dulce"]
+    cereal_words = ["cereale", "cereal", "muesli", "granola", "oatmeal"]
+    sauce_words = ["sos", "sauce", "mustar", "ketchup", "maioneza", "mayonnaise", "salsa", "condiment"]
+    bread_words = ["paine", "bread", "toast", "bagheta", "chifla", "bakery"]
+    meat_words = ["carne", "meat", "salam", "sausage", "carnati", "ham", "prosciutto"]
+    fish_words = ["peste", "fish", "ton", "tuna", "somon", "salmon", "seafood"]
+    spread_words = ["spread", "crema tartinabila", "nutella", "peanut butter", "gem", "jam", "miere", "honey"]
+    nuts_words = ["nuts", "nuci", "alune", "seeds", "seminte"]
+    ready_meal_words = ["ready meal", "sandwich", "salata", "supa", "soup"]
+    frozen_words = ["frozen", "congelat", "congelata"]
 
     if any(word in text_value for word in instant_noodle_words):
         return "instant_noodles"
@@ -6679,6 +6922,45 @@ def get_product_recommendation_family(product_data):
     if any(word in text_value for word in ["lactate", "dairy", "iaurt", "yogurt", "yoghurt", "skyr", "lapte", "milk"]):
         return "lactate"
 
+    if any(word in text_value for word in protein_words):
+        return "protein"
+
+    if any(word in text_value for word in salty_snack_words):
+        return "salty_snack"
+
+    if any(word in text_value for word in cereal_words):
+        return "cereal"
+
+    if any(word in text_value for word in sauce_words):
+        return "sauce"
+
+    if "pizza" in text_value:
+        return "pizza"
+
+    if any(word in text_value for word in frozen_words):
+        return "frozen"
+
+    if any(word in text_value for word in ready_meal_words):
+        return "ready_meal"
+
+    if any(word in text_value for word in bread_words):
+        return "bread"
+
+    if any(word in text_value for word in meat_words):
+        return "meat"
+
+    if any(word in text_value for word in fish_words):
+        return "fish"
+
+    if any(word in text_value for word in spread_words):
+        return "spread"
+
+    if any(word in text_value for word in nuts_words):
+        return "nuts"
+
+    if any(word in text_value for word in sweet_snack_words):
+        return "sweet_snack"
+
     if "bauturi" in text_value or "beverage" in text_value or "drink" in text_value:
         return "beverage"
 
@@ -6699,6 +6981,21 @@ def is_compatible_alternative(scanned_product, candidate):
         "caffeinated_beverage",
     }
     lactate_families = {"lactate", "fruit_yogurt", "dairy_dessert"}
+    strict_food_families = {
+        "protein",
+        "salty_snack",
+        "sweet_snack",
+        "cereal",
+        "sauce",
+        "pizza",
+        "frozen",
+        "ready_meal",
+        "bread",
+        "meat",
+        "fish",
+        "spread",
+        "nuts",
+    }
 
     if candidate_family == "water" and scanned_family != "water":
         return False
@@ -6727,6 +7024,12 @@ def is_compatible_alternative(scanned_product, candidate):
         return candidate_family in lactate_families
 
     if candidate_family in lactate_families and scanned_family not in lactate_families:
+        return False
+
+    if scanned_family in strict_food_families:
+        return candidate_family == scanned_family
+
+    if candidate_family in strict_food_families and scanned_family != candidate_family:
         return False
 
     if scanned_family == "energy_drink":
@@ -6767,22 +7070,40 @@ def get_off_alternative_category(product_data):
         ])
     )
     category_map = {
+        "apa": "en:waters",
+        "sucuri": "en:fruit-juices",
+        "bauturi racoritoare": "en:soft-drinks",
         "bauturi energizante": "en:energy-drinks",
         "bauturi cu cafea": "en:iced-coffees",
         "bauturi": "en:beverages",
         "lactate": "en:dairies",
+        "iaurturi cu fructe": "en:fruit-yogurts",
+        "lactate si branzeturi": "en:cheeses",
         "deserturi lactate": "en:dairy-desserts",
         "snacks": "en:snacks",
+        "snacks sarate": "en:salty-snacks",
         "dulciuri": "en:sweet-snacks",
         "cereale": "en:breakfast-cereals",
         "carne": "en:meats",
+        "peste si fructe de mare": "en:seafood",
         "panificatie": "en:breads",
         "fructe si legume": "en:fruits-and-vegetables",
         "sosuri si condimente": "en:condiments",
+        "uleiuri si condimente": "en:condiments",
+        "paste orez si leguminoase": "en:pastas",
+        "conserve si muraturi": "en:canned-foods",
         "taitei instant": "en:instant-noodles",
         "noodles": "en:instant-noodles",
         "ramen": "en:instant-noodles",
         "inghetata": "en:ice-creams",
+        "pizza": "en:pizzas",
+        "congelate": "en:frozen-foods",
+        "mese gata preparate": "en:ready-meals",
+        "alternative vegetale": "en:plant-based-foods-and-beverages",
+        "proteine si fitness": "en:sports-nutrition",
+        "creme si gemuri": "en:spreads",
+        "creme tartinabile": "en:spreads",
+        "nuci si seminte": "en:nuts",
     }
 
     if any(word in product_text for word in ["iaurt", "yogurt", "yoghurt", "skyr", "zuzu"]) and any(word in product_text for word in ["fruct", "fructe", "capsuni", "strawberry", "piersici", "visine", "afine", "zmeura", "padure"]):
@@ -6809,11 +7130,41 @@ def get_off_alternative_category(product_data):
     if any(word in product_text for word in ["inghetata", "ice cream", "gelatelli", "gelato"]):
         return "en:ice-creams"
 
+    if any(word in product_text for word in ["apa", "water", "mineral"]) and not any(word in product_text for word in ["energy", "energiz", "coffee", "cafea", "cola", "pepsi"]):
+        return "en:waters"
+
+    if any(word in product_text for word in ["cola", "pepsi", "coca cola", "cocacola", "soda", "soft drink"]):
+        return "en:soft-drinks"
+
+    if any(word in product_text for word in ["suc", "juice", "nectar", "smoothie"]):
+        return "en:fruit-juices"
+
     if any(word in product_text for word in ["sos", "mustar", "ketchup", "salsa"]):
         return "en:condiments"
 
-    if any(word in product_text for word in ["ciocolata", "napolitana", "biscuit", "dulce"]):
+    if any(word in product_text for word in ["chips", "crackers", "popcorn", "pufule", "salty snack"]):
+        return "en:salty-snacks"
+
+    if any(word in product_text for word in ["protein", "proteic", "proteina", "whey"]):
+        return "en:sports-nutrition"
+
+    if any(word in product_text for word in ["ciocolata", "napolitana", "biscuit", "dulce", "chocolate", "wafer"]):
         return "en:sweet-snacks"
+
+    if any(word in product_text for word in ["cereal", "cereale", "muesli", "granola"]):
+        return "en:breakfast-cereals"
+
+    if any(word in product_text for word in ["pizza"]):
+        return "en:pizzas"
+
+    if any(word in product_text for word in ["frozen", "congelat", "congelata"]):
+        return "en:frozen-foods"
+
+    if any(word in product_text for word in ["ready meal", "sandwich", "supa", "soup", "salata"]):
+        return "en:ready-meals"
+
+    if any(word in product_text for word in ["plant based", "vegan", "lapte vegetal", "oat drink", "almond drink"]):
+        return "en:plant-based-foods-and-beverages"
 
     if any(word in product_text for word in ["suc", "cola", "drink", "bautura"]):
         return "en:beverages"

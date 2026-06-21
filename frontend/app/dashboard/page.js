@@ -63,11 +63,11 @@ export default function DashboardPage() {
   const [loadError, setLoadError] = useState("");
 
   const actions = [
-    { href: "/live-assistant", title: pick("Asistent live", "Live assistant"), description: pick("Arată produsul și primești recomandări după preferințele tale.", "Show the product and get recommendations based on your preferences."), icon: ScanLine, tone: "emerald" },
-    { href: "/barcode-scan", title: pick("Scanare cod de bare", "Barcode scanner"), description: pick("Identifică rapid produsul direct cu telefonul.", "Identify products quickly with your phone."), icon: Barcode, tone: "cyan" },
-    { href: "/store", title: pick("Caută produs", "Search products"), description: pick("Găsește un produs după nume și magazin.", "Find a product by name and store."), icon: ScanLine, tone: "violet" },
+    { href: "/barcode-scan", title: pick("Scanează codul", "Scan barcode"), description: pick("Identifică rapid produsul cu telefonul și vezi verdictul.", "Identify the product quickly with your phone and see the verdict."), icon: Barcode, tone: "emerald" },
+    { href: "/store", title: pick("Caută produs", "Search products"), description: pick("Găsește produse în catalog după nume și magazin.", "Find products in the catalog by name and store."), icon: ScanLine, tone: "cyan" },
     { href: "/cart", title: pick("Coșul meu", "My cart"), description: pick("Produse grupate pentru următoarea cumpărătură.", "Products grouped for your next shopping trip."), icon: ShoppingCart, tone: "amber" },
     { href: "/preferences", title: pick("Preferințe", "Preferences"), description: pick("Setează cum alegi alternativele.", "Set how alternatives should be chosen."), icon: SlidersHorizontal, tone: "violet" },
+    { href: "/live-assistant", title: pick("AI vizual în dezvoltare", "Visual AI preview"), description: pick("Preview Pro/Family. Momentan folosește codul de bare; recunoașterea ambalajului este în lucru.", "Pro/Family preview. It currently uses barcodes while package recognition is in development."), icon: ScanLine, tone: "violet" },
     { href: "/history", title: pick("Istoric", "History"), description: pick("Revino la scanările și analizele recente.", "Return to your recent scans and analyses."), icon: Clock3, tone: "cyan" },
     { href: "/favorites", title: pick("Favorite", "Favorites"), description: pick("Păstrează alternativele care merită repetate.", "Keep the alternatives worth buying again."), icon: Heart, tone: "amber" },
     { href: "/submit-product", title: pick("Contribuie produs", "Contribute product"), description: pick("Completează catalogul când un produs lipsește.", "Complete the catalog when a product is missing."), icon: ListPlus, tone: "cyan" },

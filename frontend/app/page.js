@@ -44,10 +44,10 @@ export default function Home() {
   const steps = [
     {
       icon: ScanLine,
-      title: pick("Scanezi produsul", "Scan the product"),
+      title: pick("Scanezi codul de bare", "Scan the barcode"),
       detail: pick(
-        "Arati codul de bare sau eticheta camerei telefonului.",
-        "Show the barcode or label to your phone camera."
+        "Ții codul în cadru, iar aplicația caută produsul în catalogul online.",
+        "Keep the barcode in frame and the app looks up the product in the online catalog."
       ),
     },
     {
@@ -79,10 +79,10 @@ export default function Home() {
     },
     {
       icon: Camera,
-      label: pick("Asistent live", "Live assistant"),
+      label: pick("AI vizual în dezvoltare", "Visual AI in development"),
       detail: pick(
-        "Inclus in Pro si Family pentru recunoastere live la raft.",
-        "Included in Pro and Family for live shelf recognition."
+        "Pregătim recunoașterea după ambalaj. Pentru lansare, fluxul rapid rămâne codul de bare.",
+        "Package recognition is being prepared. For launch, the fast flow remains barcode scanning."
       ),
     },
     {
@@ -163,25 +163,25 @@ export default function Home() {
               </h1>
               <p className="mt-6 max-w-3xl text-lg leading-8 text-gray-200 md:text-xl">
                 {pick(
-                  "Scanezi un produs, vezi daca merita cumparat si primesti alternative clare pentru bugetul si preferintele tale.",
-                  "Scan a product, see if it is worth buying and get clear alternatives for your budget and preferences."
+                  "Scanezi codul de bare, vezi dacă produsul merită cumpărat și primești alternative clare pentru bugetul și preferințele tale.",
+                  "Scan the barcode, see if the product is worth buying and get clear alternatives for your budget and preferences."
                 )}
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Link
-                  href={liveAssistantHref}
+                  href={barcodeHref}
                   className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-white px-6 py-4 font-black text-black shadow-[0_0_30px_rgba(103,232,249,.18)] hover:-translate-y-0.5 hover:bg-cyan-100"
                 >
-                  <Camera className="h-5 w-5" />
-                  {pick("Asistent live Pro", "Pro live assistant")}
+                  <Barcode className="h-5 w-5" />
+                  {pick("Scanează codul", "Scan barcode")}
                 </Link>
                 <Link
-                  href={barcodeHref}
+                  href={liveAssistantHref}
                   className="ce-hero-secondary-action inline-flex items-center justify-center gap-2 rounded-lg border border-white/18 bg-black/35 px-6 py-4 font-bold text-white backdrop-blur hover:-translate-y-0.5 hover:bg-white/10"
                 >
-                  <Barcode className="h-5 w-5" />
-                  {pick("Scaneaza codul", "Scan barcode")}
+                  <Camera className="h-5 w-5" />
+                  {pick("AI vizual în dezvoltare", "Visual AI preview")}
                 </Link>
                 <Link
                   href="/pricing"
@@ -330,8 +330,8 @@ export default function Home() {
               </p>
               <h2 className="mt-2 text-2xl font-black">
                 {pick(
-                  "Deschide camera si verifica produsul inainte sa il pui in cos.",
-                  "Open the camera and check the product before it goes in your cart."
+                  "Scanează codul și verifică produsul înainte să îl pui în coș.",
+                  "Scan the barcode and check the product before it goes in your cart."
                 )}
               </h2>
             </div>

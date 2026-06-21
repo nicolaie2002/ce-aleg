@@ -35,8 +35,8 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
     },
     {
       href: "/live-assistant",
-      label: pick("Asistent", "Live"),
-      desktopLabel: pick("Asistent live", "Live assistant"),
+      label: pick("AI", "AI"),
+      desktopLabel: pick("AI preview", "AI preview"),
       icon: Radio,
     },
     {
