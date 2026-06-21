@@ -3816,6 +3816,21 @@ def ensure_database_indexes():
             "CREATE INDEX IF NOT EXISTS ix_price_observations_barcode "
             "ON price_observations (product_barcode)",
         ),
+        (
+            "search events result date",
+            "CREATE INDEX IF NOT EXISTS ix_search_events_result_created "
+            "ON search_events (result_count, created_at)",
+        ),
+        (
+            "search events query",
+            "CREATE INDEX IF NOT EXISTS ix_search_events_query "
+            "ON search_events (query)",
+        ),
+        (
+            "search events user date",
+            "CREATE INDEX IF NOT EXISTS ix_search_events_user_created "
+            "ON search_events (user_id, created_at)",
+        ),
     ]
 
     for label, statement in common_indexes:

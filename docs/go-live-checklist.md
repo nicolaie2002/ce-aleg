@@ -50,6 +50,9 @@ git push
 
 Fisierul `backend/.env` este ignorat si nu trebuie urcat niciodata.
 
+Checklistul de securitate inainte de lansare este in
+[`docs/security-predeployment-audit.md`](security-predeployment-audit.md).
+
 ## 2. Supabase
 
 1. Supabase Dashboard -> proiect -> `Connect`.
