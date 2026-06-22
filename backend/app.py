@@ -680,7 +680,7 @@ def render_brand_email(preheader, title, intro, button_label=None, button_url=No
     button_html = (
         f"""
         <tr>
-          <td style="padding:24px 0 8px;">
+          <td align="center" style="padding:24px 0 8px;text-align:center;">
             <a href="{safe_button_url}" style="display:inline-block;background:#ffffff;color:#020617;text-decoration:none;font-weight:800;font-size:15px;padding:14px 22px;border-radius:12px;">
               {safe_button_label}
             </a>
