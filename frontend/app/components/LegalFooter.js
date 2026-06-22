@@ -98,11 +98,11 @@ export function LegalFooter() {
               {pick("Contact", "Contact")}
             </h2>
             <a
-              href="mailto:cealegshop@gmail.com"
+              href="mailto:contact@cealeg.shop"
               className="mt-4 flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white"
             >
               <Mail size={15} className="text-cyan-200" />
-              cealegshop@gmail.com
+              contact@cealeg.shop
             </a>
             <p className="mt-4 text-sm leading-6 text-gray-400">
               {pick(

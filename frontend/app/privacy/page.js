@@ -15,7 +15,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 
-const CONTACT_EMAIL = "cealegshop@gmail.com";
+const CONTACT_EMAIL = "contact@cealeg.shop";
 
 export default function PrivacyPage() {
   const { pick } = useLocale();

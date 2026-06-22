@@ -318,6 +318,7 @@ EMAIL_SMTP_USERNAME = os.environ.get("EMAIL_SMTP_USERNAME", "").strip()
 EMAIL_SMTP_PASSWORD = read_secret_env("EMAIL_SMTP_PASSWORD")
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Ce aleg?").strip()
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact@cealeg.shop").strip().lower()
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").strip().lower() in {
     "1",
     "true",
@@ -335,6 +336,7 @@ EMAIL_VERIFICATION_MAX_AGE = int(
     os.environ.get("EMAIL_VERIFICATION_MAX_AGE", str(48 * 60 * 60))
 )
 ACCOUNT_DELETE_MAX_AGE = int(os.environ.get("ACCOUNT_DELETE_MAX_AGE", str(24 * 60 * 60)))
+LAST_EMAIL_PROVIDER_ERROR = ""
 
 PLAN_CATALOG = {
     "free": {
@@ -426,6 +428,22 @@ def is_email_configured():
     return bool(EMAIL_SMTP_HOST and EMAIL_FROM)
 
 
+def set_email_provider_error(message=""):
+    global LAST_EMAIL_PROVIDER_ERROR
+    LAST_EMAIL_PROVIDER_ERROR = str(message or "").strip()[:600]
+
+
+def is_valid_email_address(email):
+    return bool(re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", str(email or "").strip()))
+
+
+def get_email_reply_to():
+    if is_valid_email_address(CONTACT_EMAIL):
+        return CONTACT_EMAIL
+
+    return ""
+
+
 def validate_password_strength(password):
     password = password or ""
     suggestions = []
@@ -483,6 +501,7 @@ def get_email_html_body(text_body, html_body=None):
 
 
 def send_brevo_email(to_email, subject, text_body, html_body=None):
+    reply_to = get_email_reply_to()
     payload = {
         "sender": {
             "name": EMAIL_FROM_NAME,
@@ -493,6 +512,12 @@ def send_brevo_email(to_email, subject, text_body, html_body=None):
         "textContent": text_body,
         "htmlContent": get_email_html_body(text_body, html_body),
     }
+
+    if reply_to:
+        payload["replyTo"] = {
+            "name": EMAIL_FROM_NAME,
+            "email": reply_to,
+        }
 
     try:
         response = requests.post(
@@ -507,8 +532,10 @@ def send_brevo_email(to_email, subject, text_body, html_body=None):
         )
 
         if 200 <= response.status_code < 300:
+            set_email_provider_error("")
             return True
 
+        set_email_provider_error(f"Brevo HTTP {response.status_code}: {response.text[:300]}")
         app.logger.warning(
             "Brevo email failed with status %s: %s",
             response.status_code,
@@ -516,11 +543,13 @@ def send_brevo_email(to_email, subject, text_body, html_body=None):
         )
         return False
     except Exception as error:
+        set_email_provider_error(f"Brevo exception: {error}")
         app.logger.warning("Brevo email failed: %s", error)
         return False
 
 
 def send_resend_email(to_email, subject, text_body, html_body=None):
+    reply_to = get_email_reply_to()
     payload = {
         "from": f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>",
         "to": [to_email],
@@ -528,6 +557,9 @@ def send_resend_email(to_email, subject, text_body, html_body=None):
         "text": text_body,
         "html": get_email_html_body(text_body, html_body),
     }
+
+    if reply_to:
+        payload["reply_to"] = reply_to
 
     try:
         response = requests.post(
@@ -541,8 +573,10 @@ def send_resend_email(to_email, subject, text_body, html_body=None):
         )
 
         if 200 <= response.status_code < 300:
+            set_email_provider_error("")
             return True
 
+        set_email_provider_error(f"Resend HTTP {response.status_code}: {response.text[:300]}")
         app.logger.warning(
             "Resend email failed with status %s: %s",
             response.status_code,
@@ -550,15 +584,19 @@ def send_resend_email(to_email, subject, text_body, html_body=None):
         )
         return False
     except Exception as error:
+        set_email_provider_error(f"Resend exception: {error}")
         app.logger.warning("Resend email failed: %s", error)
         return False
 
 
 def send_smtp_email(to_email, subject, text_body, html_body=None):
+    reply_to = get_email_reply_to()
     message = EmailMessage()
     message["Subject"] = subject
     message["From"] = f"{EMAIL_FROM_NAME} <{EMAIL_FROM}>"
     message["To"] = to_email
+    if reply_to:
+        message["Reply-To"] = reply_to
     message.set_content(text_body)
 
     if html_body:
@@ -587,14 +625,19 @@ def send_smtp_email(to_email, subject, text_body, html_body=None):
 
             server.send_message(message)
 
+        set_email_provider_error("")
         return True
     except Exception as error:
+        set_email_provider_error(f"SMTP exception: {error}")
         app.logger.warning("SMTP email failed: %s", error)
         return False
 
 
 def send_transactional_email(to_email, subject, text_body, html_body=None):
     if not is_email_configured():
+        set_email_provider_error(
+            f"Provider={EMAIL_PROVIDER}, EMAIL_FROM set={bool(EMAIL_FROM)}, provider key/host configured={bool(BREVO_API_KEY or RESEND_API_KEY or EMAIL_SMTP_HOST)}"
+        )
         app.logger.info(
             "Email not sent because provider is not configured. To=%s Subject=%s Provider=%s",
             to_email,
@@ -4189,15 +4232,23 @@ def get_readiness():
 @app.route("/admin/email-test", methods=["POST"])
 def send_admin_email_test():
     data = request.get_json(silent=True) or {}
-    to_email = (data.get("to") or g.current_user.email).strip().lower()
+    to_email = (
+        data.get("to")
+        or CONTACT_EMAIL
+        or os.environ.get("ADMIN_EMAIL")
+        or g.current_user.email
+    ).strip().lower()
 
-    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", to_email):
+    if not is_valid_email_address(to_email):
         return jsonify({"error": "Adresa de email nu este valida."}), 400
 
     if not is_email_configured():
         return jsonify({
             "sent": False,
-            "error": "Emailul nu este configurat. Completeaza EMAIL_PROVIDER si cheia providerului ales.",
+            "error": "Emailul nu este configurat. Completeaza EMAIL_PROVIDER, EMAIL_FROM si cheia providerului ales.",
+            "provider": EMAIL_PROVIDER,
+            "from": EMAIL_FROM,
+            "to": to_email,
         }), 400
 
     sent = send_transactional_email(
@@ -4205,25 +4256,44 @@ def send_admin_email_test():
         "Test email Ce aleg?",
         (
             "Salut!\n\n"
-            "Emailurile tranzactionale Ce aleg? functioneaza. "
-            "Resetarea parolei si mesajele de cont pot fi trimise din cloud.\n"
+            "Emailurile tranzactionale Ce aleg? functioneaza.\n"
+            f"Expeditor: {EMAIL_FROM_NAME} <{EMAIL_FROM}>\n"
+            f"Reply-to: {get_email_reply_to() or EMAIL_FROM}\n"
+            f"Destinatar test: {to_email}\n\n"
+            "Resetarea parolei, confirmarea emailului si mesajele de cont pot fi trimise din cloud.\n"
         ),
-        """
-        <p>Salut!</p>
-        <p>Emailurile tranzactionale <strong>Ce aleg?</strong> functioneaza.</p>
-        <p>Resetarea parolei si mesajele de cont pot fi trimise din cloud.</p>
-        """,
+        render_brand_email(
+            "Test email",
+            "Emailurile Ce aleg? functioneaza.",
+            (
+                "Acesta este un test trimis din panoul de administrare. "
+                "Daca il vezi in inbox, Brevo, domeniul si forwardingul sunt configurate corect."
+            ),
+            "Deschide site-ul",
+            FRONTEND_PUBLIC_URL,
+            [
+                f"Expeditor: {EMAIL_FROM_NAME} <{EMAIL_FROM}>",
+                f"Reply-to: {get_email_reply_to() or EMAIL_FROM}",
+                f"Destinatar test: {to_email}",
+            ],
+        ),
     )
 
     if not sent:
+        provider_error = LAST_EMAIL_PROVIDER_ERROR or "Providerul nu a returnat detalii."
         return jsonify({
             "sent": False,
-            "error": "Emailul de test nu a putut fi trimis. Verifica datele SMTP.",
+            "error": f"Emailul de test nu a putut fi trimis. {provider_error}",
+            "provider": EMAIL_PROVIDER,
+            "from": EMAIL_FROM,
+            "to": to_email,
         }), 502
 
     return jsonify({
         "sent": True,
-        "message": "Email de test trimis cu succes.",
+        "message": f"Email de test trimis catre {to_email}. Verifica inboxul si Spam.",
+        "from": EMAIL_FROM,
+        "to": to_email,
     })
 
 
@@ -7711,7 +7781,7 @@ def fetch_off_text_search_products(query_text):
                             headers={
                                 "User-Agent": (
                                     "CeAlegApp/1.0 "
-                                    "(contact: cealegshop@gmail.com)"
+                                    "(contact: contact@cealeg.shop)"
                                 ),
                                 "Accept": "application/json",
                             },

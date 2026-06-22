@@ -36,11 +36,11 @@ export default function SupportPage() {
               )}
             </p>
             <a
-              href="mailto:cealegshop@gmail.com?subject=Suport%20Ce%20aleg"
+              href="mailto:contact@cealeg.shop?subject=Suport%20Ce%20aleg"
               className="mt-7 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
             >
               <Mail size={18} />
-              cealegshop@gmail.com
+              contact@cealeg.shop
             </a>
           </div>
 

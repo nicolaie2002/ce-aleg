@@ -17,6 +17,8 @@ const statLabels = {
   proUsers: "Utilizatori Pro",
 };
 
+const CONTACT_EMAIL = "contact@cealeg.shop";
+
 export default function AdminPage() {
   const [overview, setOverview] = useState({});
   const [submissions, setSubmissions] = useState([]);
@@ -24,6 +26,7 @@ export default function AdminPage() {
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
+  const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
 
   async function loadAdmin() {
     const [overviewResponse, submissionsResponse, missesResponse, usersResponse] = await Promise.all([
@@ -101,7 +104,7 @@ export default function AdminPage() {
       const response = await fetch(`${API_URL}/admin/email-test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ to: emailTestAddress || CONTACT_EMAIL }),
       });
       const data = await readApiJson(response);
       setMessage(
@@ -146,16 +149,31 @@ export default function AdminPage() {
             <div>
               <h2 className="text-2xl font-black">Sistem si email</h2>
               <p className="mt-2 text-sm text-gray-400">
-                Trimite un email de test catre contul tau de administrator.
+                Trimite un email de test catre adresa profesionala a site-ului.
               </p>
             </div>
-            <button
-              onClick={sendEmailTest}
-              disabled={emailBusy}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-400 px-5 py-3 font-black text-black hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Mail size={17} /> {emailBusy ? "Se trimite..." : "Testeaza email"}
-            </button>
+            <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[380px]">
+              <label className="text-xs font-black uppercase text-gray-400" htmlFor="admin-email-test">
+                Destinatar test
+              </label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  id="admin-email-test"
+                  value={emailTestAddress}
+                  onChange={(event) => setEmailTestAddress(event.target.value)}
+                  className="min-h-12 flex-1 rounded-lg border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
+                  placeholder={CONTACT_EMAIL}
+                  type="email"
+                />
+                <button
+                  onClick={sendEmailTest}
+                  disabled={emailBusy}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-400 px-5 py-3 font-black text-black hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Mail size={17} /> {emailBusy ? "Se trimite..." : "Testeaza email"}
+                </button>
+              </div>
+            </div>
           </div>
         </section>
 
