@@ -49,7 +49,7 @@ const fallbackPlans = {
 
 const featureLabels = {
   "5 scanari pe saptamana": {
-    ro: "5 scanari pe saptamana",
+    ro: "5 scanări pe săptămână",
     en: "5 scans per week",
   },
   "2 alternative pentru fiecare produs": {
@@ -57,11 +57,11 @@ const featureLabels = {
     en: "2 alternatives for each product",
   },
   "verdict rapid si istoric de baza": {
-    ro: "verdict rapid si istoric de baza",
+    ro: "verdict rapid și istoric de bază",
     en: "quick verdict and basic history",
   },
   "scanari nelimitate": {
-    ro: "scanari nelimitate",
+    ro: "scanări nelimitate",
     en: "unlimited scans",
   },
   "asistent live la raft": {
@@ -73,15 +73,15 @@ const featureLabels = {
     en: "AI preview in development",
   },
   "AI preview in dezvoltare": {
-    ro: "AI preview in dezvoltare",
+    ro: "AI preview în dezvoltare",
     en: "AI preview in development",
   },
   "3 alternative imediat + afiseaza mai multe": {
-    ro: "3 alternative imediat + afiseaza mai multe",
+    ro: "3 alternative imediat + afișează mai multe",
     en: "3 instant alternatives + show more",
   },
   "cautare dupa preferintele tale": {
-    ro: "cautare dupa preferintele tale",
+    ro: "căutare după preferințele tale",
     en: "search by your preferences",
   },
   "istoric complet": {
@@ -97,11 +97,11 @@ const featureLabels = {
     en: "family profiles",
   },
   "preferinte separate": {
-    ro: "preferinte separate",
+    ro: "preferințe separate",
     en: "separate preferences",
   },
   "liste comune de cumparaturi": {
-    ro: "liste comune de cumparaturi",
+    ro: "liste comune de cumpărături",
     en: "shared shopping lists",
   },
 };
@@ -117,7 +117,7 @@ function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPla
   const isYearly = billingCycle === "yearly";
   const isBusy = busyPlan === `${id}:${billingCycle}`;
   const displayPrice = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
-  const priceSuffix = isYearly ? pick("/ an", "/ year") : pick("/ luna", "/ month");
+  const priceSuffix = isYearly ? pick("/ an", "/ year") : pick("/ lună", "/ month");
   const monthlyEquivalent =
     isYearly && !isFree ? Number(plan.yearlyPrice || 0) / 12 : null;
 
@@ -153,7 +153,7 @@ function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPla
         <p className={`mt-1 text-sm ${isCurrent ? "text-cyan-100/70" : "text-gray-400"}`}>
           {isYearly
             ? pick(
-                `aprox. ${monthlyEquivalent.toFixed(2)} lei / luna`,
+                `aprox. ${monthlyEquivalent.toFixed(2)} lei / lună`,
                 `about ${monthlyEquivalent.toFixed(2)} lei / month`
               )
             : pick(`${plan.yearlyPrice} lei / an`, `${plan.yearlyPrice} lei / year`)}
@@ -230,7 +230,7 @@ export default function PricingPage() {
     if (checkoutStatus === "success") {
       nextTone = "success";
       nextMessage = pick(
-        "Plata a fost confirmata. Planul se actualizeaza automat imediat ce Stripe trimite confirmarea.",
+        "Plata a fost confirmată. Planul se actualizează automat imediat ce Stripe trimite confirmarea.",
         "Payment confirmed. Your plan updates automatically as soon as Stripe sends the confirmation."
       );
     }
@@ -238,7 +238,7 @@ export default function PricingPage() {
     if (checkoutStatus === "cancelled") {
       nextTone = "info";
       nextMessage = pick(
-        "Plata a fost anulata. Poti alege planul oricand esti pregatit.",
+        "Plata a fost anulată. Poți alege planul oricând ești pregătit.",
         "Payment was cancelled. You can choose a plan whenever you are ready."
       );
     }
@@ -273,7 +273,7 @@ export default function PricingPage() {
         throw new Error(
           data.error ||
             pick(
-              "Plata nu poate fi pornita momentan.",
+              "Plata nu poate fi pornită momentan.",
               "Checkout cannot start right now."
             )
         );
@@ -358,7 +358,7 @@ export default function PricingPage() {
             href="/dashboard"
             className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            <ArrowLeft size={16} /> {pick("Inapoi la dashboard", "Back to dashboard")}
+            <ArrowLeft size={16} /> {pick("Înapoi la dashboard", "Back to dashboard")}
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher compact />
@@ -373,13 +373,13 @@ export default function PricingPage() {
             </p>
             <h1 className="mt-3 text-5xl font-black leading-tight md:text-6xl">
               {pick(
-                "Alege mai bine la fiecare cumparatura.",
+                "Alege mai bine la fiecare cumpărătură.",
                 "Choose better on every shopping trip."
               )}
             </h1>
             <p className="mt-5 text-lg leading-8 text-gray-300">
               {pick(
-                "Scanezi produsul, vezi verdictul si primesti alternative clare. Free e perfect pentru inceput. Pro deblocheaza cautarea dupa preferinte si mai multe recomandari.",
+                "Scanezi produsul, vezi verdictul și primești alternative clare. Free e perfect pentru început. Pro deblochează căutarea după preferințe și mai multe recomandări.",
                 "Scan a product, see the verdict and get clear alternatives. Free is great to start. Pro unlocks preference search and more recommendations."
               )}
             </p>
@@ -396,7 +396,7 @@ export default function PricingPage() {
                 </p>
                 <p className="mt-2 text-sm leading-6 text-gray-300">
                   {pick(
-                    "Free arata primele recomandari bune. Pro te lasa sa ceri exact ce cauti: mai ieftin, fara zahar, mai multa proteina sau ingrediente mai curate.",
+                    "Free arată primele recomandări bune. Pro te lasă să ceri exact ce cauți: mai ieftin, fără zahăr, mai multă proteină sau ingrediente mai curate.",
                     "Free shows the first good picks. Pro lets you ask for exactly what you want: cheaper, less sugar, more protein or cleaner ingredients."
                   )}
                 </p>
@@ -412,7 +412,7 @@ export default function PricingPage() {
                 <CreditCard size={18} />
                 {isOpeningPortal
                   ? pick("Se deschide...", "Opening...")
-                  : pick("Administreaza abonamentul", "Manage subscription")}
+                  : pick("Administrează abonamentul", "Manage subscription")}
               </button>
             )}
           </div>
@@ -421,9 +421,9 @@ export default function PricingPage() {
         {billing?.usage && (
           <div className="ce-usage-banner mt-7 rounded-lg border p-5">
             {billing.usage.isUnlimited
-              ? pick("Ai scanari nelimitate active.", "Unlimited scans are active.")
+              ? pick("Ai scanări nelimitate active.", "Unlimited scans are active.")
               : pick(
-                  `Ai folosit ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} scanari gratuite saptamana aceasta.`,
+                  `Ai folosit ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} scanări gratuite săptămâna aceasta.`,
                   `You used ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} free scans this week.`
                 )}
           </div>
@@ -469,7 +469,7 @@ export default function PricingPage() {
           <span className="px-3 text-sm text-cyan-100">
             {billingCycle === "yearly"
               ? pick("Platesti o data pe an.", "Pay once per year.")
-              : pick("Platesti lunar.", "Pay monthly.")}
+              : pick("Plătești lunar.", "Pay monthly.")}
           </span>
         </div>
 

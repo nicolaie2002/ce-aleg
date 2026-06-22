@@ -226,7 +226,7 @@ function validateAlternativeSearch(requestText) {
     .filter((word) => word.length >= 3);
 
   if (words.length === 0) {
-    return "Descrie produsul dorit: de exemplu mai ieftin, fara zahar sau mai multa proteina.";
+    return "Descrie produsul dorit: de exemplu mai ieftin, fără zahăr sau mai multă proteină.";
   }
 
   if (text.length < 4) {
@@ -245,7 +245,7 @@ async function readJsonResponse(response, sourceLabel) {
     return JSON.parse(text);
   } catch {
     throw new Error(
-      `${sourceLabel} nu a trimis un raspuns valid. Reincarcam recomandarile disponibile.`
+      `${sourceLabel} nu a trimis un răspuns valid. Reîncărcăm recomandările disponibile.`
     );
   }
 }
@@ -664,7 +664,7 @@ function AlternativesPageContent() {
     } catch (error) {
       setErrorMessage(
         error.message ||
-          "Nu am putut incarca recomandarile. Reincearca in cateva secunde."
+          "Nu am putut încărca recomandările. Reîncearcă în câteva secunde."
       );
     } finally {
       setIsLoadingProducts(false);
@@ -932,9 +932,9 @@ function AlternativesPageContent() {
           <p className="mt-4 max-w-2xl text-gray-300">
             {recommendationSource === "openfoodfacts"
               ? lookupNotice
-                ? "Cautam alternative in surse externe si afisam doar rezultate cu date suficiente pentru comparatie."
+                ? "Căutăm alternative în surse externe și afișăm doar rezultate cu date suficiente pentru comparație."
                 : "Alternativele sunt selectate din catalogul Open Food Facts și ordonate după preferințele tale."
-              : "Scaneaza un produs ca sa primesti alternative externe comparabile."}
+              : "Scanează un produs ca să primești alternative externe comparabile."}
           </p>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2">
@@ -999,7 +999,7 @@ function AlternativesPageContent() {
             <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
               <div>
                 <p className="text-sm font-bold text-emerald-300">
-                  {isPaidPlan ? "Cautare Pro" : "Planul tau Free"}
+                  {isPaidPlan ? "Căutare Pro" : "Planul tău Free"}
                 </p>
                 <h2 className="mt-1 text-2xl font-black">
                   {isPaidPlan
@@ -1008,8 +1008,8 @@ function AlternativesPageContent() {
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">
                   {isPaidPlan
-                    ? "Scrie ce conteaza pentru tine: mai ieftin, fara zahar, proteina mai multa, ingrediente simple sau un magazin preferat."
-                    : "Pentru mai multe recomandari si cautare dupa preferinte, treci pe Pro cand esti pregatit."}
+                    ? "Scrie ce contează pentru tine: mai ieftin, fără zahăr, proteină mai multă, ingrediente simple sau un magazin preferat."
+                    : "Pentru mai multe recomandări și căutare după preferințe, treci pe Pro când ești pregătit."}
                 </p>
               </div>
 
@@ -1026,7 +1026,7 @@ function AlternativesPageContent() {
             {isPaidPlan && (
               <div className="mt-5">
                 <label className="sr-only" htmlFor="alternative-search">
-                  Cauta alternative
+                  Caută alternative
                 </label>
                 <input
                   id="alternative-search"
@@ -1035,7 +1035,7 @@ function AlternativesPageContent() {
                     setAlternativeSearch(event.target.value);
                     setShowMoreAlternatives(false);
                   }}
-                  placeholder="Ex: fara zahar, mai ieftin, mai multa proteina"
+                  placeholder="Ex: fără zahăr, mai ieftin, mai multă proteină"
                   className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-4 text-white outline-none transition placeholder:text-gray-500 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/25"
                 />
                 {searchWarning && (
@@ -1214,7 +1214,7 @@ function AlternativesPageContent() {
               {!isPaidPlan && recommendedProducts.length > visibleProducts.length && (
                 <p className="max-w-xl text-center text-sm text-gray-400">
                   Free arata 2 alternative. Pro deblocheaza mai multe rezultate
-                  si cautarea dupa preferinte.
+                  și căutarea după preferințe.
                 </p>
               )}
             </div>

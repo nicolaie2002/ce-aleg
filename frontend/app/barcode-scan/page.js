@@ -1378,8 +1378,8 @@ export default function BarcodeScanPage() {
               </h2>
               <p className="mt-2 text-sm leading-6">
                 Ai folosit {billingGate.usage?.weeklyScansUsed || 0}/
-                {billingGate.usage?.weeklyScanLimit || 5} scanari gratuite in
-                aceasta saptamana. Pro deblocheaza scanari nelimitate.
+                  {billingGate.usage?.weeklyScanLimit || 5} scanări gratuite în
+                  această săptămână. Pro deblochează scanări nelimitate.
               </p>
               <Link
                 href="/pricing"

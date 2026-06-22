@@ -24,9 +24,9 @@ export function LegalFooter() {
   ];
 
   const accountLinks = [
-    { href: "/forgot-password", label: pick("Resetare parola", "Reset password"), icon: RotateCcwKey },
+    { href: "/forgot-password", label: pick("Resetare parolă", "Reset password"), icon: RotateCcwKey },
     { href: "/support", label: pick("Suport", "Support"), icon: Mail },
-    { href: "/privacy", label: pick("Confidentialitate", "Privacy"), icon: LockKeyhole },
+    { href: "/privacy", label: pick("Confidențialitate", "Privacy"), icon: LockKeyhole },
     { href: "/terms", label: pick("Termeni", "Terms"), icon: Scale },
   ];
 
@@ -49,19 +49,19 @@ export function LegalFooter() {
               <span>
                 <span className="block text-xl font-black text-white">Ce aleg?</span>
                 <span className="text-xs font-bold text-cyan-100/75">
-                  {pick("cumparaturi mai clare", "clearer shopping")}
+                  {pick("cumpărături mai clare", "clearer shopping")}
                 </span>
               </span>
             </Link>
             <p className="mt-5 max-w-md leading-7 text-gray-300">
               {pick(
-                "Scanezi un produs, vezi informatiile importante si alegi alternative potrivite pentru bugetul si preferintele tale.",
+                "Scanezi un produs, vezi informațiile importante și alegi alternative potrivite pentru bugetul și preferințele tale.",
                 "Scan a product, see what matters and choose alternatives that match your budget and preferences."
               )}
             </p>
             <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-2 text-xs font-bold text-gray-300">
               <ShieldCheck size={15} className="text-cyan-200" />
-              {pick("Cont, cos si istoric protejate", "Protected account, cart and history")}
+              {pick("Cont, coș și istoric protejate", "Protected account, cart and history")}
             </div>
           </div>
 
@@ -106,7 +106,7 @@ export function LegalFooter() {
             </a>
             <p className="mt-4 text-sm leading-6 text-gray-400">
               {pick(
-                "Informatiile despre produse sunt orientative si nu inlocuiesc sfatul unui medic sau nutritionist.",
+                "Informațiile despre produse sunt orientative și nu înlocuiesc sfatul unui medic sau nutriționist.",
                 "Product information is guidance only and does not replace advice from a doctor or nutritionist."
               )}
             </p>

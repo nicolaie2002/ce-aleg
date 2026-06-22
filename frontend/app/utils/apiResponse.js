@@ -9,7 +9,7 @@ export async function readApiJson(response) {
   return {
     error:
       body && body.trim().startsWith("<")
-        ? "Serverul a raspuns cu o pagina in loc de date. Reincarca pagina si incearca din nou."
+    ? "Serverul a răspuns cu o pagină în loc de date. Reîncarcă pagina și încearcă din nou."
         : "Raspunsul serverului nu a putut fi citit.",
   };
 }

@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
       <section className="ce-shell-sm flex min-h-screen flex-col justify-center py-10">
         <div className="mb-8 flex items-center justify-between gap-3">
           <Link href="/login" className="inline-flex items-center gap-2 text-sm text-emerald-300 hover:text-emerald-200">
-            <ArrowLeft size={16} /> {pick("Inapoi la login", "Back to login")}
+            <ArrowLeft size={16} /> {pick("Înapoi la login", "Back to login")}
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher compact />
@@ -64,7 +64,7 @@ export default function ForgotPasswordPage() {
           <h1 className="mt-3 text-4xl font-black">{pick("Ai uitat parola?", "Forgot password?")}</h1>
           <p className="mt-3 leading-7 text-gray-300">
             {pick(
-              "Introdu emailul contului si iti trimitem un link de resetare.",
+              "Introdu emailul contului și îți trimitem un link de resetare.",
               "Enter your account email and we will send a reset link."
             )}
           </p>

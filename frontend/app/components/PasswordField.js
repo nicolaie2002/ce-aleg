@@ -42,12 +42,12 @@ export function PasswordField({
           aria-label={
             isVisible
               ? pick("Ascunde parola", "Hide password")
-              : pick("Arata parola", "Show password")
+              : pick("Arată parola", "Show password")
           }
           title={
             isVisible
               ? pick("Ascunde parola", "Hide password")
-              : pick("Arata parola", "Show password")
+              : pick("Arată parola", "Show password")
           }
         >
           {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}

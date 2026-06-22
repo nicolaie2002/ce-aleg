@@ -23,14 +23,14 @@ const spaceGrotesk = Space_Grotesk({
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.cealeg.shop";
 const siteName = "Ce aleg?";
 const siteDescription =
-  "Scaneaza codul de bare al unui produs, vezi rapid verdictul si compara alternative mai bune pentru bugetul si preferintele tale.";
+  "Scanează codul de bare al unui produs, vezi rapid verdictul și compară alternative mai bune pentru bugetul și preferințele tale.";
 const socialImage = "/opengraph-image.png";
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: siteName,
   title: {
-    default: "Ce aleg? | Scaneaza produse si compara alternative la cumparaturi",
+    default: "Ce aleg? | Scanează produse și compară alternative la cumpărături",
     template: "%s | Ce aleg?",
   },
   description: siteDescription,
@@ -38,7 +38,7 @@ export const metadata = {
     "Ce aleg",
     "scanare cod de bare",
     "alternative produse",
-    "cumparaturi inteligente",
+    "cumpărături inteligente",
     "comparare produse",
     "Open Food Facts",
     "Lidl",
@@ -80,20 +80,20 @@ export const metadata = {
     locale: "ro_RO",
     url: siteUrl,
     siteName,
-    title: "Ce aleg? - scaneaza produse si compara alternative",
+    title: "Ce aleg? - scanează produse și compară alternative",
     description: siteDescription,
     images: [
       {
         url: socialImage,
         width: 1200,
         height: 630,
-        alt: "Ce aleg? - scaneaza produse si compara alternative",
+        alt: "Ce aleg? - scanează produse și compară alternative",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ce aleg? - scaneaza produse si compara alternative",
+    title: "Ce aleg? - scanează produse și compară alternative",
     description: siteDescription,
     images: [socialImage],
   },

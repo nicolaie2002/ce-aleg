@@ -22,7 +22,7 @@ export default function NotFound() {
           </h1>
           <p className="mt-4 leading-7 text-gray-300">
             {pick(
-              "Linkul poate fi gresit sau pagina a fost mutata. Revino in dashboard sau scaneaza un produs nou.",
+              "Linkul poate fi greșit sau pagina a fost mutată. Revino în dashboard sau scanează un produs nou.",
               "The link may be wrong or the page moved. Return to dashboard or scan a new product."
             )}
           </p>
@@ -38,7 +38,7 @@ export default function NotFound() {
               href="/barcode-scan"
               className="inline-flex items-center justify-center rounded-lg border border-white/15 px-5 py-3 font-black text-white hover:bg-white/10"
             >
-              {pick("Scaneaza codul", "Scan barcode")}
+              {pick("Scanează codul", "Scan barcode")}
             </Link>
           </div>
         </div>

@@ -113,7 +113,7 @@ export default function LoginPage() {
       <section className="ce-shell-md flex min-h-screen flex-col justify-center py-10">
         <div className="mb-8 flex items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-emerald-300 hover:text-emerald-200">
-            <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
+            <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/pricing" className="inline-flex items-center gap-1 rounded-lg border border-yellow-300/35 px-3 py-2 text-sm font-black text-yellow-200 hover:bg-yellow-300/10">
@@ -128,11 +128,11 @@ export default function LoginPage() {
           <div className="hidden rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(16,185,129,0.14),rgba(250,204,21,0.08),rgba(255,255,255,0.04))] p-8 shadow-2xl lg:block">
             <p className="text-sm font-black text-emerald-300">Ce aleg?</p>
             <h2 className="mt-4 text-5xl font-black leading-tight">
-              {pick("Cumparaturi mai clare, fara ghicit.", "Clearer shopping, less guessing.")}
+              {pick("Cumpărături mai clare, fără ghicit.", "Clearer shopping, less guessing.")}
             </h2>
             <p className="mt-5 max-w-xl leading-8 text-gray-300">
               {pick(
-                "Pastreaza istoricul, cosul si preferintele intr-un singur loc.",
+                "Păstrează istoricul, coșul și preferințele într-un singur loc.",
                 "Keep history, cart and preferences in one place."
               )}
             </p>
@@ -154,14 +154,14 @@ export default function LoginPage() {
               <span>
                 <span className="block font-black">Ce aleg?</span>
                 <span className="text-xs text-gray-400">
-                  {pick("cont personal de cumparaturi", "personal shopping account")}
+                  {pick("cont personal de cumpărături", "personal shopping account")}
                 </span>
               </span>
             </div>
             <h1 className="text-3xl font-bold">{pick("Bine ai revenit", "Welcome back")}</h1>
             <p className="mt-3 text-gray-300">
               {pick(
-                "Intra in cont ca sa vezi cosul, istoricul si produsele favorite.",
+                "Intră în cont ca să vezi coșul, istoricul și produsele favorite.",
                 "Sign in to view your cart, history and favorite products."
               )}
             </p>
@@ -237,7 +237,7 @@ export default function LoginPage() {
             <p className="mt-5 text-center text-sm text-gray-400">
               {pick("Nu ai cont?", "No account yet?")}{" "}
               <Link href="/register" className="font-semibold text-emerald-300 hover:text-emerald-200">
-                {pick("Creeaza cont", "Create account")}
+                {pick("Creează cont", "Create account")}
               </Link>
             </p>
           </div>

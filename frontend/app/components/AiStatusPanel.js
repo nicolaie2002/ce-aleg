@@ -53,7 +53,7 @@ export function AiStatusPanel({ compact = false }) {
         {!compact && (
           <div className="mb-4">
             <p className="text-xs font-bold uppercase text-emerald-300">
-              Asistent de cumparaturi
+              Asistent de cumpărături
             </p>
             <h2 className="mt-1 text-xl font-bold text-white">
               Totul este pregatit pentru scanare

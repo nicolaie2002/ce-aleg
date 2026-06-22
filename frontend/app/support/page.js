@@ -17,7 +17,7 @@ export default function SupportPage() {
           className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
         >
           <ArrowLeft size={16} />
-          {pick("Inapoi la dashboard", "Back to dashboard")}
+          {pick("Înapoi la dashboard", "Back to dashboard")}
         </Link>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
@@ -31,7 +31,7 @@ export default function SupportPage() {
             </h1>
             <p className="mt-4 max-w-2xl leading-8 text-gray-300">
               {pick(
-                "Scrie-ne pentru probleme de cont, abonament, scanare, produse gresite sau stergerea datelor.",
+                "Scrie-ne pentru probleme de cont, abonament, scanare, produse greșite sau ștergerea datelor.",
                 "Contact us for account, subscription, scan, wrong product or data deletion issues."
               )}
             </p>
@@ -64,7 +64,7 @@ export default function SupportPage() {
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-400">
                 {pick(
-                  "Trimite emailul contului, pagina unde ai vazut problema si, daca poti, o captura de ecran.",
+                  "Trimite emailul contului, pagina unde ai văzut problema și, dacă poți, o captură de ecran.",
                   "Send the account email, the page where the issue happened and, if possible, a screenshot."
                 )}
               </p>

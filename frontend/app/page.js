@@ -54,7 +54,7 @@ export default function Home() {
       icon: Sparkles,
       title: pick("Primești verdictul", "Get the verdict"),
       detail: pick(
-        "Vezi rapid scorul, ingredientele importante si ce merita retinut.",
+        "Vezi rapid scorul, ingredientele importante și ce merită reținut.",
         "See the score, key ingredients and what matters."
       ),
     },
@@ -62,7 +62,7 @@ export default function Home() {
       icon: TrendingDown,
       title: pick("Alegi alternativa", "Choose an alternative"),
       detail: pick(
-        "Compari variante mai potrivite pentru buget, zahar, proteina sau ingrediente.",
+        "Compari variante mai potrivite pentru buget, zahăr, proteină sau ingrediente.",
         "Compare better picks for price, sugar, protein or ingredients."
       ),
     },
@@ -73,7 +73,7 @@ export default function Home() {
       icon: Barcode,
       label: pick("Coduri de bare", "Barcodes"),
       detail: pick(
-        "Identificare rapida din camera si cautare manuala cand codul nu se vede perfect.",
+        "Identificare rapidă din cameră și căutare manuală când codul nu se vede perfect.",
         "Fast camera identification and manual lookup when the code is hard to read."
       ),
     },
@@ -87,9 +87,9 @@ export default function Home() {
     },
     {
       icon: Search,
-      label: pick("Cautare dupa preferinte", "Preference search"),
+      label: pick("Căutare după preferințe", "Preference search"),
       detail: pick(
-        "Cere alternative mai ieftine, fara zahar, mai proteice sau cu ingrediente mai curate.",
+        "Cere alternative mai ieftine, fără zahăr, mai proteice sau cu ingrediente mai curate.",
         "Ask for cheaper, lower sugar, higher protein or cleaner alternatives."
       ),
     },
@@ -97,8 +97,8 @@ export default function Home() {
 
   const metrics = [
     { label: pick("Scor", "Score"), value: "8.7/10", accent: "text-cyan-200" },
-    { label: pick("Zahar", "Sugar"), value: "-42%", accent: "text-yellow-200" },
-    { label: pick("Proteina", "Protein"), value: "+6g", accent: "text-cyan-200" },
+    { label: pick("Zahăr", "Sugar"), value: "-42%", accent: "text-yellow-200" },
+    { label: pick("Proteină", "Protein"), value: "+6g", accent: "text-cyan-200" },
   ];
 
   return (
@@ -124,7 +124,7 @@ export default function Home() {
               <span>
                 <span className="block text-lg font-black leading-none text-white">Ce aleg?</span>
                 <span className="text-xs font-semibold text-cyan-50/85">
-                  {pick("cumparaturi mai inteligente", "smarter shopping")}
+                  {pick("cumpărături mai inteligente", "smarter shopping")}
                 </span>
               </span>
             </Link>
@@ -143,7 +143,7 @@ export default function Home() {
                 href={isAuthenticated ? "/dashboard" : "/login"}
                 className="inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-black text-black hover:bg-cyan-100"
               >
-                {isAuthenticated ? pick("Dashboard", "Dashboard") : pick("Intra in cont", "Sign in")}
+                {isAuthenticated ? pick("Dashboard", "Dashboard") : pick("Intră în cont", "Sign in")}
                 <ArrowRight size={16} />
               </Link>
             </div>
@@ -153,7 +153,7 @@ export default function Home() {
             <div className="ce-hero-copy ce-reveal ce-reveal-delay-1">
               <div className="ce-hero-pill inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
                 <BadgeCheck size={17} />
-                {pick("Verdict rapid inainte sa cumperi", "Quick verdict before you buy")}
+                {pick("Verdict rapid înainte să cumperi", "Quick verdict before you buy")}
               </div>
               <h1 className="mt-6 max-w-5xl text-5xl font-black leading-[1.02] md:text-7xl xl:text-8xl">
                 {pick(
@@ -199,11 +199,11 @@ export default function Home() {
                 </span>
                 <span className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-cyan-200" />
-                  {pick("Istoric si cos salvate", "Saved history and cart")}
+                  {pick("Istoric și coș salvate", "Saved history and cart")}
                 </span>
                 <span className="flex items-center gap-2">
                   <Zap className="h-4 w-4 text-cyan-200" />
-                  {pick("Recomandari rapide", "Fast recommendations")}
+                  {pick("Recomandări rapide", "Fast recommendations")}
                 </span>
               </div>
             </div>
@@ -241,7 +241,7 @@ export default function Home() {
                   </p>
                   <p className="ce-demo-recommendation-copy mt-2 text-sm leading-6">
                     {pick(
-                      "Potrivit pentru o gustare simpla. Compara alternativele daca vrei mai multa proteina, zahar mai putin sau ingrediente mai curate.",
+                      "Potrivit pentru o gustare simplă. Compară alternativele dacă vrei mai multă proteină, zahăr mai puțin sau ingrediente mai curate.",
                       "Good for a simple snack. Compare alternatives if you want more protein, less sugar or cleaner ingredients."
                     )}
                   </p>
@@ -253,7 +253,7 @@ export default function Home() {
                     className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100"
                   >
                     <ScanLine size={18} />
-                    {pick("Testeaza acum", "Try now")}
+                    {pick("Testează acum", "Try now")}
                   </Link>
                   <Link
                     href="/alternatives"
@@ -292,17 +292,17 @@ export default function Home() {
           <div className="grid gap-8 xl:grid-cols-[420px_minmax(0,1fr)] xl:items-start">
             <div>
               <p className="text-sm font-black text-cyan-200">
-                {pick("Pentru cumparaturi reale", "For real shopping")}
+                {pick("Pentru cumpărături reale", "For real shopping")}
               </p>
               <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
                 {pick(
-                  "Tot ce ai nevoie in fata raftului.",
+                  "Tot ce ai nevoie în fața raftului.",
                   "Everything you need in front of the shelf."
                 )}
               </h2>
               <p className="mt-4 leading-8 text-gray-300">
                 {pick(
-                  "Aplicatia este gandita pentru momentele in care vrei un raspuns rapid: merita produsul sau exista o varianta mai buna?",
+                  "Aplicația este gândită pentru momentele în care vrei un răspuns rapid: merită produsul sau există o variantă mai bună?",
                   "The app is built for the moment when you need a quick answer: is this product worth it or is there a better option?"
                 )}
               </p>
@@ -326,7 +326,7 @@ export default function Home() {
           <InteractiveSurface className="mt-10 rounded-2xl border border-cyan-300/25 bg-[linear-gradient(135deg,rgba(103,232,249,.14),rgba(250,204,21,.09),rgba(255,255,255,.035))] p-5 md:flex md:items-center md:justify-between md:gap-6 md:p-7">
             <div>
               <p className="text-sm font-black text-cyan-100">
-                {pick("Pentru urmatoarea cumparatura", "For your next shop")}
+                {pick("Pentru următoarea cumpărătură", "For your next shop")}
               </p>
               <h2 className="mt-2 text-2xl font-black">
                 {pick(
@@ -340,7 +340,7 @@ export default function Home() {
                 href={isAuthenticated ? "/dashboard" : "/register"}
                 className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
               >
-                {isAuthenticated ? pick("Mergi la dashboard", "Go to dashboard") : pick("Creeaza cont", "Create account")}
+                {isAuthenticated ? pick("Mergi la dashboard", "Go to dashboard") : pick("Creează cont", "Create account")}
                 <ArrowRight size={18} />
               </Link>
               <Link
@@ -348,7 +348,7 @@ export default function Home() {
                 className="inline-flex items-center justify-center gap-2 rounded-lg border border-yellow-300/35 bg-yellow-300/10 px-5 py-3 font-black text-yellow-100 hover:bg-yellow-300/20"
               >
                 <Crown size={18} />
-                {pick("Compara planurile", "Compare plans")}
+                {pick("Compară planurile", "Compare plans")}
               </Link>
             </div>
           </InteractiveSurface>

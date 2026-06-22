@@ -11,7 +11,7 @@ const statLabels = {
   users: "Conturi",
   products: "Produse in catalog",
   pendingSubmissions: "Propuneri de verificat",
-  searches: "Cautari salvate",
+  searches: "Căutări salvate",
   missingProducts: "Produse negasite",
   priceObservations: "Preturi raportate",
   proUsers: "Utilizatori Pro",
@@ -130,7 +130,7 @@ export default function AdminPage() {
         </p>
         <h1 className="mt-3 text-4xl font-black">Moderare, planuri si sanatatea platformei</h1>
         <p className="mt-3 max-w-2xl text-gray-300">
-          Verifica propunerile comunitatii, planurile utilizatorilor si serviciile esentiale inainte de publicare.
+                  Verifică propunerile comunității, planurile utilizatorilor și serviciile esențiale înainte de publicare.
         </p>
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
@@ -239,7 +239,7 @@ export default function AdminPage() {
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="text-gray-400">
                 <tr>
-                  <th className="border-b border-white/10 py-3">Cautare</th>
+                  <th className="border-b border-white/10 py-3">Căutare</th>
                   <th className="border-b border-white/10 py-3">Magazin</th>
                   <th className="border-b border-white/10 py-3">Sursa</th>
                   <th className="border-b border-white/10 py-3">Aparitii</th>
@@ -288,7 +288,7 @@ export default function AdminPage() {
                     <button onClick={() => approve(item.id)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-3 py-2 text-sm font-black text-black hover:bg-emerald-300">
                       <CheckCircle2 size={15} /> Publica
                     </button>
-                    <button onClick={() => remove(item.id)} title="Sterge propunerea" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10">
+                    <button onClick={() => remove(item.id)} title="Șterge propunerea" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10">
                       <Trash2 size={15} />
                     </button>
                   </div>

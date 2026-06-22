@@ -20,13 +20,13 @@ export function getPasswordStrength(password) {
   if (/\d/.test(value)) {
     score += 1;
   } else {
-    suggestions.push("Adauga cel putin o cifra.");
+    suggestions.push("Adaugă cel puțin o cifră.");
   }
 
   if (/[^A-Za-z0-9]/.test(value)) {
     score += 1;
   } else {
-    suggestions.push("Adauga un simbol.");
+    suggestions.push("Adaugă un simbol.");
   }
 
   if (value.length >= 12) {

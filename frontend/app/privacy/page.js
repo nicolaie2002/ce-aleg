@@ -23,9 +23,9 @@ export default function PrivacyPage() {
   const sections = [
     {
       icon: UserCheck,
-      title: pick("Cine poate folosi aplicatia", "Who can use the app"),
+      title: pick("Cine poate folosi aplicația", "Who can use the app"),
       text: pick(
-        "Conturile sunt pentru persoane de cel putin 16 ani sau pentru minori care folosesc aplicatia cu acordul si supravegherea parintelui/tutorelui. Nu cerem in mod intentionat date de la copii sub 13 ani.",
+        "Conturile sunt pentru persoane de cel puțin 16 ani sau pentru minori care folosesc aplicația cu acordul și supravegherea părintelui/tutorelui. Nu cerem în mod intenționat date de la copii sub 13 ani.",
         "Accounts are for people who are at least 16 years old, or for minors using the app with parent/guardian consent and supervision. We do not knowingly request data from children under 13."
       ),
     },
@@ -33,13 +33,13 @@ export default function PrivacyPage() {
       icon: Database,
       title: pick("Date pe care le pastram", "Data we keep"),
       text: pick(
-        "Pastram datele necesare pentru cont, autentificare, cos, favorite, istoric de scanari, preferinte, abonament, produse contribuite si rapoarte de pret. Nu vindem date personale.",
+        "Păstrăm datele necesare pentru cont, autentificare, coș, favorite, istoric de scanări, preferințe, abonament, produse contribuite și rapoarte de preț. Nu vindem date personale.",
         "We keep the data needed for your account, authentication, cart, favorites, scan history, preferences, subscription, contributed products and price reports. We do not sell personal data."
       ),
     },
     {
       icon: Camera,
-      title: pick("Camera, microfon si scanari", "Camera, microphone and scans"),
+      title: pick("Cameră, microfon și scanări", "Camera, microphone and scans"),
       text: pick(
         "Camera porneste doar dupa permisiunea ta. Cadrele folosite pentru identificare sunt procesate pentru a gasi produsul. Microfonul este folosit doar cand activezi o functie vocala.",
         "The camera starts only after you grant permission. Frames used for identification are processed to find the product. The microphone is used only when you enable a voice feature."
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
       icon: Mail,
       title: pick("Emailuri de cont", "Account emails"),
       text: pick(
-        "Putem trimite emailuri pentru crearea contului, resetarea parolei, securitate si informatii importante despre abonament. Emailurile de marketing vor fi separate si optionale.",
+        "Putem trimite emailuri pentru crearea contului, resetarea parolei, securitate și informații importante despre abonament. Emailurile de marketing vor fi separate și opționale.",
         "We may send emails for account creation, password reset, security and important subscription information. Marketing emails will be separate and optional."
       ),
     },
@@ -63,9 +63,9 @@ export default function PrivacyPage() {
     },
     {
       icon: Trash2,
-      title: pick("Stergere si acces", "Deletion and access"),
+      title: pick("Ștergere și acces", "Deletion and access"),
       text: pick(
-        "Poti cere stergerea contului din dashboard. Trimitem un email de confirmare, apoi stergem contul si datele personale asociate care nu mai sunt necesare legal sau operational. Pentru export de date, contacteaza-ne la emailul oficial al aplicatiei.",
+        "Poți cere ștergerea contului din dashboard. Trimitem un email de confirmare, apoi ștergem contul și datele personale asociate care nu mai sunt necesare legal sau operațional. Pentru export de date, contactează-ne la emailul oficial al aplicației.",
         "You can request account deletion from the dashboard. We send a confirmation email, then delete the account and associated personal data that is no longer legally or operationally required. For data export, contact us at the official app email."
       ),
     },
@@ -79,7 +79,7 @@ export default function PrivacyPage() {
             href="/"
             className="inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200"
           >
-            <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
+            <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
           </Link>
           <div className="flex items-center gap-2">
             <Link
@@ -102,7 +102,7 @@ export default function PrivacyPage() {
           </h1>
           <p className="mt-4 max-w-3xl leading-8 text-gray-300">
             {pick(
-              "Aceasta politica explica ce colecteaza Ce aleg?, de ce avem nevoie de aceste date si cum poti cere stergerea lor. Ultima actualizare: 5 iunie 2026.",
+              "Această politică explică ce colectează Ce aleg?, de ce avem nevoie de aceste date și cum poți cere ștergerea lor. Ultima actualizare: 5 iunie 2026.",
               "This policy explains what Ce aleg? collects, why we need that data and how you can request deletion. Last updated: June 5, 2026."
             )}
           </p>
@@ -126,7 +126,7 @@ export default function PrivacyPage() {
             </h2>
             <p className="mt-2 leading-7">
               {pick(
-                "Ce aleg? ofera informatii orientative despre produse alimentare. Verifica mereu eticheta produsului, alergeni, pretul real si recomandarile medicului daca ai restrictii alimentare.",
+                "Ce aleg? oferă informații orientative despre produse alimentare. Verifică mereu eticheta produsului, alergenii, prețul real și recomandările medicului dacă ai restricții alimentare.",
                 "Ce aleg? provides informational guidance about food products. Always check the product label, allergens, real shelf price and medical advice if you have dietary restrictions."
               )}
             </p>
@@ -136,7 +136,7 @@ export default function PrivacyPage() {
             <h2 className="font-black">{pick("Contact pentru date personale", "Personal data contact")}</h2>
             <p className="mt-2 leading-7 text-gray-300">
               {pick(
-                "Pentru intrebari despre date, stergere cont sau export, scrie-ne la",
+                "Pentru întrebări despre date, ștergere cont sau export, scrie-ne la",
                 "For questions about data, account deletion or export, contact us at"
               )}{" "}
               <a href={`mailto:${CONTACT_EMAIL}`} className="font-bold text-cyan-200 hover:text-white">

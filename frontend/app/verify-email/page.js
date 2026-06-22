@@ -72,7 +72,7 @@ function VerifyEmailContent() {
       <section className="ce-shell-sm flex min-h-screen flex-col justify-center py-10">
         <div className="mb-8 flex items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-cyan-200 hover:text-white">
-            <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
+            <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher compact />
@@ -109,7 +109,7 @@ function VerifyEmailContent() {
               href="/"
               className="inline-flex justify-center rounded-lg border border-white/12 px-5 py-3 font-black text-white hover:bg-white/10"
             >
-              {pick("Pagina principala", "Home")}
+              {pick("Pagina principală", "Home")}
             </Link>
           </div>
         </div>

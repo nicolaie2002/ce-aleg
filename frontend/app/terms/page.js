@@ -42,7 +42,7 @@ export default function TermsPage() {
       icon: AlertTriangle,
       title: pick("Nu este sfat medical", "Not medical advice"),
       text: pick(
-        "Scorurile, verdicturile si alternativele sunt informative. Nu inlocuiesc sfatul medicului, nutritionistului, eticheta oficiala, informatiile despre alergeni sau pretul afisat in magazin.",
+        "Scorurile, verdicturile și alternativele sunt informative. Nu înlocuiesc sfatul medicului, nutriționistului, eticheta oficială, informațiile despre alergeni sau prețul afișat în magazin.",
         "Scores, verdicts and alternatives are informational. They do not replace advice from a doctor, nutritionist, official label, allergen information or the shelf price."
       ),
     },
@@ -50,7 +50,7 @@ export default function TermsPage() {
       icon: Wallet,
       title: pick("Abonamente si plati", "Subscriptions and payments"),
       text: pick(
-        "Planurile platite pot debloca scanari nelimitate si recomandari suplimentare. Plata este procesata prin Stripe. Preturile, taxele si conditiile pot fi actualizate inainte de lansarea publica.",
+        "Planurile plătite pot debloca scanări nelimitate și recomandări suplimentare. Plata este procesată prin Stripe. Prețurile, taxele și condițiile pot fi actualizate înainte de lansarea publică.",
         "Paid plans may unlock unlimited scans and extra recommendations. Payment is processed through Stripe. Prices, taxes and conditions may be updated before public launch."
       ),
     },
@@ -58,7 +58,7 @@ export default function TermsPage() {
       icon: Trash2,
       title: pick("Inchiderea contului", "Closing your account"),
       text: pick(
-        "Poti cere stergerea contului din dashboard. Pentru protectia ta, contul se sterge doar dupa confirmarea linkului trimis pe email. Daca ai abonament activ, incercam sa il anulam inainte de stergerea definitiva.",
+        "Poți cere ștergerea contului din dashboard. Pentru protecția ta, contul se șterge doar după confirmarea linkului trimis pe email. Dacă ai abonament activ, încercăm să îl anulăm înainte de ștergerea definitivă.",
         "You can request account deletion from the dashboard. For your protection, the account is deleted only after confirming the link sent by email. If you have an active subscription, we try to cancel it before final deletion."
       ),
     },
@@ -66,7 +66,7 @@ export default function TermsPage() {
       icon: UploadCloud,
       title: pick("Produse contribuite", "Contributed products"),
       text: pick(
-        "Daca incarci produse, imagini sau preturi, confirmi ca ai dreptul sa le trimiti si ca informatiile sunt corecte dupa cunostinta ta. Putem modera, corecta sau sterge contributiile.",
+        "Dacă încarci produse, imagini sau prețuri, confirmi că ai dreptul să le trimiți și că informațiile sunt corecte după cunoștința ta. Putem modera, corecta sau șterge contribuțiile.",
         "If you upload products, images or prices, you confirm that you have the right to submit them and that the information is accurate to your knowledge. We may moderate, correct or delete contributions."
       ),
     },
@@ -74,7 +74,7 @@ export default function TermsPage() {
       icon: FileText,
       title: pick("Utilizare corecta", "Fair use"),
       text: pick(
-        "Nu incerca sa ocolesti limitele, sa ataci API-ul, sa incarci continut ilegal, sa copiezi masiv datele sau sa folosesti aplicatia pentru activitati abuzive.",
+        "Nu încerca să ocolești limitele, să ataci API-ul, să încarci conținut ilegal, să copiezi masiv datele sau să folosești aplicația pentru activități abuzive.",
         "Do not try to bypass limits, attack the API, upload illegal content, scrape data at scale or use the app for abusive activity."
       ),
     },
@@ -88,7 +88,7 @@ export default function TermsPage() {
             href="/"
             className="inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200"
           >
-            <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
+            <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
           </Link>
           <div className="flex items-center gap-2">
             <Link
@@ -135,7 +135,7 @@ export default function TermsPage() {
             </h2>
             <p className="mt-2 leading-7">
               {pick(
-                "Datele din surse publice pot fi incomplete, traduse gresit sau invechite. Folosesti recomandarile pe propria raspundere si trebuie sa verifici produsul real inainte de cumparare.",
+                "Datele din surse publice pot fi incomplete, traduse greșit sau învechite. Folosești recomandările pe propria răspundere și trebuie să verifici produsul real înainte de cumpărare.",
                 "Public-source data may be incomplete, mistranslated or outdated. You use recommendations at your own discretion and must verify the real product before purchase."
               )}
             </p>

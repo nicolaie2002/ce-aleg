@@ -12,13 +12,13 @@ const stores = [
   {
     id: "lidl",
     name: "Lidl",
-    tagline: "Calitate la pret bun",
+    tagline: "Calitate la preț bun",
     logo: "/stores/lidl.png",
   },
   {
     id: "kaufland",
     name: "Kaufland",
-    tagline: "Totul pentru cumparaturi mari",
+    tagline: "Totul pentru cumpărături mari",
     logo: "/stores/kaufland.png",
   },
   {
@@ -76,12 +76,12 @@ export default function StorePage() {
             </p>
 
             <h1 className="text-3xl font-black md:text-5xl">
-              {pick("Unde faci cumparaturile acum?", "Where are you shopping now?")}
+              {pick("Unde faci cumpărăturile acum?", "Where are you shopping now?")}
             </h1>
 
             <p className="mt-4 max-w-2xl text-gray-300">
               {pick(
-                "Selectia ajuta aplicatia sa ordoneze mai bine alternativele si lista de cumparaturi.",
+                "Selecția ajută aplicația să ordoneze mai bine alternativele și lista de cumpărături.",
                 "This helps the app rank alternatives and your shopping list better."
               )}
             </p>

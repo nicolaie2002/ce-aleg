@@ -51,7 +51,7 @@ export default function DeleteAccountPage() {
       <section className="ce-shell-sm flex min-h-screen flex-col justify-center py-10">
         <div className="mb-8 flex items-center justify-between gap-3">
           <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-emerald-300 hover:text-emerald-200">
-            <ArrowLeft size={16} /> {pick("Inapoi la dashboard", "Back to dashboard")}
+            <ArrowLeft size={16} /> {pick("Înapoi la dashboard", "Back to dashboard")}
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher compact />
@@ -76,7 +76,7 @@ export default function DeleteAccountPage() {
                 href="/"
                 className="mt-7 inline-flex items-center justify-center rounded-lg bg-emerald-400 px-6 py-3 font-black text-black hover:bg-emerald-300"
               >
-                {pick("Pagina principala", "Home")}
+                {pick("Pagina principală", "Home")}
               </Link>
             </div>
           ) : (
@@ -88,11 +88,11 @@ export default function DeleteAccountPage() {
                 {pick("Confirmare necesara", "Confirmation required")}
               </p>
               <h1 className="mt-3 text-4xl font-black">
-                {pick("Stergi definitiv contul?", "Delete your account permanently?")}
+                {pick("Ștergi definitiv contul?", "Delete your account permanently?")}
               </h1>
               <p className="mt-4 leading-7 text-gray-300">
                 {pick(
-                  "Dupa confirmare, contul, istoricul, cosul, favoritele si contributiile tale vor fi sterse. Actiunea nu poate fi anulata.",
+                  "După confirmare, contul, istoricul, coșul, favoritele și contribuțiile tale vor fi șterse. Acțiunea nu poate fi anulată.",
                   "After confirmation, your account, history, cart, favorites and contributions will be deleted. This action cannot be undone."
                 )}
               </p>
@@ -124,13 +124,13 @@ export default function DeleteAccountPage() {
                   }`}
                 >
                   <Trash2 size={18} />
-                  {isDeleting ? pick("Se sterge...", "Deleting...") : pick("Sterge contul definitiv", "Delete account permanently")}
+                  {isDeleting ? pick("Se șterge...", "Deleting...") : pick("Șterge contul definitiv", "Delete account permanently")}
                 </button>
                 <Link
                   href="/dashboard"
                   className="inline-flex items-center justify-center rounded-lg border border-white/10 px-6 py-4 font-bold text-white hover:bg-white/10"
                 >
-                  {pick("Pastreaza contul", "Keep account")}
+                  {pick("Păstrează contul", "Keep account")}
                 </Link>
               </div>
             </div>

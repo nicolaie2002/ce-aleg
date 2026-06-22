@@ -33,7 +33,7 @@ const criteriaOptions = [
   { id: "vegan", label: "De post", icon: Sprout },
   { id: "lactose_free", label: "Fără lactoză", icon: MilkOff },
   { id: "natural", label: "Ingrediente mai curate", icon: Leaf },
-  { id: "value", label: "Raport calitate-pret", icon: BadgeCheck },
+  { id: "value", label: "Raport calitate-preț", icon: BadgeCheck },
 ];
 
 const emptyScannedProduct = {
@@ -183,18 +183,18 @@ function ResultPageContent() {
   if (!scannedProduct) {
     return (
       <main className="min-h-screen bg-[#0b0f14] text-white">
-        <AppHeader actionHref="/barcode-scan" actionLabel="Scaneaza produs" />
+        <AppHeader actionHref="/barcode-scan" actionLabel="Scanează produs" />
         <section className="ce-shell-sm ce-page">
           <div className="rounded-3xl border border-white/10 bg-black/30 p-8 text-center shadow-2xl">
             <h1 className="text-3xl font-black">Nu exista un rezultat de afisat.</h1>
             <p className="mt-3 text-gray-300">
-              Scaneaza sau cauta un produs ca sa vezi analiza si alternativele.
+              Scanează sau caută un produs ca să vezi analiza și alternativele.
             </p>
             <Link
               href={`/scan?store=${storeParam}`}
               className="mt-6 inline-flex rounded-2xl bg-emerald-400 px-6 py-3 font-black text-black hover:bg-emerald-300"
             >
-              Scaneaza produsul
+              Scanează produsul
             </Link>
           </div>
         </section>

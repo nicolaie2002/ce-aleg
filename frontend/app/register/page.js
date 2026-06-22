@@ -68,7 +68,7 @@ export default function RegisterPage() {
     } catch (error) {
       setErrorMessage(
         error.message ||
-          pick("A aparut o eroare la crearea contului.", "An account creation error occurred.")
+          pick("A apărut o eroare la crearea contului.", "An account creation error occurred.")
       );
     } finally {
       setIsLoading(false);
@@ -80,7 +80,7 @@ export default function RegisterPage() {
       <section className="ce-shell-md flex min-h-screen flex-col justify-center py-10">
         <div className="mb-8 flex items-center justify-between gap-3">
           <Link href="/" className="inline-flex items-center gap-2 text-sm text-emerald-300 hover:text-emerald-200">
-            <ArrowLeft size={16} /> {pick("Pagina principala", "Home")}
+            <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
           </Link>
           <div className="flex items-center gap-2">
             <Link href="/pricing" className="inline-flex items-center gap-1 rounded-lg border border-yellow-300/35 px-3 py-2 text-sm font-black text-yellow-200 hover:bg-yellow-300/10">
@@ -99,7 +99,7 @@ export default function RegisterPage() {
             </h2>
             <p className="mt-5 max-w-xl leading-8 text-gray-300">
               {pick(
-                "Contul pastreaza cosul, favoritele si preferintele pentru recomandari mai potrivite.",
+                "Contul păstrează coșul, favoritele și preferințele pentru recomandări mai potrivite.",
                 "Your account keeps your cart, favorites and preferences for better recommendations."
               )}
             </p>
@@ -107,10 +107,10 @@ export default function RegisterPage() {
 
           <div className="rounded-lg border border-white/10 bg-[#0d141b]/95 p-6 shadow-2xl">
             <p className="text-sm font-bold text-emerald-300">{pick("Cont nou", "New account")}</p>
-            <h1 className="mt-3 text-4xl font-bold">{pick("Creeaza cont", "Create account")}</h1>
+            <h1 className="mt-3 text-4xl font-bold">{pick("Creează cont", "Create account")}</h1>
             <p className="mt-3 text-gray-300">
               {pick(
-                "Alege o parola de minimum 8 caractere. Iti vom arata cat de puternica este.",
+                "Alege o parolă de minimum 8 caractere. Îți vom arăta cât de puternică este.",
                 "Choose a password with at least 8 characters. We will show how strong it is."
               )}
             </p>
@@ -151,7 +151,7 @@ export default function RegisterPage() {
               {password && (
                 <div className="rounded-lg border border-white/10 bg-black/25 p-3">
                   <div className="flex items-center justify-between text-xs font-black">
-                    <span className="text-gray-300">{pick("Putere parola", "Password strength")}</span>
+                    <span className="text-gray-300">{pick("Putere parolă", "Password strength")}</span>
                     <span className="text-emerald-300">{getPasswordStrengthLabel(strength, pick)}</span>
                   </div>
                   <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
@@ -182,7 +182,7 @@ export default function RegisterPage() {
                   </p>
                   <p className="mt-2 text-sm leading-6 text-cyan-50/80">
                     {pick(
-                      "Dupa confirmare te vom trimite automat in cont.",
+                      "După confirmare te vom trimite automat în cont.",
                       "After confirmation we will send you into your account automatically."
                     )}
                   </p>
@@ -207,7 +207,7 @@ export default function RegisterPage() {
                 />
                 <span>
                   {pick(
-                    "Confirm ca am cel putin 16 ani sau folosesc aplicatia cu acordul parintelui/tutorelui.",
+                    "Confirm că am cel puțin 16 ani sau folosesc aplicația cu acordul părintelui/tutorelui.",
                     "I confirm that I am at least 16 or that I use the app with parent/guardian consent."
                   )}
                 </span>
@@ -244,7 +244,7 @@ export default function RegisterPage() {
                 }`}
               >
                 <UserPlus size={18} />
-                {isLoading ? pick("Se creeaza contul...", "Creating account...") : pick("Creeaza cont", "Create account")}
+                {isLoading ? pick("Se creează contul...", "Creating account...") : pick("Creează cont", "Create account")}
               </button>
             </form>
 

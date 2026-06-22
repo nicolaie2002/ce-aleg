@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
       <section className="ce-shell-sm flex min-h-screen flex-col justify-center py-10">
         <div className="mb-8 flex items-center justify-between gap-3">
           <Link href="/login" className="inline-flex items-center gap-2 text-sm text-emerald-300 hover:text-emerald-200">
-            <ArrowLeft size={16} /> {pick("Inapoi la login", "Back to login")}
+            <ArrowLeft size={16} /> {pick("Înapoi la login", "Back to login")}
           </Link>
           <div className="flex items-center gap-2">
             <LanguageSwitcher compact />
@@ -63,10 +63,10 @@ export default function ResetPasswordPage() {
 
         <div className="rounded-2xl border border-white/10 bg-[#0d141b]/95 p-6 shadow-2xl">
           <p className="text-sm font-black text-emerald-300">{pick("Securitate cont", "Account security")}</p>
-          <h1 className="mt-3 text-4xl font-black">{pick("Alege o parola noua", "Choose a new password")}</h1>
+          <h1 className="mt-3 text-4xl font-black">{pick("Alege o parolă nouă", "Choose a new password")}</h1>
           <p className="mt-3 leading-7 text-gray-300">
             {pick(
-              "Parola trebuie sa aiba minimum 8 caractere. O parola mai lunga este mai greu de ghicit.",
+              "Parola trebuie să aibă minimum 8 caractere. O parolă mai lungă este mai greu de ghicit.",
               "The password must have at least 8 characters. A longer password is harder to guess."
             )}
           </p>
@@ -84,7 +84,7 @@ export default function ResetPasswordPage() {
             {password && (
               <div className="rounded-lg border border-white/10 bg-black/25 p-3">
                 <div className="flex items-center justify-between text-xs font-black">
-                  <span className="text-gray-300">{pick("Putere parola", "Password strength")}</span>
+                  <span className="text-gray-300">{pick("Putere parolă", "Password strength")}</span>
                   <span className="text-emerald-300">{getPasswordStrengthLabel(strength, pick)}</span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
@@ -117,7 +117,7 @@ export default function ResetPasswordPage() {
               }`}
             >
               <LockKeyhole size={18} />
-              {isLoading ? pick("Se salveaza...", "Saving...") : pick("Schimba parola", "Change password")}
+              {isLoading ? pick("Se salvează...", "Saving...") : pick("Schimbă parola", "Change password")}
             </button>
           </form>
         </div>

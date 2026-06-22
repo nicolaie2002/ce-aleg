@@ -3,7 +3,7 @@ export default function manifest() {
     name: "Ce aleg?",
     short_name: "Ce aleg?",
     description:
-      "Scaneaza coduri de bare, vezi verdictul produsului si compara alternative mai bune la cumparaturi.",
+      "Scanează coduri de bare, vezi verdictul produsului și compară alternative mai bune la cumpărături.",
     start_url: "/",
     scope: "/",
     display: "standalone",

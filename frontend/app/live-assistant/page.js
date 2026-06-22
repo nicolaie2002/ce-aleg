@@ -463,7 +463,7 @@ export default function LiveAssistantPage() {
 
     if (!cleanText) {
       setError(pick(
-        "Spune sau scrie ce vrei de la alternativa: mai ieftin, mai putin zahar, mai multa proteina.",
+      "Spune sau scrie ce vrei de la alternativă: mai ieftin, mai puțin zahăr, mai multă proteină.",
         "Say or write what you want from the alternative: cheaper, less sugar, more protein."
       ));
       return;
@@ -682,12 +682,12 @@ export default function LiveAssistantPage() {
             <section className="rounded-lg border border-white/10 bg-[#11171d] p-5">
               <p className="text-sm font-bold">{pick("Preferinte pentru alternative", "Alternative preferences")}</p>
               <p className="mt-2 text-sm leading-6 text-gray-400">
-                {pick("Spune sau scrie ce conteaza: mai putin zahar, pret mai bun, proteina mai multa sau ingrediente mai simple.", "Say or write what matters: less sugar, better price, more protein or simpler ingredients.")}
+                {pick("Spune sau scrie ce contează: mai puțin zahăr, preț mai bun, proteină mai multă sau ingrediente mai simple.", "Say or write what matters: less sugar, better price, more protein or simpler ingredients.")}
               </p>
               <textarea
                 value={manualPreference}
                 onChange={(event) => setManualPreference(event.target.value)}
-                placeholder={pick("Ex: vreau o varianta mai ieftina si fara mult zahar", "Example: I want a cheaper option with less sugar")}
+                placeholder={pick("Ex: vreau o variantă mai ieftină și fără mult zahăr", "Example: I want a cheaper option with less sugar")}
                 className="mt-4 min-h-24 w-full rounded-lg border border-white/10 bg-black/30 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
               />
               <div className={`mt-3 grid gap-2 ${voiceSupported ? "sm:grid-cols-2" : ""}`}>
@@ -738,7 +738,7 @@ export default function LiveAssistantPage() {
                         "Use barcode scanning on Free or switch to Pro/Family for the live camera."
                       )
                     : pick(
-                        "Treci la Pro pentru scanari nelimitate.",
+                    "Treci la Pro pentru scanări nelimitate.",
                         "Go Pro for unlimited scans."
                       )}
                 </p>

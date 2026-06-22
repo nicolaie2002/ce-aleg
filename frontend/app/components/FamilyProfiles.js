@@ -47,7 +47,7 @@ export function FamilyProfiles({ compact = false }) {
   const subtitle = useMemo(() => {
     if (enabled) {
       return pick(
-        "Alege cine cumpara acum. Preferintele se pastreaza separat pentru fiecare membru.",
+        "Alege cine cumpără acum. Preferințele se păstrează separat pentru fiecare membru.",
         "Choose who is shopping now. Preferences stay separate for every member."
       );
     }
@@ -168,7 +168,7 @@ export function FamilyProfiles({ compact = false }) {
             {pick("Profiluri Family", "Family profiles")}
           </p>
           <h2 className="mt-2 text-2xl font-black">
-            {pick("Cine face cumparaturile?", "Who is shopping?")}
+            {pick("Cine face cumpărăturile?", "Who is shopping?")}
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">{subtitle}</p>
         </div>
@@ -216,7 +216,7 @@ export function FamilyProfiles({ compact = false }) {
                     type="button"
                     onClick={() => deleteProfile(profile)}
                     className="absolute -right-2 -top-2 hidden rounded-full border border-red-300/35 bg-[#180b0b] p-1.5 text-red-200 shadow-xl hover:bg-red-400 hover:text-black group-hover:inline-flex"
-                    aria-label={pick("Sterge profilul", "Delete profile")}
+                    aria-label={pick("Șterge profilul", "Delete profile")}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -256,7 +256,7 @@ export function FamilyProfiles({ compact = false }) {
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-4 font-black text-black hover:bg-cyan-100 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
           >
             <Plus size={17} />
-            {isCreating ? pick("Se adauga...", "Adding...") : pick("Adauga", "Add")}
+            {isCreating ? pick("Se adaugă...", "Adding...") : pick("Adaugă", "Add")}
           </button>
         </form>
       ) : (
@@ -267,7 +267,7 @@ export function FamilyProfiles({ compact = false }) {
             </span>
             <p className="text-sm leading-6 text-gray-300">
               {pick(
-                "Cu Family poti crea profiluri pentru fiecare persoana si recomandari separate.",
+                "Cu Family poți crea profiluri pentru fiecare persoană și recomandări separate.",
                 "With Family you can create a profile for each person and keep recommendations separate."
               )}
             </p>

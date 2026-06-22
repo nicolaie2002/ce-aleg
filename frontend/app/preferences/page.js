@@ -19,12 +19,12 @@ const criteria = [
     id: "cheap",
     ro: "Mai ieftin",
     en: "Cheaper",
-    detailRo: "Alege variante cu pret mai bun cand diferenta merita.",
+    detailRo: "Alege variante cu preț mai bun când diferența merită.",
     detailEn: "Prioritize better prices when the difference is worth it.",
   },
   {
     id: "protein",
-    ro: "Mai multa proteina",
+    ro: "Mai multă proteină",
     en: "More protein",
     detailRo: "Bun pentru satietate, sport sau gustari mai consistente.",
     detailEn: "Good for satiety, fitness and more filling snacks.",
@@ -33,14 +33,14 @@ const criteria = [
     id: "low_calorie",
     ro: "Mai putine calorii",
     en: "Fewer calories",
-    detailRo: "Cauta optiuni mai usoare per 100g sau per portie.",
+    detailRo: "Caută opțiuni mai ușoare per 100g sau per porție.",
     detailEn: "Look for lighter options per 100g or serving.",
   },
   {
     id: "low_sugar",
-    ro: "Mai putin zahar",
+    ro: "Mai puțin zahăr",
     en: "Less sugar",
-    detailRo: "Reduce zaharul cand exista alternative apropiate.",
+    detailRo: "Reduce zahărul când există alternative apropiate.",
     detailEn: "Reduce sugar when close alternatives exist.",
   },
   {
@@ -66,9 +66,9 @@ const criteria = [
   },
   {
     id: "value",
-    ro: "Raport calitate-pret",
+    ro: "Raport calitate-preț",
     en: "Best value",
-    detailRo: "Echilibreaza scorul, pretul si valorile nutritionale.",
+    detailRo: "Echilibrează scorul, prețul și valorile nutriționale.",
     detailEn: "Balance score, price and nutrition.",
   },
 ];
@@ -144,10 +144,10 @@ export default function PreferencesPage() {
 
   return (
     <main className="min-h-screen text-white">
-      <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scaneaza codul", "Scan barcode")} />
+      <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scanează codul", "Scan barcode")} />
       <section className="ce-shell ce-page">
         <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white">
-          <ArrowLeft size={16} /> {pick("Inapoi la dashboard", "Back to dashboard")}
+          <ArrowLeft size={16} /> {pick("Înapoi la dashboard", "Back to dashboard")}
         </Link>
 
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
@@ -201,7 +201,7 @@ export default function PreferencesPage() {
                   setRequest(event.target.value);
                 }}
                 placeholder={pick(
-                  "Ex: Vreau produse mai ieftine, cu putin zahar, dar sa nu fie foarte procesate.",
+                  "Ex: Vreau produse mai ieftine, cu puțin zahăr, dar să nu fie foarte procesate.",
                   "Example: I want cheaper products with less sugar, but not highly processed options."
                 )}
                 className="mt-3 min-h-32 w-full rounded-xl border border-white/10 bg-black/25 p-4 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
@@ -210,7 +210,7 @@ export default function PreferencesPage() {
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <button onClick={savePreferences} className="ce-premium-button rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100">
-                {pick("Salveaza preferintele", "Save preferences")}
+                {pick("Salvează preferințele", "Save preferences")}
               </button>
               <button onClick={resetPreferences} className="rounded-lg border border-white/15 px-5 py-3 font-bold text-gray-200 hover:bg-white/10">
                 {pick("Reseteaza", "Reset")}
