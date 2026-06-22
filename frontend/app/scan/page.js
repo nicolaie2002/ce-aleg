@@ -208,7 +208,7 @@ function ScanPageContent() {
         if (isActive) {
           setSuggestions([]);
           setSearchError(
-            error.message || "Catalogul extern nu este disponibil momentan."
+            error.message || "Catalogul extern nu răspunde acum. Încearcă din nou în câteva clipe."
           );
         }
       } finally {
@@ -315,7 +315,7 @@ function ScanPageContent() {
       console.error(error);
       setErrorMessage(
         error.message ||
-          "Analiza nu este disponibilă momentan. Încearcă din nou în câteva clipe."
+          "Analiza nu este disponibilă acum. Încearcă din nou în câteva clipe."
       );
     } finally {
       setIsAnalyzing(false);

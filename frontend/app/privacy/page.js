@@ -83,16 +83,6 @@ export default function PrivacyPage() {
     pick("îmbunătățirea produsului prin statistici agregate și Analytics doar dacă accepți cookie-urile opționale", "improving the product through aggregated statistics and Analytics only if you accept optional cookies"),
   ];
 
-  const processors = [
-    "Supabase - bază de date și stocare pentru produse/imagini",
-    "Render - găzduire backend/API",
-    "Vercel - găzduire frontend",
-    "Stripe - plăți, abonamente, facturi și portal client",
-    "Brevo - emailuri tranzacționale",
-    "Google Analytics - statistici doar după consimțământ",
-    "Open Food Facts - identificare și completare date produs din catalog public",
-  ];
-
   const rights = [
     pick("acces la datele tale", "access your data"),
     pick("corectarea datelor incorecte", "correct inaccurate data"),
@@ -194,18 +184,23 @@ export default function PrivacyPage() {
               </p>
               <p>
                 {pick(
-                  "Asistentul AI vizual este în dezvoltare; momentan serviciul se bazează pe coduri de bare, OCR local și surse de catalog.",
-                  "The visual AI assistant is in development; for now the service relies on barcodes, local OCR and catalog sources."
+                  "Camera și citirea etichetei ajută la identificarea produsului. Pentru rezultate precise, aplicația confirmă produsul cu ajutorul codului de bare și al catalogului de produse.",
+                  "The camera and label reading help identify the product. For precise results, the app confirms the product through the barcode and product catalog."
                 )}
               </p>
             </InfoCard>
 
-            <InfoCard icon={Server} title={pick("Furnizori și procesatori", "Providers and processors")}>
-              <BulletList items={processors} />
+            <InfoCard icon={Server} title={pick("Servicii care susțin aplicația", "Services that support the app")}>
               <p>
                 {pick(
-                  "Folosim acești furnizori doar pentru funcționarea serviciului, plăți, emailuri, găzduire, securitate și analiză cu consimțământ.",
-                  "We use these providers only for service operation, payments, emails, hosting, security and consent-based analytics."
+                  "Pentru ca Ce aleg? să funcționeze corect, folosim servicii de încredere pentru găzduire, baze de date, stocare, plăți, emailuri, securitate, statistici și completarea informațiilor despre produse. Aceste servicii includ Supabase, Render, Vercel, Stripe, Brevo, Google Analytics și Open Food Facts.",
+                  "To keep Ce aleg? working correctly, we use trusted services for hosting, databases, storage, payments, emails, security, statistics and product information. These services include Supabase, Render, Vercel, Stripe, Brevo, Google Analytics and Open Food Facts."
+                )}
+              </p>
+              <p>
+                {pick(
+                  "Nu vindem datele tale și nu le folosim pentru reclame personalizate fără acordul tău.",
+                  "We do not sell your data and we do not use it for personalized ads without your consent."
                 )}
               </p>
             </InfoCard>

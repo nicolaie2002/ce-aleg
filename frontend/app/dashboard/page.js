@@ -67,7 +67,7 @@ export default function DashboardPage() {
     { href: "/store", title: pick("Caută produs", "Search products"), description: pick("Găsește produse în catalog după nume și magazin.", "Find products in the catalog by name and store."), icon: ScanLine, tone: "cyan" },
     { href: "/cart", title: pick("Coșul meu", "My cart"), description: pick("Produse grupate pentru următoarea cumpărătură.", "Products grouped for your next shopping trip."), icon: ShoppingCart, tone: "amber" },
     { href: "/preferences", title: pick("Preferințe", "Preferences"), description: pick("Setează cum alegi alternativele.", "Set how alternatives should be chosen."), icon: SlidersHorizontal, tone: "violet" },
-    { href: "/live-assistant", title: pick("AI vizual în dezvoltare", "Visual AI preview"), description: pick("Preview Pro/Family. Momentan folosește codul de bare; recunoașterea ambalajului este în lucru.", "Pro/Family preview. It currently uses barcodes while package recognition is in development."), icon: ScanLine, tone: "violet" },
+    { href: "/live-assistant", title: pick("Asistent vizual Pro", "Visual assistant Pro"), description: pick("Cameră live pentru scanare ghidată și recomandări potrivite planului tău.", "Live camera for guided scanning and recommendations matched to your plan."), icon: ScanLine, tone: "violet" },
     { href: "/history", title: pick("Istoric", "History"), description: pick("Revino la scanările și analizele recente.", "Return to your recent scans and analyses."), icon: Clock3, tone: "cyan" },
     { href: "/favorites", title: pick("Favorite", "Favorites"), description: pick("Păstrează alternativele care merită repetate.", "Keep the alternatives worth buying again."), icon: Heart, tone: "amber" },
     { href: "/submit-product", title: pick("Contribuie produs", "Contribute product"), description: pick("Completează catalogul când un produs lipsește.", "Complete the catalog when a product is missing."), icon: ListPlus, tone: "cyan" },
@@ -87,7 +87,7 @@ export default function DashboardPage() {
       );
 
       if (responses.slice(0, 3).some((response) => !response.ok)) {
-        throw new Error(pick("Datele nu au putut fi încărcate momentan.", "Your data could not be loaded right now."));
+        throw new Error(pick("Datele nu au putut fi încărcate. Reîncearcă în câteva clipe.", "Your data could not be loaded. Try again in a few moments."));
       }
 
       setCounts({
@@ -143,7 +143,7 @@ export default function DashboardPage() {
           setEmailStatusNotice(
             emailStatus.configured
               ? pick(
-                  "Contul este creat, dar emailul de bun venit nu a putut fi trimis momentan.",
+                  "Contul este creat, dar emailul de bun venit nu a putut fi trimis acum.",
                   "The account is ready, but the welcome email could not be sent right now."
                 )
               : pick(
@@ -193,7 +193,7 @@ export default function DashboardPage() {
               `Am trimis confirmarea la ${data.email}. Contul nu se sterge pana nu confirmi din email.`,
               `We sent the confirmation to ${data.email}. The account is not deleted until you confirm by email.`
             )
-          : data.message || pick("Foloseste linkul local de test pentru confirmare.", "Use the local test link to confirm.")
+          : data.message || pick("Verifică emailul pentru confirmare.", "Check your email to confirm.")
       );
 
       if (data.devDeletionLink) {

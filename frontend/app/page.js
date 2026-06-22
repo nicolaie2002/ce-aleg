@@ -46,8 +46,8 @@ export default function Home() {
       icon: ScanLine,
       title: pick("Scanezi codul de bare", "Scan the barcode"),
       detail: pick(
-        "Ții codul în cadru, iar aplicația caută produsul în catalogul online.",
-        "Keep the barcode in frame and the app looks up the product in the online catalog."
+        "Încadrează codul de bare, iar aplicația identifică produsul din catalog.",
+        "Frame the barcode and the app identifies the product from the catalog."
       ),
     },
     {
@@ -79,10 +79,10 @@ export default function Home() {
     },
     {
       icon: Camera,
-      label: pick("AI vizual în dezvoltare", "Visual AI in development"),
+      label: pick("Asistent vizual Pro", "Visual assistant Pro"),
       detail: pick(
-        "Pregătim recunoașterea după ambalaj. Pentru lansare, fluxul rapid rămâne codul de bare.",
-        "Package recognition is being prepared. For launch, the fast flow remains barcode scanning."
+        "Cameră live pentru scanare ghidată și recomandări potrivite planurilor Pro și Family.",
+        "Live camera for guided scanning and recommendations included in Pro and Family."
       ),
     },
     {
@@ -181,7 +181,7 @@ export default function Home() {
                   className="ce-hero-secondary-action inline-flex items-center justify-center gap-2 rounded-lg border border-white/18 bg-black/35 px-6 py-4 font-bold text-white backdrop-blur hover:-translate-y-0.5 hover:bg-white/10"
                 >
                   <Camera className="h-5 w-5" />
-                  {pick("AI vizual în dezvoltare", "Visual AI preview")}
+                  {pick("Asistent vizual Pro", "Visual assistant Pro")}
                 </Link>
                 <Link
                   href="/pricing"
@@ -292,7 +292,7 @@ export default function Home() {
           <div className="grid gap-8 xl:grid-cols-[420px_minmax(0,1fr)] xl:items-start">
             <div>
               <p className="text-sm font-black text-cyan-200">
-                {pick("Pentru cumpărături reale", "For real shopping")}
+                {pick("La raft, fără ghicit", "At the shelf, without guessing")}
               </p>
               <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
                 {pick(

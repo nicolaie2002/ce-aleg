@@ -359,7 +359,7 @@ PLAN_CATALOG = {
         "weeklyScanLimit": None,
         "features": [
             "scanari nelimitate",
-            "AI preview in dezvoltare",
+            "asistent live Pro",
             "3 alternative imediat + afiseaza mai multe",
             "cautare dupa preferintele tale",
             "istoric complet",
@@ -1273,7 +1273,7 @@ def get_publication_readiness():
     payment_provider = PAYMENT_PROVIDER
 
     if not database_url:
-        blockers.append("DATABASE_URL lipseste. Pentru publicare foloseste Supabase/Postgres, nu SQLite local.")
+        blockers.append("DATABASE_URL lipseste. Configureaza Supabase/Postgres pentru mediul de productie.")
 
     if not auth_secret or auth_secret == DEFAULT_AUTH_SECRET or len(auth_secret) < 32:
         blockers.append("AUTH_SECRET trebuie sa fie unic, lung si secret.")
@@ -1333,7 +1333,7 @@ def get_publication_readiness():
 
         if PRODUCTION_MODE and stripe_secret_key.startswith("sk_test_"):
             blockers.append(
-                "Stripe este in modul test. Pentru lansare publica foloseste STRIPE_SECRET_KEY live si price id-uri live."
+                "Stripe este in modul test. Configureaza STRIPE_SECRET_KEY live si price id-uri live."
             )
 
         if PRODUCTION_MODE and "cealeg.shop" not in FRONTEND_PUBLIC_URL:
@@ -1344,7 +1344,7 @@ def get_publication_readiness():
         warnings.append("Platile reale nu sunt conectate. Pro/Family se pot activa doar manual din admin.")
 
     if not env_flag("ENABLE_OPENAI_VISION", False):
-        warnings.append("Vision cloud este oprit. Produsul rămâne funcțional prin barcode, OCR local și Open Food Facts.")
+        warnings.append("Identificarea vizuala avansata este oprita. Produsul ramane functional prin cod de bare, citirea etichetelor si Open Food Facts.")
 
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
         warnings.append("Storage Supabase nu este complet configurat; imaginile contribuite pot rămâne locale.")
@@ -1355,7 +1355,7 @@ def get_publication_readiness():
         )
     elif PRODUCTION_MODE and EMAIL_PROVIDER == "brevo" and str(os.environ.get("EMAIL_FROM", "")).lower().endswith("@gmail.com"):
         warnings.append(
-            "Brevo este configurat, dar pentru lansare este recomandat un sender pe domeniul cealeg.shop cu SPF/DKIM."
+            "Brevo este configurat; recomandam un sender pe domeniul cealeg.shop cu SPF/DKIM."
         )
 
     return {

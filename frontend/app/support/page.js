@@ -52,8 +52,8 @@ export default function SupportPage() {
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-400">
                 {pick(
-                  "Pentru lansarea beta, raspundem manual cat mai repede posibil.",
-                  "During beta launch, replies are handled manually as quickly as possible."
+                  "Răspundem cât mai repede pentru probleme de cont, plată, scanare sau produse identificate greșit.",
+                  "We reply as quickly as possible for account, payment, scan or incorrect product issues."
                 )}
               </p>
             </div>

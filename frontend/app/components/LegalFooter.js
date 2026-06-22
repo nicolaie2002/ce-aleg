@@ -19,7 +19,7 @@ export function LegalFooter() {
 
   const productLinks = [
     { href: "/barcode-scan", label: pick("Scanare cod", "Barcode scan"), icon: Barcode },
-    { href: "/live-assistant", label: pick("AI preview", "AI preview"), icon: Camera },
+    { href: "/live-assistant", label: pick("Asistent live", "Live assistant"), icon: Camera },
     { href: "/pricing", label: pick("Planuri", "Plans"), icon: Crown },
   ];
 

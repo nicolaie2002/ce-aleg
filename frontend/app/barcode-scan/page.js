@@ -488,7 +488,7 @@ export default function BarcodeScanPage() {
             await handleDetectedBarcode(detectedCode, 2);
           } else if (!detectedRef.current) {
             setScanStatus(
-              "Caut codul... ține codul drept, clar și bine luminat."
+              "Caut codul de bare. Apropie produsul, păstrează imaginea clară și evită reflexiile."
             );
           }
         }

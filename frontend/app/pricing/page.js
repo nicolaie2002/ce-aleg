@@ -65,16 +65,16 @@ const featureLabels = {
     en: "unlimited scans",
   },
   "asistent live la raft": {
-    ro: "AI preview in dezvoltare",
-    en: "AI preview in development",
+    ro: "asistent live Pro",
+    en: "live assistant Pro",
   },
   "asistent smart live": {
-    ro: "AI preview in dezvoltare",
-    en: "AI preview in development",
+    ro: "asistent live Pro",
+    en: "live assistant Pro",
   },
-  "AI preview in dezvoltare": {
-    ro: "AI preview în dezvoltare",
-    en: "AI preview in development",
+  "asistent live Pro": {
+    ro: "asistent live Pro",
+    en: "live assistant Pro",
   },
   "3 alternative imediat + afiseaza mai multe": {
     ro: "3 alternative imediat + afișează mai multe",
@@ -273,7 +273,7 @@ export default function PricingPage() {
         throw new Error(
           data.error ||
             pick(
-              "Plata nu poate fi pornită momentan.",
+              "Plata nu poate fi pornită acum.",
               "Checkout cannot start right now."
             )
         );
@@ -332,7 +332,7 @@ export default function PricingPage() {
         throw new Error(
           data.error ||
             pick(
-              "Portalul de abonament nu poate fi deschis momentan.",
+              "Portalul de abonament nu poate fi deschis acum.",
               "The billing portal cannot be opened right now."
             )
         );
