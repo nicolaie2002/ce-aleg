@@ -304,7 +304,8 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Configureaza webhook Stripe live catre `https://cealeg-api.onrender.com/billing/stripe/webhook`
 - [x] Verifica sender/domeniu Brevo pentru `cealeg.shop` cu SPF/DKIM
 - [x] Adauga `https://www.cealeg.shop/sitemap.xml` in Google Search Console
-- [ ] Optional: creeaza GA4 si seteaza `NEXT_PUBLIC_GA_ID` in Vercel
+- [x] Optional: creeaza GA4 si seteaza `NEXT_PUBLIC_GA_ID` in Vercel
+- [x] Banner de consimțământ pentru Google Analytics
 - [ ] Test final pe telefon pe domeniul public: cont nou, confirmare email, login, scanare, alternative, cos, favorite, plata, resetare parola, stergere cont
 
 ### Blocante pentru lansare

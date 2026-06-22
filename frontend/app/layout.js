@@ -7,6 +7,7 @@ import { LegalFooter } from "./components/LegalFooter";
 import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
 import { ScrollRevealController } from "./components/ScrollRevealController";
 import { Analytics } from "./components/Analytics";
+import { CookieConsentBanner } from "./components/CookieConsentBanner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -179,6 +180,7 @@ export default function RootLayout({ children }) {
             <Analytics />
             {children}
             <LegalFooter />
+            <CookieConsentBanner />
           </ThemeProvider>
         </LocaleProvider>
       </body>

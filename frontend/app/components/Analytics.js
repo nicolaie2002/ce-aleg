@@ -1,10 +1,19 @@
 "use client";
 
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Script from "next/script";
 import { usePathname, useSearchParams } from "next/navigation";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "";
+const CONSENT_KEY = "cealeg_analytics_consent";
+
+function hasAnalyticsConsent() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  return localStorage.getItem(CONSENT_KEY) === "accepted";
+}
 
 function PageViewTracker() {
   const pathname = usePathname();
@@ -25,7 +34,24 @@ function PageViewTracker() {
 }
 
 export function Analytics() {
-  if (!GA_ID) {
+  const [hasConsent, setHasConsent] = useState(false);
+
+  useEffect(() => {
+    function syncConsent() {
+      setHasConsent(hasAnalyticsConsent());
+    }
+
+    syncConsent();
+    window.addEventListener("storage", syncConsent);
+    window.addEventListener("cealeg:analytics-consent", syncConsent);
+
+    return () => {
+      window.removeEventListener("storage", syncConsent);
+      window.removeEventListener("cealeg:analytics-consent", syncConsent);
+    };
+  }, []);
+
+  if (!GA_ID || !hasConsent) {
     return null;
   }
 
