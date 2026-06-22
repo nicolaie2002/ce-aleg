@@ -20,62 +20,141 @@ const spaceGrotesk = Space_Grotesk({
   display: "swap",
 });
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.cealeg.shop";
+const siteName = "Ce aleg?";
+const siteDescription =
+  "Scaneaza codul de bare al unui produs, vezi rapid verdictul si compara alternative mai bune pentru bugetul si preferintele tale.";
+const socialImage = "/opengraph-image.png";
+
 export const metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://www.cealeg.shop"),
-  applicationName: "Ce aleg?",
+  metadataBase: new URL(siteUrl),
+  applicationName: siteName,
   title: {
-    default: "Ce aleg?",
+    default: "Ce aleg? | Scaneaza produse si compara alternative la cumparaturi",
     template: "%s | Ce aleg?",
   },
-  description:
-    "Scaneaza produse, compara rapid alternative si alege mai bine la cumparaturi.",
+  description: siteDescription,
+  keywords: [
+    "Ce aleg",
+    "scanare cod de bare",
+    "alternative produse",
+    "cumparaturi inteligente",
+    "comparare produse",
+    "Open Food Facts",
+    "Lidl",
+    "Kaufland",
+    "Carrefour",
+    "Mega Image",
+  ],
+  authors: [{ name: siteName }],
+  creator: siteName,
+  publisher: siteName,
+  category: "shopping",
   alternates: {
     canonical: "/",
   },
   icons: {
     icon: [
       {
+        url: "/favicon.ico",
+        sizes: "any",
+      },
+      {
         url: "/icon.png",
-        sizes: "500x500",
+        sizes: "512x512",
         type: "image/png",
       },
     ],
     apple: [
       {
-        url: "/icon.png",
-        sizes: "500x500",
+        url: "/apple-icon.png",
+        sizes: "180x180",
         type: "image/png",
       },
     ],
-    shortcut: ["/icon.png"],
+    shortcut: ["/favicon.ico"],
   },
+  manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     locale: "ro_RO",
-    url: "/",
-    siteName: "Ce aleg?",
-    title: "Ce aleg? - cumparaturi mai inteligente",
-    description:
-      "Scaneaza produsul, vezi verdictul si primeste alternative clare pentru bugetul si preferintele tale.",
+    url: siteUrl,
+    siteName,
+    title: "Ce aleg? - scaneaza produse si compara alternative",
+    description: siteDescription,
     images: [
       {
-        url: "/icon.png",
-        width: 500,
-        height: 500,
-        alt: "Ce aleg?",
+        url: socialImage,
+        width: 1200,
+        height: 630,
+        alt: "Ce aleg? - scaneaza produse si compara alternative",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Ce aleg? - cumparaturi mai inteligente",
-    description:
-      "Scaneaza produsul, vezi verdictul si primeste alternative clare pentru cumparaturi.",
-    images: ["/icon.png"],
+    title: "Ce aleg? - scaneaza produse si compara alternative",
+    description: siteDescription,
+    images: [socialImage],
   },
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+};
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: siteName,
+  url: siteUrl,
+  applicationCategory: "ShoppingApplication",
+  operatingSystem: "Web, iOS, Android",
+  description: siteDescription,
+  inLanguage: ["ro-RO", "en"],
+  image: `${siteUrl}/opengraph-image.png`,
+  logo: `${siteUrl}/icon.png`,
+  offers: [
+    {
+      "@type": "Offer",
+      name: "Free",
+      price: "0",
+      priceCurrency: "RON",
+      category: "free",
+    },
+    {
+      "@type": "Offer",
+      name: "Pro",
+      price: "19.99",
+      priceCurrency: "RON",
+      category: "subscription",
+    },
+    {
+      "@type": "Offer",
+      name: "Family",
+      price: "29.99",
+      priceCurrency: "RON",
+      category: "subscription",
+    },
+  ],
+  publisher: {
+    "@type": "Organization",
+    name: siteName,
+    url: siteUrl,
+    logo: `${siteUrl}/icon.png`,
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "customer support",
+      email: "contact@cealeg.shop",
+      availableLanguage: ["Romanian", "English"],
+    },
   },
 };
 
@@ -87,6 +166,11 @@ export default function RootLayout({ children }) {
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+        />
         <LocaleProvider>
           <ThemeProvider>
             <AutomaticPageTranslation />
