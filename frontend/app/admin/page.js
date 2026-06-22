@@ -9,11 +9,11 @@ import { readApiJson } from "../utils/apiResponse";
 
 const statLabels = {
   users: "Conturi",
-  products: "Produse in catalog",
+  products: "Produse în catalog",
   pendingSubmissions: "Propuneri de verificat",
   searches: "Căutări salvate",
-  missingProducts: "Produse negasite",
-  priceObservations: "Preturi raportate",
+  missingProducts: "Produse negăsite",
+  priceObservations: "Prețuri raportate",
   proUsers: "Utilizatori Pro",
 };
 
@@ -42,7 +42,7 @@ export default function AdminPage() {
     }
 
     if (!overviewResponse.ok || !submissionsResponse.ok || !usersResponse.ok) {
-      setMessage("Acest spatiu este disponibil doar administratorului.");
+      setMessage("Acest spațiu este disponibil doar administratorului.");
       return;
     }
 
@@ -76,7 +76,7 @@ export default function AdminPage() {
   }
 
   async function remove(submissionId) {
-    if (!window.confirm("Stergi propunerea?")) return;
+    if (!window.confirm("Ștergi propunerea?")) return;
     const response = await fetch(`${API_URL}/submissions/item/${submissionId}`, {
       method: "DELETE",
     });
@@ -126,11 +126,11 @@ export default function AdminPage() {
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
       <section className="ce-shell ce-page">
         <p className="flex items-center gap-2 text-sm font-bold text-emerald-300">
-          <ShieldCheck size={16} /> Administrare platforma
+          <ShieldCheck size={16} /> Administrare platformă
         </p>
-        <h1 className="mt-3 text-4xl font-black">Moderare, planuri si sanatatea platformei</h1>
+        <h1 className="mt-3 text-4xl font-black">Moderare, planuri și sănătatea platformei</h1>
         <p className="mt-3 max-w-2xl text-gray-300">
-                  Verifică propunerile comunității, planurile utilizatorilor și serviciile esențiale înainte de publicare.
+          Verifică propunerile comunității, planurile utilizatorilor și serviciile esențiale ale platformei.
         </p>
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
@@ -147,9 +147,9 @@ export default function AdminPage() {
         <section className="mt-8 rounded-lg border border-white/10 bg-[#11171d] p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-2xl font-black">Sistem si email</h2>
+              <h2 className="text-2xl font-black">Sistem și email</h2>
               <p className="mt-2 text-sm text-gray-400">
-                Trimite un email de test catre adresa profesionala a site-ului.
+                Trimite un email de test către adresa profesională a site-ului.
               </p>
             </div>
             <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[380px]">
@@ -170,7 +170,7 @@ export default function AdminPage() {
                   disabled={emailBusy}
                   className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-400 px-5 py-3 font-black text-black hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <Mail size={17} /> {emailBusy ? "Se trimite..." : "Testeaza email"}
+                  <Mail size={17} /> {emailBusy ? "Se trimite..." : "Testează email"}
                 </button>
               </div>
             </div>
@@ -181,9 +181,9 @@ export default function AdminPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="text-2xl font-black">Planuri utilizatori</h2>
-              <p className="mt-2 text-sm text-gray-400">Activeaza manual Free, Pro sau Family.</p>
+              <p className="mt-2 text-sm text-gray-400">Activează manual Free, Pro sau Family.</p>
             </div>
-            <button onClick={loadAdmin} title="Reincarca" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 hover:bg-white/10">
+            <button onClick={loadAdmin} title="Reîncarcă" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 hover:bg-white/10">
               <RefreshCw size={17} />
             </button>
           </div>
@@ -194,7 +194,7 @@ export default function AdminPage() {
                   <th className="border-b border-white/10 py-3">Email</th>
                   <th className="border-b border-white/10 py-3">Admin</th>
                   <th className="border-b border-white/10 py-3">Plan</th>
-                  <th className="border-b border-white/10 py-3">Actiuni</th>
+                  <th className="border-b border-white/10 py-3">Acțiuni</th>
                 </tr>
               </thead>
               <tbody>
@@ -223,15 +223,15 @@ export default function AdminPage() {
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="flex items-center gap-2 text-sm font-bold text-amber-200">
-                <SearchX size={16} /> Produse negasite
+                <SearchX size={16} /> Produse negăsite
               </p>
-              <h2 className="mt-2 text-2xl font-black">Ce cauta oamenii si lipseste</h2>
+              <h2 className="mt-2 text-2xl font-black">Ce caută oamenii și lipsește</h2>
               <p className="mt-2 text-sm text-gray-400">
-                Interogari cu zero rezultate in ultimele 30 de zile. Prioritizeaza-le pentru import sau verificare manuala.
+                Interogări cu zero rezultate în ultimele 30 de zile. Prioritizează-le pentru import sau verificare manuală.
               </p>
             </div>
-            <button onClick={loadAdmin} title="Reincarca lipsurile" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-bold hover:bg-white/10">
-              <RefreshCw size={16} /> Reincarca
+            <button onClick={loadAdmin} title="Reîncarcă lipsurile" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-bold hover:bg-white/10">
+              <RefreshCw size={16} /> Reîncarcă
             </button>
           </div>
 
@@ -242,8 +242,8 @@ export default function AdminPage() {
                   <th className="border-b border-white/10 py-3">Căutare</th>
                   <th className="border-b border-white/10 py-3">Magazin</th>
                   <th className="border-b border-white/10 py-3">Sursa</th>
-                  <th className="border-b border-white/10 py-3">Aparitii</th>
-                  <th className="border-b border-white/10 py-3">Ultima data</th>
+                  <th className="border-b border-white/10 py-3">Apariții</th>
+                  <th className="border-b border-white/10 py-3">Ultima dată</th>
                 </tr>
               </thead>
               <tbody>
@@ -262,7 +262,7 @@ export default function AdminPage() {
             </table>
             {!misses.length && (
               <p className="mt-4 rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-gray-400">
-                Nu exista inca produse negasite in perioada selectata.
+                Nu există încă produse negăsite în perioada selectată.
               </p>
             )}
           </div>
@@ -283,10 +283,10 @@ export default function AdminPage() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button onClick={() => review(item.id)} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10">
-                      <RefreshCw size={15} /> Verifica
+                      <RefreshCw size={15} /> Verifică
                     </button>
                     <button onClick={() => approve(item.id)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-3 py-2 text-sm font-black text-black hover:bg-emerald-300">
-                      <CheckCircle2 size={15} /> Publica
+                      <CheckCircle2 size={15} /> Publică
                     </button>
                     <button onClick={() => remove(item.id)} title="Șterge propunerea" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10">
                       <Trash2 size={15} />
@@ -295,12 +295,12 @@ export default function AdminPage() {
                 </div>
               </article>
             ))}
-            {!submissions.length && <p className="rounded-lg border border-white/10 bg-[#11171d] p-5 text-gray-400">Nu exista propuneri de verificat.</p>}
+            {!submissions.length && <p className="rounded-lg border border-white/10 bg-[#11171d] p-5 text-gray-400">Nu există propuneri de verificat.</p>}
           </div>
         </section>
 
         <Link href="/privacy" className="mt-8 inline-block text-sm font-bold text-emerald-300 hover:text-emerald-200">
-          Politica de confidentialitate
+          Politica de confidențialitate
         </Link>
       </section>
     </main>

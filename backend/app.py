@@ -709,7 +709,7 @@ def render_brand_email(preheader, title, intro, button_label=None, button_url=No
                           <img src="{safe_logo_url}" width="54" height="54" alt="Ce aleg?" style="display:inline-block;border-radius:14px;vertical-align:middle;margin-right:12px;">
                           <span style="display:inline-block;vertical-align:middle;">
                             <span style="display:block;color:#ffffff;font-size:18px;font-weight:900;line-height:22px;">Ce aleg?</span>
-                            <span style="display:block;color:#a5f3fc;font-size:12px;font-weight:700;">cumparaturi mai inteligente</span>
+                            <span style="display:block;color:#a5f3fc;font-size:12px;font-weight:700;">cumpărături mai inteligente</span>
                           </span>
                         </td>
                       </tr>
@@ -739,7 +739,7 @@ def render_brand_email(preheader, title, intro, button_label=None, button_url=No
                 </tr>
                 <tr>
                   <td style="padding:18px 28px 26px;border-top:1px solid rgba(148,163,184,0.16);color:#94a3b8;font-size:12px;line-height:20px;">
-                    Daca nu ai cerut acest email, il poti ignora. Pentru siguranta, nu trimitem niciodata parola ta prin email.
+                    Dacă nu ai cerut acest email, îl poți ignora. Pentru siguranță, nu trimitem niciodată parola ta prin email.
                   </td>
                 </tr>
               </table>
@@ -755,25 +755,25 @@ def send_welcome_email(user):
     dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
     text_body = (
         f"Salut, {user.name}!\n\n"
-        "Contul tau Ce aleg? este pregatit.\n"
-        "Poti scana produse, salva cosul si primi alternative mai bune.\n\n"
-        f"Intra aici: {dashboard_url}\n"
+        "Contul tău Ce aleg? este pregătit.\n"
+        "Poți scana produse, salva coșul și primi alternative mai bune.\n\n"
+        f"Intră aici: {dashboard_url}\n"
     )
     html_body = render_brand_email(
         "Cont activ",
         f"Salut, {user.name}.",
-        "Contul tau este pregatit. Poti scana produse, salva cosul si compara alternative potrivite pentru tine.",
+        "Contul tău este pregătit. Poți scana produse, salva coșul și compara alternative potrivite pentru tine.",
         "Deschide dashboardul",
         dashboard_url,
         [
-            "Scaneaza produse direct cu telefonul.",
-            "Pastreaza istoricul, favoritele si cosul de cumparaturi.",
-            "Compara rapid alternative mai potrivite.",
+            "Scanează produse direct cu telefonul.",
+            "Păstrează istoricul, favoritele și coșul de cumpărături.",
+            "Compară rapid alternative mai potrivite.",
         ],
     )
     return send_transactional_email(
         user.email,
-        "Bine ai venit in Ce aleg?",
+        "Bine ai venit în Ce aleg?",
         text_body,
         html_body,
     )
@@ -817,25 +817,25 @@ def send_email_verification_email(user):
     verification_url = f"{FRONTEND_PUBLIC_URL}/verify-email?token={token}"
     text_body = (
         f"Salut, {user.name}!\n\n"
-        "Confirma adresa de email pentru contul Ce aleg?.\n"
-        f"Confirma aici: {verification_url}\n\n"
-        "Linkul expira in 48 de ore.\n"
+        "Confirmă adresa de email pentru contul Ce aleg?.\n"
+        f"Confirmă aici: {verification_url}\n\n"
+        "Linkul expiră în 48 de ore.\n"
     )
     html_body = render_brand_email(
-        "Confirma emailul",
-        "Verifica adresa de email.",
-        "Apasa pe buton pentru a activa contul si pentru a pastra aplicatia curata de conturi false.",
-        "Confirma emailul",
+        "Confirmă emailul",
+        "Verifică adresa de email.",
+        "Apasă pe buton pentru a activa contul și pentru a păstra aplicația curată de conturi false.",
+        "Confirmă emailul",
         verification_url,
         [
-            "Confirmarea dureaza cateva secunde.",
-            "Dupa confirmare poti intra in cont si scana produse.",
-            "Linkul expira in 48 de ore.",
+            "Confirmarea durează câteva secunde.",
+            "După confirmare poți intra în cont și scana produse.",
+            "Linkul expiră în 48 de ore.",
         ],
     )
     sent = send_transactional_email(
         user.email,
-        "Confirma emailul pentru Ce aleg?",
+        "Confirmă emailul pentru Ce aleg?",
         text_body,
         html_body,
     )
@@ -873,24 +873,24 @@ def send_password_reset_email(user):
     text_body = (
         f"Salut, {user.name}!\n\n"
         "Ai cerut resetarea parolei pentru contul Ce aleg?.\n"
-        f"Schimba parola aici: {reset_url}\n\n"
-        "Linkul expira in 60 de minute. Daca nu ai cerut resetarea, ignora acest email.\n"
+        f"Schimbă parola aici: {reset_url}\n\n"
+        "Linkul expiră în 60 de minute. Dacă nu ai cerut resetarea, ignoră acest email.\n"
     )
     html_body = render_brand_email(
         "Securitate cont",
-        "Schimba parola in siguranta.",
-        "Am primit o cerere de resetare pentru contul tau. Foloseste linkul de mai jos daca tu ai cerut schimbarea parolei.",
-        "Schimba parola",
+        "Schimbă parola în siguranță.",
+        "Am primit o cerere de resetare pentru contul tău. Folosește linkul de mai jos dacă tu ai cerut schimbarea parolei.",
+        "Schimbă parola",
         reset_url,
         [
-            "Linkul expira in 60 de minute.",
-            "Daca nu ai cerut resetarea, ignora acest email.",
-            "Parola ta veche nu este trimisa si nu poate fi vazuta.",
+            "Linkul expiră în 60 de minute.",
+            "Dacă nu ai cerut resetarea, ignoră acest email.",
+            "Parola ta veche nu este trimisă și nu poate fi văzută.",
         ],
     )
     sent = send_transactional_email(
         user.email,
-        "Resetare parola Ce aleg?",
+        "Resetare parolă Ce aleg?",
         text_body,
         html_body,
     )
@@ -935,28 +935,28 @@ def send_account_deletion_email(user):
     deletion_url = f"{FRONTEND_PUBLIC_URL}/delete-account?token={token}"
     text_body = (
         f"Salut, {user.name}!\n\n"
-        "Ai cerut stergerea contului Ce aleg?.\n"
-        "Daca tu ai facut cererea, confirma stergerea aici:\n"
+        "Ai cerut ștergerea contului Ce aleg?.\n"
+        "Dacă tu ai făcut cererea, confirmă ștergerea aici:\n"
         f"{deletion_url}\n\n"
-        "Linkul expira in 24 de ore. Daca nu ai cerut stergerea, ignora acest email "
-        "si contul tau ramane activ.\n"
+        "Linkul expiră în 24 de ore. Dacă nu ai cerut ștergerea, ignoră acest email "
+        "și contul tău rămâne activ.\n"
     )
     html_body = render_brand_email(
-        "Confirmare necesara",
-        "Confirma stergerea contului.",
-        "Stergerea contului elimina istoricul, cosul, favoritele si contributiile tale dupa confirmare.",
-        "Sterge contul meu",
+        "Confirmare necesară",
+        "Confirmă ștergerea contului.",
+        "Ștergerea contului elimină istoricul, coșul, favoritele și contribuțiile tale după confirmare.",
+        "Șterge contul meu",
         deletion_url,
         [
-            "Linkul expira in 24 de ore.",
-            "Daca nu ai cerut stergerea, ignora acest email.",
-            "Contul ramane activ pana confirmi din email.",
+            "Linkul expiră în 24 de ore.",
+            "Dacă nu ai cerut ștergerea, ignoră acest email.",
+            "Contul rămâne activ până confirmi din email.",
         ],
         tone="danger",
     )
     sent = send_transactional_email(
         user.email,
-        "Confirmare stergere cont Ce aleg?",
+        "Confirmare ștergere cont Ce aleg?",
         text_body,
         html_body,
     )
@@ -1027,7 +1027,7 @@ def cancel_subscription_before_account_deletion(user):
         return True, None
 
     if not configure_stripe():
-        return False, "Abonamentul Stripe nu a putut fi anulat momentan. Incearca din nou sau contacteaza suportul."
+        return False, "Abonamentul Stripe nu a putut fi anulat momentan. Încearcă din nou sau contactează suportul."
 
     try:
         cancel_method = getattr(stripe.Subscription, "cancel", None)
@@ -1338,20 +1338,20 @@ def get_publication_readiness():
 
         if PRODUCTION_MODE and "cealeg.shop" not in FRONTEND_PUBLIC_URL:
             warnings.append(
-                "FRONTEND_PUBLIC_URL nu pare sa fie domeniul public cealeg.shop. Verifica linkurile din emailuri si Stripe."
+                "FRONTEND_PUBLIC_URL nu pare să fie domeniul public cealeg.shop. Verifică linkurile din emailuri și Stripe."
             )
     elif payment_provider in {"", "manual", "mock", "none"}:
         warnings.append("Platile reale nu sunt conectate. Pro/Family se pot activa doar manual din admin.")
 
     if not env_flag("ENABLE_OPENAI_VISION", False):
-        warnings.append("Vision cloud este oprit. Produsul ramane functional prin barcode, OCR local si Open Food Facts.")
+        warnings.append("Vision cloud este oprit. Produsul rămâne funcțional prin barcode, OCR local și Open Food Facts.")
 
     if not SUPABASE_URL or not SUPABASE_SERVICE_ROLE_KEY:
-        warnings.append("Storage Supabase nu este complet configurat; imaginile contribuite pot ramane locale.")
+        warnings.append("Storage Supabase nu este complet configurat; imaginile contribuite pot rămâne locale.")
 
     if not is_email_configured():
         warnings.append(
-            "Emailurile tranzactionale nu sunt configurate; welcome/reset vor merge doar in mod local de test."
+            "Emailurile tranzacționale nu sunt configurate; welcome/reset vor merge doar în mod local de test."
         )
     elif PRODUCTION_MODE and EMAIL_PROVIDER == "brevo" and str(os.environ.get("EMAIL_FROM", "")).lower().endswith("@gmail.com"):
         warnings.append(
@@ -2057,7 +2057,7 @@ def enforce_access_controls():
         return None
 
     if not rate_limit("global", GLOBAL_RATE_LIMIT, GLOBAL_RATE_LIMIT_WINDOW):
-        return jsonify({"error": "Prea multe cereri. Reincearca in cateva secunde."}), 429
+        return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
     payload_error = validate_request_payload()
 
@@ -2086,12 +2086,12 @@ def enforce_access_controls():
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
     if endpoint == "translate_text" and not rate_limit(endpoint, 120, 60):
-        return jsonify({"error": "Prea multe traduceri. Reincearca in cateva secunde."}), 429
+        return jsonify({"error": "Prea multe traduceri. Reîncearcă în câteva secunde."}), 429
 
     if endpoint in {"ai_extract_product_info", "get_open_food_facts_alternatives"} and not rate_limit(
         endpoint, 30, 60
     ):
-        return jsonify({"error": "Prea multe cereri. Reincearca in cateva secunde."}), 429
+        return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
     needs_auth = (
         endpoint in AUTH_ENDPOINTS
@@ -2129,13 +2129,13 @@ def enforce_access_controls():
         data = request.get_json(silent=True) or {}
 
         if data.get("user_id") and not require_same_user(data["user_id"]):
-            return jsonify({"error": "Nu poti modifica datele altui cont."}), 403
+            return jsonify({"error": "Nu poți modifica datele altui cont."}), 403
 
     if endpoint == "add_product_submission" and not user.is_admin:
         user_id = request.form.get("user_id")
 
         if user_id and not require_same_user(user_id):
-            return jsonify({"error": "Nu poti trimite produse pentru alt cont."}), 403
+            return jsonify({"error": "Nu poți trimite produse pentru alt cont."}), 403
 
     return None
 
@@ -2217,7 +2217,7 @@ def handle_internal_server_error(error):
         exc_info=error,
     )
     return jsonify({
-        "error": "A aparut o eroare interna. Reincearca in cateva momente.",
+        "error": "A apărut o eroare internă. Reîncearcă în câteva momente.",
         "requestId": request_id,
     }), 500
 
@@ -2375,8 +2375,8 @@ PRODUCTS_DB_SEED = [
 # =========================
 
 DEFAULT_LIMITED_PRODUCT_REASON = (
-    "Informatiile nutritionale sunt limitate. Verifica zaharul, caloriile si "
-    "ingredientele de pe eticheta, apoi compara produsul cu variante similare."
+    "Informațiile nutriționale sunt limitate. Verifică zahărul, caloriile și "
+    "ingredientele de pe etichetă, apoi compară produsul cu variante similare."
 )
 
 
@@ -3959,9 +3959,9 @@ def generate_product_reason(category, calories, protein, sugar, fat, ingredients
 
     if not reasons:
         return (
-            "Produsul are informatii nutritionale limitate. Verifica zaharul, "
-            "caloriile si ingredientele de pe eticheta, apoi compara-l cu produse "
-            "din aceeasi categorie."
+            "Produsul are informații nutriționale limitate. Verifică zahărul, "
+            "caloriile și ingredientele de pe etichetă, apoi compară-l cu produse "
+            "din aceeași categorie."
         )
 
     sentence = "Produsul " + ", ".join(reasons) + "."
@@ -4245,7 +4245,7 @@ def send_admin_email_test():
     if not is_email_configured():
         return jsonify({
             "sent": False,
-            "error": "Emailul nu este configurat. Completeaza EMAIL_PROVIDER, EMAIL_FROM si cheia providerului ales.",
+            "error": "Emailul nu este configurat. Completează EMAIL_PROVIDER, EMAIL_FROM și cheia providerului ales.",
             "provider": EMAIL_PROVIDER,
             "from": EMAIL_FROM,
             "to": to_email,
@@ -4256,18 +4256,18 @@ def send_admin_email_test():
         "Test email Ce aleg?",
         (
             "Salut!\n\n"
-            "Emailurile tranzactionale Ce aleg? functioneaza.\n"
+            "Emailurile tranzacționale Ce aleg? funcționează.\n"
             f"Expeditor: {EMAIL_FROM_NAME} <{EMAIL_FROM}>\n"
             f"Reply-to: {get_email_reply_to() or EMAIL_FROM}\n"
             f"Destinatar test: {to_email}\n\n"
-            "Resetarea parolei, confirmarea emailului si mesajele de cont pot fi trimise din cloud.\n"
+            "Resetarea parolei, confirmarea emailului și mesajele de cont pot fi trimise din cloud.\n"
         ),
         render_brand_email(
             "Test email",
-            "Emailurile Ce aleg? functioneaza.",
+            "Emailurile Ce aleg? funcționează.",
             (
                 "Acesta este un test trimis din panoul de administrare. "
-                "Daca il vezi in inbox, Brevo, domeniul si forwardingul sunt configurate corect."
+                "Dacă îl vezi în inbox, Brevo, domeniul și forwardingul sunt configurate corect."
             ),
             "Deschide site-ul",
             FRONTEND_PUBLIC_URL,
@@ -4291,7 +4291,7 @@ def send_admin_email_test():
 
     return jsonify({
         "sent": True,
-        "message": f"Email de test trimis catre {to_email}. Verifica inboxul si Spam.",
+        "message": f"Email de test trimis către {to_email}. Verifică inboxul și Spam.",
         "from": EMAIL_FROM,
         "to": to_email,
     })
@@ -4376,7 +4376,7 @@ def register():
     accepted_terms = bool(data.get("acceptedTerms"))
 
     if not name or not email or not password:
-        return jsonify({"error": "Numele, emailul si parola sunt obligatorii."}), 400
+        return jsonify({"error": "Numele, emailul și parola sunt obligatorii."}), 400
 
     if not age_confirmed:
         return jsonify({
@@ -4385,14 +4385,14 @@ def register():
 
     if not accepted_terms:
         return jsonify({
-            "error": "Trebuie sa accepti Termenii si Politica de confidentialitate."
+            "error": "Trebuie să accepți Termenii și Politica de confidențialitate."
         }), 400
 
     password_strength = validate_password_strength(password)
 
     if not password_strength["isValid"]:
         return jsonify({
-            "error": f"Parola trebuie sa aiba minimum {PASSWORD_MIN_LENGTH} caractere.",
+            "error": f"Parola trebuie să aibă minimum {PASSWORD_MIN_LENGTH} caractere.",
             "passwordStrength": password_strength,
         }), 400
 
@@ -4425,7 +4425,7 @@ def register():
         email_status["devVerificationLink"] = verification_url
 
     response = jsonify({
-        "message": "Cont creat. Verifica emailul ca sa activezi contul.",
+        "message": "Cont creat. Verifică emailul ca să activezi contul.",
         "user": user_to_dict(new_user),
         "emailStatus": email_status,
     })
@@ -4480,7 +4480,7 @@ def resend_email_verification():
             dev_verification_link = verification_url
 
     response = {
-        "message": "Daca exista un cont neconfirmat cu acest email, trimitem un nou link de confirmare.",
+        "message": "Dacă există un cont neconfirmat cu acest email, trimitem un nou link de confirmare.",
     }
 
     if dev_verification_link:
@@ -4497,12 +4497,12 @@ def login():
     password = data.get("password", "")
 
     if not email or not password:
-        return jsonify({"error": "Emailul si parola sunt obligatorii."}), 400
+        return jsonify({"error": "Emailul și parola sunt obligatorii."}), 400
 
     user = User.query.filter_by(email=email).first()
 
     if not user or not check_password_hash(user.password_hash, password):
-        return jsonify({"error": "Email sau parola gresita."}), 401
+        return jsonify({"error": "Email sau parolă greșită."}), 401
 
     if not user.email_verified:
         return jsonify({
@@ -4540,7 +4540,7 @@ def forgot_password():
             dev_reset_link = reset_url
 
     response = {
-        "message": "Daca exista un cont cu acest email, vei primi un link pentru resetarea parolei.",
+        "message": "Dacă există un cont cu acest email, vei primi un link pentru resetarea parolei.",
     }
 
     if dev_reset_link:
@@ -4556,7 +4556,7 @@ def reset_password():
     password = data.get("password", "")
 
     if not token or not password:
-        return jsonify({"error": "Tokenul si parola noua sunt obligatorii."}), 400
+        return jsonify({"error": "Tokenul și parola nouă sunt obligatorii."}), 400
 
     user = verify_password_reset_token(token)
 
@@ -4567,7 +4567,7 @@ def reset_password():
 
     if not password_strength["isValid"]:
         return jsonify({
-            "error": f"Parola trebuie sa aiba minimum {PASSWORD_MIN_LENGTH} caractere.",
+            "error": f"Parola trebuie să aibă minimum {PASSWORD_MIN_LENGTH} caractere.",
             "passwordStrength": password_strength,
         }), 400
 
@@ -4578,7 +4578,7 @@ def reset_password():
     db.session.commit()
 
     response = jsonify({
-        "message": "Parola a fost schimbata. Te-am autentificat automat.",
+        "message": "Parola a fost schimbată. Te-am autentificat automat.",
         "user": user_to_dict(user),
     })
     return set_auth_cookie(response, user)
@@ -4591,12 +4591,12 @@ def request_account_deletion():
 
     if not sent and PRODUCTION_MODE:
         return jsonify({
-            "error": "Emailul de confirmare nu a putut fi trimis momentan. Incearca din nou mai tarziu.",
+            "error": "Emailul de confirmare nu a putut fi trimis momentan. Încearcă din nou mai târziu.",
             "emailConfigured": is_email_configured(),
         }), 502
 
     response = {
-        "message": "Ti-am trimis un email cu linkul de confirmare pentru stergerea contului.",
+        "message": "Ți-am trimis un email cu linkul de confirmare pentru ștergerea contului.",
         "sent": sent,
         "email": user.email,
         "emailConfigured": is_email_configured(),
@@ -4605,7 +4605,7 @@ def request_account_deletion():
     if not sent and not PRODUCTION_MODE:
         response["devDeletionLink"] = deletion_url
         response["message"] = (
-            "Emailul nu a putut fi trimis in mediul local. Foloseste linkul de test pentru confirmare."
+            "Emailul nu a putut fi trimis în mediul local. Folosește linkul de test pentru confirmare."
         )
 
     return jsonify(response)
@@ -4622,7 +4622,7 @@ def confirm_account_deletion():
     user = verify_account_deletion_token(token)
 
     if not user:
-        return jsonify({"error": "Linkul de stergere este invalid sau a expirat."}), 400
+        return jsonify({"error": "Linkul de ștergere este invalid sau a expirat."}), 400
 
     canceled, cancel_error = cancel_subscription_before_account_deletion(user)
 
@@ -4635,11 +4635,11 @@ def confirm_account_deletion():
         db.session.rollback()
         app.logger.exception("Account deletion failed: %s", error)
         return jsonify({
-            "error": "Contul nu a putut fi sters momentan. Incearca din nou mai tarziu.",
+            "error": "Contul nu a putut fi șters momentan. Încearcă din nou mai târziu.",
         }), 500
 
     response = jsonify({
-        "message": "Contul tau si datele personale asociate au fost sterse.",
+        "message": "Contul tău și datele personale asociate au fost șterse.",
     })
     response.delete_cookie(AUTH_COOKIE_NAME, path="/")
     return response
@@ -4923,7 +4923,7 @@ def start_checkout():
         "mode": "manual",
         "plan": plan,
         "billingInterval": billing_interval,
-        "message": "Am notat alegerea ta. Verifica datele de plata sau activeaza planul din administrare.",
+        "message": "Am notat alegerea ta. Verifică datele de plată sau activează planul din administrare.",
         "nextStep": "prepare_plan_activation",
     })
 
@@ -5092,7 +5092,7 @@ def delete_admin_product(product_id):
 
     db.session.delete(product)
     db.session.commit()
-    return jsonify({"message": "Produs sters din catalog."})
+    return jsonify({"message": "Produs șters din catalog."})
 
 
 @app.route("/admin/users/<int:user_id>/plan", methods=["PATCH"])
@@ -5926,7 +5926,7 @@ def get_submission_image(filename):
     image_path = f"/uploads/submissions/{filename}"
 
     if not user_can_access_submission_image(image_path):
-        return jsonify({"error": "Nu poti accesa aceasta imagine."}), 403
+        return jsonify({"error": "Nu poți accesa această imagine."}), 403
 
     return send_from_directory(SUBMISSIONS_FOLDER, filename)
 
@@ -5942,7 +5942,7 @@ def get_supabase_submission_image(object_path):
     image_path = f"/uploads/supabase-submissions/{object_path}"
 
     if not user_can_access_submission_image(image_path):
-        return jsonify({"error": "Nu poti accesa aceasta imagine."}), 403
+        return jsonify({"error": "Nu poți accesa această imagine."}), 403
 
     if not supabase_storage_enabled():
         return jsonify({"error": "Storage indisponibil."}), 503

@@ -300,22 +300,22 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Testeaza inregistrare, login, scanare, cos, plata si stergere cont
 - [x] Cumpara si conecteaza domeniul
 - [x] Verifica textele legale si datele de contact de baza
-- [ ] Creeaza produsele/preturile Stripe live si pune cheile `sk_live_` + price ID-urile live in Render
-- [ ] Configureaza webhook Stripe live catre `https://cealeg-api.onrender.com/billing/stripe/webhook`
-- [ ] Verifica sender/domeniu Brevo pentru `cealeg.shop` cu SPF/DKIM
-- [ ] Adauga `https://www.cealeg.shop/sitemap.xml` in Google Search Console
+- [x] Creeaza produsele/preturile Stripe live si pune cheile `sk_live_` + price ID-urile live in Render
+- [x] Configureaza webhook Stripe live catre `https://cealeg-api.onrender.com/billing/stripe/webhook`
+- [x] Verifica sender/domeniu Brevo pentru `cealeg.shop` cu SPF/DKIM
+- [x] Adauga `https://www.cealeg.shop/sitemap.xml` in Google Search Console
 - [ ] Optional: creeaza GA4 si seteaza `NEXT_PUBLIC_GA_ID` in Vercel
 - [ ] Test final pe telefon pe domeniul public: cont nou, confirmare email, login, scanare, alternative, cos, favorite, plata, resetare parola, stergere cont
 
 ### Blocante pentru lansare
 
-- [ ] `/readiness` nu raporteaza blocante cu Stripe live, nu test
+- [x] `/readiness` nu raporteaza blocante cu Stripe live, nu test
 - [x] `APP_ENV=production`
 - [x] `COOKIE_SECURE=true`
 - [x] Niciun URL localhost in variabilele de productie
 - [x] Buildul frontend trece
 - [x] Stripe test functioneaza si webhookul actualizeaza planurile
-- [ ] Stripe live functioneaza si webhookul actualizeaza planurile
+- [x] Stripe live functioneaza si webhookul actualizeaza planurile
 - [x] Emailurile ajung in inbox
 - [x] Scanarea este testata pe telefon prin HTTPS
 
@@ -362,6 +362,18 @@ Render /health:         HTTP 200
 Render /readiness:      HTTP 401 fara login, asteptat pentru detalii sensibile
 Vercel proxy readiness: HTTP 401 fara login, backendul raspunde
 Catalog Supabase:       peste 16.000 produse raportate local
+```
+
+## Stare verificata la 22 iunie 2026
+
+```text
+Stripe live:            OK, plata reala confirma planul
+Brevo domeniu:          OK, SPF/DKIM verzi in Brevo
+Google Search Console:  OK, sitemap trimis cu succes
+Render readiness:       ready=true
+Emailuri tranzactionale: diacritice corectate in template-uri
+Frontend lint:          OK
+Backend compile:        OK
 ```
 
 Brevo a blocat initial serverul Render pentru IP neautorizat. IP-ul folosit la
