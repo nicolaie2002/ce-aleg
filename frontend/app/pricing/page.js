@@ -19,7 +19,9 @@ const fallbackPlans = {
     features: [
       "5 scanari pe saptamana",
       "2 alternative pentru fiecare produs",
-      "verdict rapid si istoric de baza",
+      "scanare cod de bare si cautare manuala",
+      "verdict rapid",
+      "istoric de baza",
     ],
   },
   pro: {
@@ -29,9 +31,11 @@ const fallbackPlans = {
     weeklyScanLimit: null,
     features: [
       "scanari nelimitate",
-      "3 alternative imediat + afiseaza mai multe",
+      "3 alternative initiale plus afiseaza mai multe",
       "cautare dupa preferintele tale",
       "istoric complet",
+      "cos si favorite salvate",
+      "asistent vizual AI in curand",
     ],
   },
   family: {
@@ -41,8 +45,14 @@ const fallbackPlans = {
     weeklyScanLimit: null,
     features: [
       "scanari nelimitate",
+      "3 alternative initiale plus afiseaza mai multe",
+      "cautare dupa preferintele tale",
+      "istoric complet",
+      "cos si favorite salvate",
       "profiluri pentru familie",
-      "liste comune de cumparaturi",
+      "preferinte separate pe profil",
+      "cos separat pentru fiecare profil",
+      "asistent vizual AI in curand",
     ],
   },
 };
@@ -56,6 +66,18 @@ const featureLabels = {
     ro: "2 alternative pentru fiecare produs",
     en: "2 alternatives for each product",
   },
+  "scanare cod de bare si cautare manuala": {
+    ro: "scanare cod de bare și căutare manuală",
+    en: "barcode scanning and manual search",
+  },
+  "verdict rapid": {
+    ro: "verdict rapid pentru produs",
+    en: "quick product verdict",
+  },
+  "istoric de baza": {
+    ro: "istoric de bază",
+    en: "basic history",
+  },
   "verdict rapid si istoric de baza": {
     ro: "verdict rapid și istoric de bază",
     en: "quick verdict and basic history",
@@ -65,19 +87,27 @@ const featureLabels = {
     en: "unlimited scans",
   },
   "asistent live la raft": {
-    ro: "asistent live Pro",
-    en: "live assistant Pro",
+    ro: "asistent vizual AI în curând",
+    en: "AI visual assistant coming soon",
   },
   "asistent smart live": {
-    ro: "asistent live Pro",
-    en: "live assistant Pro",
+    ro: "asistent vizual AI în curând",
+    en: "AI visual assistant coming soon",
   },
   "asistent live Pro": {
-    ro: "asistent live Pro",
-    en: "live assistant Pro",
+    ro: "asistent vizual AI în curând",
+    en: "AI visual assistant coming soon",
+  },
+  "asistent vizual AI in curand": {
+    ro: "asistent vizual AI în curând",
+    en: "AI visual assistant coming soon",
+  },
+  "3 alternative initiale plus afiseaza mai multe": {
+    ro: "3 alternative inițiale + afișează mai multe",
+    en: "3 instant alternatives + show more",
   },
   "3 alternative imediat + afiseaza mai multe": {
-    ro: "3 alternative imediat + afișează mai multe",
+    ro: "3 alternative inițiale + afișează mai multe",
     en: "3 instant alternatives + show more",
   },
   "cautare dupa preferintele tale": {
@@ -88,13 +118,29 @@ const featureLabels = {
     ro: "istoric complet",
     en: "full history",
   },
+  "cos si favorite salvate": {
+    ro: "coș și favorite salvate",
+    en: "saved cart and favorites",
+  },
   "mai multe alternative": {
     ro: "mai multe alternative",
     en: "more alternatives",
   },
+  "tot ce include Pro": {
+    ro: "tot ce include Pro",
+    en: "everything included in Pro",
+  },
   "profiluri pentru familie": {
     ro: "profiluri pentru familie",
     en: "family profiles",
+  },
+  "preferinte separate pe profil": {
+    ro: "preferințe separate pe profil",
+    en: "separate preferences per profile",
+  },
+  "cos separat pentru fiecare profil": {
+    ro: "coș separat pentru fiecare profil",
+    en: "separate cart for each profile",
   },
   "preferinte separate": {
     ro: "preferințe separate",
@@ -423,8 +469,8 @@ export default function PricingPage() {
             </h1>
             <p className="mt-5 text-lg leading-8 text-gray-300">
               {pick(
-                "Scanezi produsul, vezi verdictul și primești alternative clare. Free e perfect pentru început. Pro deblochează căutarea după preferințe și mai multe recomandări.",
-                "Scan a product, see the verdict and get clear alternatives. Free is great to start. Pro unlocks preference search and more recommendations."
+                "Scanezi produsul, vezi verdictul și primești alternative clare. Free acoperă primele verificări, Pro deblochează recomandări nelimitate și căutare după preferințe, iar Family adaugă profiluri separate pentru casă.",
+                "Scan a product, see the verdict and get clear alternatives. Free covers the first checks, Pro unlocks unlimited recommendations and preference search, while Family adds separate household profiles."
               )}
             </p>
           </div>
@@ -440,8 +486,8 @@ export default function PricingPage() {
                 </p>
                 <p className="mt-2 text-sm leading-6 text-gray-300">
                   {pick(
-                    "Free arată primele recomandări bune. Pro te lasă să ceri exact ce cauți: mai ieftin, fără zahăr, mai multă proteină sau ingrediente mai curate.",
-                    "Free shows the first good picks. Pro lets you ask for exactly what you want: cheaper, less sugar, more protein or cleaner ingredients."
+                    "Alegi lunar sau anual. Identificarea vizuală cu AI vine în curând pentru Pro și Family.",
+                    "Choose monthly or yearly. AI visual identification is coming soon for Pro and Family."
                   )}
                 </p>
               </div>

@@ -348,7 +348,9 @@ PLAN_CATALOG = {
         "features": [
             "5 scanari pe saptamana",
             "2 alternative pentru fiecare produs",
-            "verdict rapid si istoric de baza",
+            "scanare cod de bare si cautare manuala",
+            "verdict rapid",
+            "istoric de baza",
         ],
     },
     "pro": {
@@ -359,10 +361,11 @@ PLAN_CATALOG = {
         "weeklyScanLimit": None,
         "features": [
             "scanari nelimitate",
-            "asistent live Pro",
-            "3 alternative imediat + afiseaza mai multe",
+            "3 alternative initiale plus afiseaza mai multe",
             "cautare dupa preferintele tale",
             "istoric complet",
+            "cos si favorite salvate",
+            "asistent vizual AI in curand",
         ],
     },
     "family": {
@@ -373,9 +376,14 @@ PLAN_CATALOG = {
         "weeklyScanLimit": None,
         "features": [
             "scanari nelimitate",
+            "3 alternative initiale plus afiseaza mai multe",
+            "cautare dupa preferintele tale",
+            "istoric complet",
+            "cos si favorite salvate",
             "profiluri pentru familie",
-            "preferinte separate",
-            "liste comune de cumparaturi",
+            "preferinte separate pe profil",
+            "cos separat pentru fiecare profil",
+            "asistent vizual AI in curand",
         ],
     },
 }

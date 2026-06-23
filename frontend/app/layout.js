@@ -25,7 +25,7 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://www.cealeg.shop";
 const siteName = "Ce aleg?";
 const siteDescription =
   "Scanează codul de bare al unui produs, vezi rapid verdictul și compară alternative mai bune pentru bugetul și preferințele tale.";
-const socialImage = "/opengraph-image.png";
+const socialImage = "/opengraph-image.png?v=20260623";
 
 export const metadata = {
   metadataBase: new URL(siteUrl),
@@ -57,13 +57,13 @@ export const metadata = {
   icons: {
     icon: [
       {
-        url: "/favicon.ico",
-        sizes: "any",
-      },
-      {
         url: "/icon.png",
         sizes: "512x512",
         type: "image/png",
+      },
+      {
+        url: "/favicon.ico",
+        sizes: "any",
       },
     ],
     apple: [
@@ -73,7 +73,7 @@ export const metadata = {
         type: "image/png",
       },
     ],
-    shortcut: ["/favicon.ico"],
+    shortcut: ["/icon.png"],
   },
   manifest: "/manifest.webmanifest",
   openGraph: {
@@ -121,6 +121,7 @@ const structuredData = {
   description: siteDescription,
   inLanguage: ["ro-RO", "en"],
   image: `${siteUrl}/opengraph-image.png`,
+  thumbnailUrl: `${siteUrl}/opengraph-image.png`,
   logo: `${siteUrl}/icon.png`,
   offers: [
     {

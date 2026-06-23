@@ -206,8 +206,8 @@ export default function LiveAssistantPage() {
               plan,
             });
             setMessage(pick(
-              "Asistentul live este inclus în Pro și Family. Pe Free poți folosi scanarea codului de bare.",
-              "The live assistant is included in Pro and Family. On Free, you can use barcode scanning."
+              "AI vizual va fi inclus în Pro și Family. Pe Free poți folosi scanarea codului de bare.",
+              "AI visual recognition will be included in Pro and Family. On Free, you can use barcode scanning."
             ));
           }
         })
@@ -235,8 +235,8 @@ export default function LiveAssistantPage() {
         plan: currentPlan || "free",
       });
       setMessage(pick(
-        "Asistentul live este disponibil in Pro si Family. Scanarea codului de bare ramane disponibila pe Free.",
-        "The live assistant is available in Pro and Family. Barcode scanning remains available on Free."
+        "Scanarea ghidată este disponibilă în Pro și Family. Scanarea codului de bare rămâne disponibilă pe Free.",
+        "Guided scanning is available in Pro and Family. Barcode scanning remains available on Free."
       ));
       return;
     }
@@ -391,8 +391,8 @@ export default function LiveAssistantPage() {
         plan: currentPlan || "free",
       });
       setMessage(pick(
-        "Asistentul live este disponibil in Pro si Family. Scanarea codului de bare ramane disponibila pe Free.",
-        "The live assistant is available in Pro and Family. Barcode scanning remains available on Free."
+        "Scanarea ghidată este disponibilă în Pro și Family. Scanarea codului de bare rămâne disponibilă pe Free.",
+        "Guided scanning is available in Pro and Family. Barcode scanning remains available on Free."
       ));
       return;
     }
@@ -609,13 +609,13 @@ export default function LiveAssistantPage() {
         <div className="flex flex-col gap-4 border-b border-white/10 pb-7 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="flex items-center gap-2 text-sm font-bold text-cyan-200">
-              <Sparkles size={16} /> {pick("Asistent vizual Pro", "Visual assistant Pro")}
+              <Sparkles size={16} /> {pick("AI vizual în curând", "AI visual coming soon")}
             </p>
             <h1 className="mt-3 max-w-3xl text-4xl font-black md:text-5xl">
-              {pick("Asistentul de cumpărături cu cameră live.", "The shopping assistant with a live camera.")}
+              {pick("Scanare ghidată acum, identificare AI în curând.", "Guided scanning now, AI identification coming soon.")}
             </h1>
             <p className="mt-3 max-w-2xl text-gray-300">
-              {pick("Camera identifică produsul prin codul de bare și pregătește analiza potrivită pentru magazinul și preferințele tale.", "The camera identifies the product through its barcode and prepares the right analysis for your store and preferences.")}
+              {pick("Camera folosește codul de bare pentru rezultate precise. Identificarea după ambalaj va fi disponibilă pentru Pro și Family când serviciul AI este activ.", "The camera uses the barcode for precise results. Package recognition will be available for Pro and Family when the AI service is active.")}
             </p>
           </div>
         </div>
@@ -631,8 +631,8 @@ export default function LiveAssistantPage() {
                     {isCheckingBilling
                       ? pick("Verificam planul tau...", "Checking your plan...")
                       : pick(
-                          "Asistentul live este inclus în Pro și Family.",
-                          "The live assistant is included in Pro and Family."
+                          "AI vizual va fi inclus în Pro și Family.",
+                          "AI visual recognition will be included in Pro and Family."
                         )}
                   </p>
                   {!isCheckingBilling && (
@@ -728,14 +728,14 @@ export default function LiveAssistantPage() {
               <section className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm leading-6 text-yellow-100">
                 <p className="font-bold text-yellow-200">
                   {billingGate.code === "paid_plan_required"
-                    ? pick("Asistent live inclus în Pro", "Live assistant included in Pro")
+                    ? pick("AI vizual în curând pentru Pro și Family", "AI visual coming soon for Pro and Family")
                     : pick("Limita gratuita a fost atinsa", "Free limit reached")}
                 </p>
                 <p className="mt-2">
                   {billingGate.code === "paid_plan_required"
                     ? pick(
-                        "Foloseste scanarea codului de bare pe Free sau treci la Pro/Family pentru camera live.",
-                        "Use barcode scanning on Free or switch to Pro/Family for the live camera."
+                        "Pe Free poți folosi scanarea codului de bare. Identificarea după ambalaj va fi disponibilă pentru Pro și Family.",
+                        "On Free, use barcode scanning. Package recognition will be available for Pro and Family."
                       )
                     : pick(
                     "Treci la Pro pentru scanări nelimitate.",

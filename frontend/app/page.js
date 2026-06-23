@@ -79,10 +79,10 @@ export default function Home() {
     },
     {
       icon: Camera,
-      label: pick("Asistent vizual Pro", "Visual assistant Pro"),
+      label: pick("Asistent vizual AI în curând", "AI visual assistant coming soon"),
       detail: pick(
-        "Cameră live pentru scanare ghidată și recomandări potrivite planurilor Pro și Family.",
-        "Live camera for guided scanning and recommendations included in Pro and Family."
+        "Identificarea produsului după ambalaj va fi activată pentru Pro și Family când serviciul AI este disponibil.",
+        "Package-based product identification will be enabled for Pro and Family when the AI service is available."
       ),
     },
     {
@@ -181,7 +181,7 @@ export default function Home() {
                   className="ce-hero-secondary-action inline-flex items-center justify-center gap-2 rounded-lg border border-white/18 bg-black/35 px-6 py-4 font-bold text-white backdrop-blur hover:-translate-y-0.5 hover:bg-white/10"
                 >
                   <Camera className="h-5 w-5" />
-                  {pick("Asistent vizual Pro", "Visual assistant Pro")}
+                  {pick("AI vizual în curând", "AI visual coming soon")}
                 </Link>
                 <Link
                   href="/pricing"
