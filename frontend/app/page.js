@@ -23,7 +23,6 @@ import { ThemeSwitcher } from "./components/ThemeSwitcher";
 import { InteractiveSurface } from "./components/InteractiveSurface";
 import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
 import { useLocale } from "./components/LocaleProvider";
-import { API_URL } from "./config";
 
 export default function Home() {
   const { pick } = useLocale();
@@ -36,9 +35,13 @@ export default function Home() {
     : "/login?next=/barcode-scan";
 
   useEffect(() => {
-    fetch(`${API_URL}/auth/me`)
-      .then((response) => setIsAuthenticated(response.ok))
-      .catch(() => setIsAuthenticated(false));
+    queueMicrotask(() => {
+      try {
+        setIsAuthenticated(Boolean(window.localStorage.getItem("cealeg_user")));
+      } catch {
+        setIsAuthenticated(false);
+      }
+    });
   }, []);
 
   const steps = [
