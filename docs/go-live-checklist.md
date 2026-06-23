@@ -285,6 +285,8 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Cache server pentru cautari populare dupa text
 - [x] Sitemap si robots pentru Google Search Console
 - [x] Suport optional Google Analytics prin `NEXT_PUBLIC_GA_ID`
+- [x] Billing: schimbarea planului este blocata cat timp exista un abonament Pro/Family activ
+- [x] Billing: un plan se activeaza doar dupa confirmarea Stripe, prin Checkout/webhook
 
 ### De facut de tine
 
@@ -307,6 +309,7 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Optional: creeaza GA4 si seteaza `NEXT_PUBLIC_GA_ID` in Vercel
 - [x] Banner de consimțământ pentru Google Analytics
 - [ ] Test final pe telefon pe domeniul public: cont nou, confirmare email, login, scanare, alternative, cos, favorite, plata, resetare parola, stergere cont
+- [ ] Test final abonamente: cont cu Pro activ -> incearca Family -> trebuie sa afiseze data expirarii si sa nu activeze Family fara plata
 
 ### Blocante pentru lansare
 
@@ -317,6 +320,7 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Buildul frontend trece
 - [x] Stripe test functioneaza si webhookul actualizeaza planurile
 - [x] Stripe live functioneaza si webhookul actualizeaza planurile
+- [x] Stripe nu permite schimbarea Pro/Family fara Checkout nou sau portal Stripe
 - [x] Emailurile ajung in inbox
 - [x] Scanarea este testata pe telefon prin HTTPS
 
@@ -369,6 +373,7 @@ Catalog Supabase:       peste 16.000 produse raportate local
 
 ```text
 Stripe live:            OK, plata reala confirma planul
+Stripe plan lock:       OK, abonamentele active nu pot fi schimbate fara plata
 Brevo domeniu:          OK, SPF/DKIM verzi in Brevo
 Google Search Console:  OK, sitemap trimis cu succes
 Render readiness:       ready=true

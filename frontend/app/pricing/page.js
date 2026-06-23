@@ -110,12 +110,37 @@ function getFeatureLabel(feature, locale) {
   return featureLabels[feature]?.[locale] || feature;
 }
 
-function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPlan }) {
+function formatBillingDate(dateString, locale) {
+  if (!dateString) return "";
+
+  try {
+    return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ro-RO", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(new Date(dateString));
+  } catch {
+    return "";
+  }
+}
+
+function PlanCard({
+  id,
+  plan,
+  currentPlan,
+  billingCycle,
+  onChoose,
+  pick,
+  busyPlan,
+  isLockedByActiveSubscription,
+  lockedUntilLabel,
+}) {
   const isCurrent = currentPlan === id;
   const isFree = id === "free";
   const isPro = id === "pro";
   const isYearly = billingCycle === "yearly";
   const isBusy = busyPlan === `${id}:${billingCycle}`;
+  const isLocked = isLockedByActiveSubscription && !isCurrent;
   const displayPrice = isYearly ? plan.yearlyPrice : plan.monthlyPrice;
   const priceSuffix = isYearly ? pick("/ an", "/ year") : pick("/ lună", "/ month");
   const monthlyEquivalent =
@@ -171,10 +196,12 @@ function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPla
 
       <button
         onClick={() => onChoose(id, billingCycle)}
-        disabled={isCurrent || isBusy}
+        disabled={isCurrent || isBusy || isLocked}
         className={`mt-7 w-full rounded-lg px-4 py-3 font-black transition ${
           isCurrent
             ? "cursor-default border border-white/15 bg-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+            : isLocked
+              ? "cursor-not-allowed border border-white/10 bg-white/5 text-gray-400"
             : isBusy
               ? "cursor-wait bg-white/10 text-gray-400"
             : isFree
@@ -184,10 +211,14 @@ function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPla
       >
         {isBusy
           ? pick("Se deschide plata...", "Opening checkout...")
+          : isLocked
+          ? lockedUntilLabel
+            ? pick(`Disponibil după ${lockedUntilLabel}`, `Available after ${lockedUntilLabel}`)
+            : pick("Disponibil după expirare", "Available after expiry")
           : isCurrent
-          ? pick("Planul tau actual", "Current plan")
+          ? pick("Planul tău actual", "Current plan")
           : isFree
-            ? pick("Ramai pe Free", "Stay on Free")
+            ? pick("Rămâi pe Free", "Stay on Free")
             : isYearly
               ? pick("Alege anual", "Choose yearly")
               : pick("Alege lunar", "Choose monthly")}
@@ -197,7 +228,7 @@ function PlanCard({ id, plan, currentPlan, billingCycle, onChoose, pick, busyPla
 }
 
 export default function PricingPage() {
-  const { pick } = useLocale();
+  const { pick, locale } = useLocale();
   const [billing, setBilling] = useState(null);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState("info");
@@ -207,6 +238,12 @@ export default function PricingPage() {
   const plans = billing?.plans || fallbackPlans;
   const currentPlan = billing?.usage?.plan || "free";
   const subscription = billing?.subscription;
+  const subscriptionEndLabel = formatBillingDate(subscription?.currentPeriodEnd, locale);
+  const hasActivePaidSubscription =
+    ["pro", "family"].includes(currentPlan) &&
+    ["active", "trialing", "past_due"].includes(subscription?.status) &&
+    (!subscription?.currentPeriodEnd || new Date(subscription.currentPeriodEnd) > new Date());
+  const currentPlanName = plans[currentPlan]?.name || currentPlan;
   const canManageBilling =
     subscription?.provider === "stripe" && subscription?.hasCustomer;
 
@@ -270,6 +307,13 @@ export default function PricingPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
+        if (data.code === "active_subscription_exists") {
+          setMessageTone("info");
+          setMessage(data.error);
+          loadBillingStatus({ syncStripe: true });
+          return;
+        }
+
         throw new Error(
           data.error ||
             pick(
@@ -301,7 +345,7 @@ export default function PricingPage() {
       setMessage(
         data.message ||
           pick(
-            "Am notat alegerea ta. Verifica datele de plata sau contacteaza-ne pentru activare.",
+            "Am notat alegerea ta. Verifică datele de plată sau contactează-ne pentru activare.",
             "We saved your choice. Check payment settings or contact us for activation."
           )
       );
@@ -309,7 +353,7 @@ export default function PricingPage() {
       setMessageTone("error");
       setMessage(
         error.message ||
-          pick("A aparut o eroare la plata.", "A payment error occurred.")
+          pick("A apărut o eroare la plată.", "A payment error occurred.")
       );
     } finally {
       setBusyPlan("");
@@ -392,7 +436,7 @@ export default function PricingPage() {
               </span>
               <div>
                 <p className="font-black">
-                  {pick("Simplu pentru cumparator", "Simple for shoppers")}
+                  {pick("Simplu pentru cumpărător", "Simple for shoppers")}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-gray-300">
                   {pick(
@@ -421,7 +465,15 @@ export default function PricingPage() {
         {billing?.usage && (
           <div className="ce-usage-banner mt-7 rounded-lg border p-5">
             {billing.usage.isUnlimited
-              ? pick("Ai scanări nelimitate active.", "Unlimited scans are active.")
+              ? subscriptionEndLabel
+                ? pick(
+                    `Planul ${currentPlanName} este activ până la ${subscriptionEndLabel}.`,
+                    `${currentPlanName} is active until ${subscriptionEndLabel}.`
+                  )
+                : pick(
+                    `Planul ${currentPlanName} este activ.`,
+                    `${currentPlanName} is active.`
+                  )
               : pick(
                   `Ai folosit ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} scanări gratuite săptămâna aceasta.`,
                   `You used ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} free scans this week.`
@@ -468,7 +520,7 @@ export default function PricingPage() {
           </div>
           <span className="px-3 text-sm text-cyan-100">
             {billingCycle === "yearly"
-              ? pick("Platesti o data pe an.", "Pay once per year.")
+              ? pick("Plătești o dată pe an.", "Pay once per year.")
               : pick("Plătești lunar.", "Pay monthly.")}
           </span>
         </div>
@@ -484,6 +536,8 @@ export default function PricingPage() {
               onChoose={choosePlan}
               pick={pick}
               busyPlan={busyPlan}
+              isLockedByActiveSubscription={hasActivePaidSubscription}
+              lockedUntilLabel={subscriptionEndLabel}
             />
           ))}
         </div>

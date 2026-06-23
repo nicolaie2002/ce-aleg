@@ -1093,6 +1093,22 @@ def subscription_to_billing_dict(subscription):
     }
 
 
+def is_subscription_period_active(subscription):
+    if not subscription:
+        return False
+
+    if subscription.plan not in {"pro", "family"}:
+        return False
+
+    if subscription.status not in {"active", "trialing", "past_due"}:
+        return False
+
+    if subscription.current_period_end and subscription.current_period_end <= datetime.utcnow():
+        return False
+
+    return True
+
+
 def set_auth_cookie(response, user):
     token = get_auth_serializer().dumps({"user_id": user.id})
     response.set_cookie(
@@ -1573,58 +1589,6 @@ def sync_best_stripe_subscription_for_user(user):
     return sync_stripe_subscription(best_subscription) or subscription
 
 
-def update_existing_stripe_subscription_price(
-    local_subscription,
-    plan,
-    billing_interval,
-    price_id,
-    metadata,
-):
-    if (
-        local_subscription.provider != "stripe"
-        or not local_subscription.provider_subscription_id
-        or not configure_stripe()
-    ):
-        return None
-
-    try:
-        stripe_subscription = stripe.Subscription.retrieve(
-            local_subscription.provider_subscription_id
-        )
-        line_item_id = get_subscription_line_item_id(stripe_subscription)
-
-        if not line_item_id:
-            return None
-
-        updated_subscription = stripe.Subscription.modify(
-            local_subscription.provider_subscription_id,
-            cancel_at_period_end=False,
-            items=[{"id": line_item_id, "price": price_id}],
-            metadata=metadata,
-            proration_behavior=os.environ.get(
-                "STRIPE_PRORATION_BEHAVIOR",
-                "create_prorations",
-            ).strip()
-            or "create_prorations",
-        )
-    except Exception as error:
-        app.logger.warning("Stripe subscription update failed: %s", error)
-        return None
-
-    synced_subscription = sync_stripe_subscription(updated_subscription)
-
-    if synced_subscription:
-        return {
-            "mode": "stripe",
-            "plan": plan,
-            "billingInterval": billing_interval,
-            "updated": True,
-            "message": "Abonamentul a fost actualizat.",
-        }
-
-    return None
-
-
 def find_user_for_stripe_subscription(stripe_subscription):
     metadata = stripe_subscription.get("metadata") or {}
     user_id = metadata.get("user_id")
@@ -1733,6 +1697,7 @@ def handle_stripe_checkout_completed(session):
     plan = metadata.get("plan")
     user_id = metadata.get("user_id")
     subscription_id = session.get("subscription")
+    payment_status = session.get("payment_status")
 
     if plan not in {"pro", "family"} or not user_id:
         app.logger.warning("Stripe checkout ignored: missing metadata.")
@@ -1752,10 +1717,12 @@ def handle_stripe_checkout_completed(session):
         if synced_subscription:
             return synced_subscription
 
+    fallback_status = "active" if payment_status in {"paid", "no_payment_required"} else "incomplete"
+
     return update_local_subscription_from_stripe(
         user=user,
         plan=plan,
-        status="active",
+        status=fallback_status,
         customer_id=session.get("customer"),
         subscription_id=subscription_id,
     )
@@ -4853,6 +4820,27 @@ def start_checkout():
 
         user = g.current_user
         subscription = get_or_create_subscription(user)
+
+        if is_subscription_period_active(subscription):
+            current_plan_name = PLAN_CATALOG.get(subscription.plan, {}).get(
+                "name",
+                subscription.plan.title(),
+            )
+            period_end = (
+                subscription.current_period_end.isoformat() + "Z"
+                if subscription.current_period_end
+                else None
+            )
+            return jsonify({
+                "error": (
+                    f"Ai deja planul {current_plan_name} activ. "
+                    "Poți alege alt plan după finalul perioadei curente sau poți administra abonamentul din portal."
+                ),
+                "code": "active_subscription_exists",
+                "currentPlan": subscription.plan,
+                "currentPeriodEnd": period_end,
+            }), 409
+
         metadata = {
             "user_id": str(user.id),
             "plan": plan,
@@ -4861,16 +4849,6 @@ def start_checkout():
             "price_env": price_env_name,
             "app": "ce-aleg",
         }
-        existing_subscription_update = update_existing_stripe_subscription_price(
-            subscription,
-            plan,
-            billing_interval,
-            price_id,
-            metadata,
-        )
-
-        if existing_subscription_update:
-            return jsonify(existing_subscription_update)
 
         automatic_tax_enabled = env_flag("STRIPE_AUTOMATIC_TAX", False)
         checkout_params = {
