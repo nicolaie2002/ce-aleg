@@ -456,13 +456,28 @@ export default function DashboardPage() {
     : leaderboardData.allTime;
   const leaderboard = selectedLeaderboard?.top || leaderboardData.top || [];
   const currentLeaderboardRow = selectedLeaderboard?.currentUser || leaderboardData.currentUser;
-  const shopItems = gamification?.shopItems || [];
-  const coinPacks = gamification?.coinPacks || [];
-  const nextRewards = gamification?.nextRewards || [
-    { title: "Pro", description: pick("Scanări nelimitate și căutare după preferințe.", "Unlimited scans and preference search."), href: "/pricing" },
-    { title: "Family", description: pick("Profiluri separate pentru fiecare persoană din casă.", "Separate profiles for each person at home."), href: "/pricing" },
-    { title: pick("Contribuie produse", "Contribute products"), description: pick("Produsele aprobate îți aduc scanări bonus.", "Approved products bring bonus scans."), href: "/submit-product" },
+  const fallbackShopItems = [
+    {
+      id: "bonus_scan_1",
+      title: pick("1 scanare bonus", "1 bonus scan"),
+      description: pick("Adaugă o scanare extra peste limita săptămânală.", "Add one extra scan over the weekly limit."),
+      cost: 80,
+    },
+    {
+      id: "bonus_scan_5",
+      title: pick("5 scanări bonus", "5 bonus scans"),
+      description: pick("Un pachet util pentru cumpărături mai lungi.", "A useful pack for longer shopping trips."),
+      cost: 350,
+    },
+    {
+      id: "unlimited_day_1",
+      title: pick("1 zi de scanări nelimitate", "1 day of unlimited scans"),
+      description: pick("Activează scanări nelimitate pentru o zi.", "Activate unlimited scans for one day."),
+      cost: 700,
+    },
   ];
+  const shopItems = gamification?.shopItems?.length ? gamification.shopItems : fallbackShopItems;
+  const coinPacks = gamification?.coinPacks || [];
   const missionCopy = {
     first_scan: {
       title: pick("Prima scanare", "First scan"),
@@ -876,16 +891,6 @@ export default function DashboardPage() {
                         </div>
                       );
                     })}
-                    {shopItems.length === 0 && nextRewards.map((reward) => (
-                      <Link
-                        key={`${reward.title}-${reward.href}`}
-                        href={reward.href || "/pricing"}
-                        className="block rounded-lg border border-white/10 bg-black/20 p-3 transition hover:-translate-y-0.5 hover:border-yellow-300/35"
-                      >
-                        <span className="block text-sm font-black text-white">{reward.title}</span>
-                        <span className="mt-1 block text-xs leading-5 text-gray-400">{reward.description}</span>
-                      </Link>
-                    ))}
                   </div>
 
                   {coinPacks.length > 0 && (
