@@ -66,6 +66,8 @@ const fallbackCoinPacks = [
     coins: 500,
     priceText: "9,99 lei",
     configured: false,
+    image: "/brand/Bronze.png",
+    icon: "/brand/Bronze_icon.png",
     descriptionRo: "Pentru cateva scanari bonus si recompense rapide.",
     descriptionEn: "For a few bonus scans and quick rewards.",
   },
@@ -75,6 +77,8 @@ const fallbackCoinPacks = [
     coins: 1200,
     priceText: "19,99 lei",
     configured: false,
+    image: "/brand/Gold.png",
+    icon: "/brand/Gold_icon.png",
     descriptionRo: "Mai multe puncte pentru saptamanile cu multe cumparaturi.",
     descriptionEn: "More points for weeks with heavier shopping.",
   },
@@ -84,10 +88,18 @@ const fallbackCoinPacks = [
     coins: 3000,
     priceText: "39,99 lei",
     configured: false,
+    image: "/brand/Diamond.png",
+    icon: "/brand/Diamond_icon.png",
     descriptionRo: "Cel mai bun pachet pentru scanari bonus si activari dese.",
     descriptionEn: "The best pack for bonus scans and frequent unlocks.",
   },
 ];
+
+const CECOIN_PACK_VISUALS = {
+  starter: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
+  boost: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
+  power: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
+};
 
 const featureLabels = {
   "5 scanari pe luna": {
@@ -748,26 +760,45 @@ export default function PricingPage() {
             {coinPacks.map((pack) => (
               <InteractiveSurface
                 key={pack.id}
-                className="flex h-full flex-col rounded-xl border border-white/10 bg-white/[0.045] p-5 shadow-xl"
+                className="flex h-full flex-col overflow-hidden rounded-xl border border-white/10 bg-white/[0.045] p-5 shadow-xl"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <Image
-                      src="/brand/CeCoin.png"
-                      alt=""
-                      width={42}
-                      height={42}
-                      className="rounded-full shadow-[0_0_24px_rgba(250,204,21,.18)]"
-                    />
-                    <div>
-                      <h3 className="text-lg font-black">{pack.title}</h3>
-                      <p className="text-sm font-bold text-yellow-100">{pack.coins} CeCoins</p>
-                    </div>
-                  </div>
-                  <span className="rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-xs font-black text-yellow-100">
-                    {pack.priceText}
-                  </span>
-                </div>
+                {(() => {
+                  const packVisual = CECOIN_PACK_VISUALS[pack.id] || {};
+                  const packImage = pack.image || packVisual.image || "/brand/CeCoin.png";
+
+                  return (
+                    <>
+                      <div className="mb-5 flex h-36 items-center justify-center rounded-xl border border-white/10 bg-black/25 p-3">
+                        <Image
+                          src={packImage}
+                          alt=""
+                          width={220}
+                          height={220}
+                          className="h-full w-full object-contain drop-shadow-[0_16px_30px_rgba(0,0,0,.42)]"
+                          sizes="(min-width: 768px) 28vw, 90vw"
+                        />
+                      </div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={pack.icon || packVisual.icon || "/brand/CeCoin.png"}
+                            alt=""
+                            width={42}
+                            height={42}
+                            className="rounded-full shadow-[0_0_24px_rgba(250,204,21,.18)]"
+                          />
+                          <div>
+                            <h3 className="text-lg font-black">{pack.title}</h3>
+                            <p className="text-sm font-bold text-yellow-100">{pack.coins} CeCoins</p>
+                          </div>
+                        </div>
+                        <span className="rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-xs font-black text-yellow-100">
+                          {pack.priceText}
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
                 <p className="mt-4 flex-1 text-sm leading-6 text-gray-300">
                   {pick(pack.descriptionRo, pack.descriptionEn)}
                 </p>

@@ -56,6 +56,12 @@ const ACTION_TONES = {
   },
 };
 
+const CECOIN_PACK_VISUALS = {
+  starter: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
+  boost: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
+  power: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
+};
+
 export default function DashboardPage() {
   const { pick } = useLocale();
   const [user, setUser] = useState(null);
@@ -489,6 +495,8 @@ export default function DashboardPage() {
       coins: 500,
       priceText: "9,99 lei",
       configured: false,
+      image: CECOIN_PACK_VISUALS.starter.image,
+      icon: CECOIN_PACK_VISUALS.starter.icon,
     },
     {
       id: "boost",
@@ -496,6 +504,8 @@ export default function DashboardPage() {
       coins: 1200,
       priceText: "19,99 lei",
       configured: false,
+      image: CECOIN_PACK_VISUALS.boost.image,
+      icon: CECOIN_PACK_VISUALS.boost.icon,
     },
     {
       id: "power",
@@ -503,6 +513,8 @@ export default function DashboardPage() {
       coins: 3000,
       priceText: "39,99 lei",
       configured: false,
+      image: CECOIN_PACK_VISUALS.power.image,
+      icon: CECOIN_PACK_VISUALS.power.icon,
     },
   ];
   const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;
@@ -927,27 +939,44 @@ export default function DashboardPage() {
                         {pick("Cumpără CeCoins", "Buy CeCoins")}
                       </p>
                       <div className="mt-3 space-y-2">
-                        {coinPacks.map((pack) => (
-                          <button
-                            key={pack.id}
-                            type="button"
-                            onClick={() => buyCoinPack(pack.id)}
-                            disabled={!pack.configured || buyingPackId === pack.id}
-                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-yellow-300/35 disabled:cursor-not-allowed disabled:opacity-55"
-                          >
-                            <span>
-                              <span className="block text-sm font-black text-white">{pack.title}</span>
-                              <span className="block text-xs text-gray-400">{pack.coins} CeCoins</span>
-                            </span>
-                            <span className="text-sm font-black text-yellow-100">
-                              {buyingPackId === pack.id
-                                ? pick("Se deschide...", "Opening...")
-                                : pack.configured
-                                  ? pack.priceText
-                                  : pick("În curând", "Soon")}
-                            </span>
-                          </button>
-                        ))}
+                        {coinPacks.map((pack) => {
+                          const packVisual = CECOIN_PACK_VISUALS[pack.id] || {};
+                          const packImage = pack.image || packVisual.image || "/brand/CeCoin.png";
+
+                          return (
+                            <button
+                              key={pack.id}
+                              type="button"
+                              onClick={() => buyCoinPack(pack.id)}
+                              disabled={!pack.configured || buyingPackId === pack.id}
+                              className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-yellow-300/35 disabled:cursor-not-allowed disabled:opacity-55"
+                            >
+                              <span className="flex min-w-0 items-center gap-3">
+                                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                                  <Image
+                                    src={packImage}
+                                    alt=""
+                                    width={96}
+                                    height={96}
+                                    className="h-full w-full object-cover"
+                                    sizes="48px"
+                                  />
+                                </span>
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-black text-white">{pack.title}</span>
+                                  <span className="block text-xs text-gray-400">{pack.coins} CeCoins</span>
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-sm font-black text-yellow-100">
+                                {buyingPackId === pack.id
+                                  ? pick("Se deschide...", "Opening...")
+                                  : pack.configured
+                                    ? pack.priceText
+                                    : pick("În curând", "Soon")}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

@@ -502,6 +502,8 @@ CECOIN_PACKS = [
         "coins": 500,
         "priceText": "9,99 lei",
         "priceEnv": "STRIPE_CECOINS_STARTER_PRICE_ID",
+        "image": "/brand/Bronze.png",
+        "icon": "/brand/Bronze_icon.png",
     },
     {
         "id": "boost",
@@ -509,6 +511,8 @@ CECOIN_PACKS = [
         "coins": 1200,
         "priceText": "19,99 lei",
         "priceEnv": "STRIPE_CECOINS_BOOST_PRICE_ID",
+        "image": "/brand/Gold.png",
+        "icon": "/brand/Gold_icon.png",
     },
     {
         "id": "power",
@@ -516,6 +520,8 @@ CECOIN_PACKS = [
         "coins": 3000,
         "priceText": "39,99 lei",
         "priceEnv": "STRIPE_CECOINS_POWER_PRICE_ID",
+        "image": "/brand/Diamond.png",
+        "icon": "/brand/Diamond_icon.png",
     },
 ]
 

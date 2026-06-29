@@ -163,6 +163,23 @@ sincronizeaza la urmatorul deploy.
    - Start CeCoins: `9.99 RON`, plata unica
    - Boost CeCoins: `19.99 RON`, plata unica
    - Power CeCoins: `39.99 RON`, plata unica
+
+Descrieri recomandate pentru produsele CeCoins din Stripe:
+
+```text
+Start CeCoins
+500 CeCoins pentru scanari bonus si activari rapide in Magazinul CeCoins. Potrivit pentru testare fara abonament.
+Icon: frontend/public/brand/Bronze_icon.png
+
+Boost CeCoins
+1.200 CeCoins pentru scanari bonus, activari temporare si recompense utile cand folosesti aplicatia mai des.
+Icon: frontend/public/brand/Gold_icon.png
+
+Power CeCoins
+3.000 CeCoins pentru utilizatori activi care vor mai multe scanari bonus si flexibilitate maxima fara sa astepte recompense.
+Icon: frontend/public/brand/Diamond_icon.png
+```
+
 3. Copiaza ID-urile `price_...` in Render:
    - `STRIPE_PRO_PRICE_ID`
    - `STRIPE_PRO_YEARLY_PRICE_ID`
