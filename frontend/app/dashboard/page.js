@@ -8,6 +8,7 @@ import {
   ArrowRight,
   Barcode,
   Clock3,
+  Coins,
   Copy,
   Eye,
   EyeOff,
@@ -293,6 +294,18 @@ export default function DashboardPage() {
       : pick("Se generează...", "Generating...");
   const bonusUntil = billing?.usage?.bonusUnlimitedUntil || user.bonusUnlimitedUntil;
   const bonusCredits = billing?.usage?.bonusScanCredits ?? user.bonusScanCredits ?? 0;
+  const usage = billing?.usage || {};
+  const hasUnlimitedScans = Boolean(usage.isUnlimited);
+  const weeklyLimit = usage.weeklyScanLimit;
+  const weeklyRemaining = usage.weeklyScansRemaining;
+  const freeScanValue = hasUnlimitedScans
+    ? pick("Nelimitat", "Unlimited")
+    : Number.isFinite(weeklyLimit)
+      ? `${weeklyRemaining ?? 0}/${weeklyLimit}`
+      : "-";
+  const freeScanDetail = hasUnlimitedScans
+    ? pick("scanări prin plan", "plan scans")
+    : pick("rămase săptămâna aceasta", "left this week");
   const fallbackMissions = [
     {
       id: "first_scan",
@@ -408,6 +421,36 @@ export default function DashboardPage() {
       description: pick("Un prieten își creează cont și confirmă emailul cu codul tău.", "A friend creates an account and verifies their email with your code."),
     },
   };
+  const walletCards = [
+    {
+      label: pick("Plan", "Plan"),
+      value: String(usage.plan || "free").toUpperCase(),
+      detail: hasUnlimitedScans ? pick("scanări nelimitate", "unlimited scans") : pick("5 scanări gratuite", "5 free scans"),
+      icon: Trophy,
+      tone: "border-violet-300/25 bg-violet-300/[0.08] text-violet-100",
+    },
+    {
+      label: pick("Scanări", "Scans"),
+      value: freeScanValue,
+      detail: freeScanDetail,
+      icon: ScanLine,
+      tone: "border-cyan-300/25 bg-cyan-300/[0.08] text-cyan-100",
+    },
+    {
+      label: pick("Bonus", "Bonus"),
+      value: bonusCredits > 0 ? `+${bonusCredits}` : bonusUntil ? pick("Activ", "Active") : "0",
+      detail: bonusUntil ? pick("nelimitat temporar", "temporary unlimited") : pick("scanări bonus", "bonus scans"),
+      icon: Gift,
+      tone: "border-yellow-300/25 bg-yellow-300/[0.08] text-yellow-100",
+    },
+    {
+      label: "CeCoins",
+      value: coinBalance,
+      detail: pick("soldul tău", "your balance"),
+      icon: Coins,
+      tone: "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100",
+    },
+  ];
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
@@ -423,11 +466,28 @@ export default function DashboardPage() {
         </div>
 
         <div className="ce-panel ce-lifted-shell ce-reveal p-6 md:p-8">
-          <p className="text-sm font-bold text-cyan-200">{pick("Spațiul tău", "Your space")}</p>
-          <h1 className="mt-3 text-4xl font-bold md:text-5xl">{pick("Salut", "Hello")}, {user.name}</h1>
-          <p className="mt-4 max-w-2xl text-gray-300">
-            {pick("Continuă cumpărăturile sau scanează un produs nou pentru recomandări potrivite preferințelor tale.", "Continue shopping or scan a new product for recommendations matched to your preferences.")}
-          </p>
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+            <div className="max-w-2xl">
+              <p className="text-sm font-bold text-cyan-200">{pick("Spațiul tău", "Your space")}</p>
+              <h1 className="mt-3 text-4xl font-bold md:text-5xl">{pick("Salut", "Hello")}, {user.name}</h1>
+              <p className="mt-4 text-gray-300">
+                {pick("Continuă cumpărăturile sau scanează un produs nou pentru recomandări potrivite preferințelor tale.", "Continue shopping or scan a new product for recommendations matched to your preferences.")}
+              </p>
+            </div>
+
+            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-[560px]">
+              {walletCards.map(({ label, value, detail, icon: Icon, tone }) => (
+                <div key={label} className={`rounded-xl border p-4 ${tone}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-black uppercase tracking-wide opacity-80">{label}</p>
+                    <Icon size={17} />
+                  </div>
+                  <p className="mt-2 truncate text-2xl font-black">{value}</p>
+                  <p className="mt-1 text-xs font-bold opacity-75">{detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <InlineNotice message={loadError} tone="warning" className="mt-6" />
 
@@ -472,7 +532,6 @@ export default function DashboardPage() {
                   {bonusUntil
                     ? pick(`Bonus activ până la ${formatBonusDate(bonusUntil)}.`, `Bonus active until ${formatBonusDate(bonusUntil)}.`)
                     : pick("Nu ai bonus temporar activ acum.", "No temporary bonus is active right now.")}
-                  {bonusCredits > 0 ? ` ${pick(`Ai și ${bonusCredits} scanări bonus.`, `You also have ${bonusCredits} bonus scans.`)}` : ""}
                 </p>
               </div>
 
