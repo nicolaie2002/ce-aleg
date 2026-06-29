@@ -359,7 +359,7 @@ export default function PricingPage() {
   useEffect(() => {
     let isMounted = true;
 
-    fetch(`${API_URL}/gamification/summary`)
+    fetch(`${API_URL}/gamification/coin-packs`)
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
         if (isMounted && response.ok && data.coinPacks?.length) {

@@ -2562,6 +2562,21 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
     }
 
 
+def get_public_cecoin_packs():
+    return [
+        {
+            "id": pack["id"],
+            "title": pack["title"],
+            "coins": pack["coins"],
+            "priceText": pack["priceText"],
+            "image": pack.get("image"),
+            "icon": pack.get("icon"),
+            "configured": bool(get_cecoin_pack_price_id(pack)),
+        }
+        for pack in CECOIN_PACKS
+    ]
+
+
 def get_gamification_summary_for_user(user):
     metrics = get_user_gamification_metrics(user.id)
     missions = build_mission_statuses(user.id, metrics)
@@ -2595,18 +2610,7 @@ def get_gamification_summary_for_user(user):
             "currentUser": all_time_leaderboard["currentUser"],
         },
         "shopItems": CECOIN_SHOP_ITEMS,
-        "coinPacks": [
-            {
-                "id": pack["id"],
-                "title": pack["title"],
-                "coins": pack["coins"],
-                "priceText": pack["priceText"],
-                "image": pack.get("image"),
-                "icon": pack.get("icon"),
-                "configured": bool(get_cecoin_pack_price_id(pack)),
-            }
-            for pack in CECOIN_PACKS
-        ],
+        "coinPacks": get_public_cecoin_packs(),
         "nextRewards": [
             {
                 "title": "Pro",
@@ -5747,6 +5751,11 @@ def stripe_webhook():
 # =========================
 # Gamification
 # =========================
+
+@app.route("/gamification/coin-packs", methods=["GET"])
+def get_cecoin_packs():
+    return jsonify({"coinPacks": get_public_cecoin_packs()})
+
 
 @app.route("/gamification/summary", methods=["GET"])
 def get_gamification_summary():
