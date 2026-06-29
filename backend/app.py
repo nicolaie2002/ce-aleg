@@ -404,6 +404,54 @@ STRIPE_PRICE_ENV_BY_PLAN = {
 }
 PLAN_RANK = {"free": 0, "pro": 1, "family": 2}
 
+MISSION_CATALOG = [
+    {
+        "id": "first_scan",
+        "title": "Prima scanare",
+        "description": "Scanează primul produs și începe istoricul tău.",
+        "metric": "scanCount",
+        "target": 1,
+        "coins": 20,
+        "bonusScans": 1,
+    },
+    {
+        "id": "smart_cart",
+        "title": "Coș pregătit",
+        "description": "Adaugă 3 produse în coșul activ.",
+        "metric": "cartCount",
+        "target": 3,
+        "coins": 35,
+        "bonusScans": 1,
+    },
+    {
+        "id": "favorites_keeper",
+        "title": "Favorite utile",
+        "description": "Salvează 3 produse la favorite.",
+        "metric": "favoritesCount",
+        "target": 3,
+        "coins": 35,
+        "bonusScans": 1,
+    },
+    {
+        "id": "catalog_helper",
+        "title": "Ajutor pentru catalog",
+        "description": "Trimite un produs care este aprobat în catalog.",
+        "metric": "approvedSubmissions",
+        "target": 1,
+        "coins": 80,
+        "bonusScans": 2,
+    },
+    {
+        "id": "invite_starter",
+        "title": "Invită un prieten",
+        "description": "Un prieten își creează cont și confirmă emailul cu codul tău.",
+        "metric": "confirmedInvites",
+        "target": 1,
+        "coins": 120,
+        "bonusDays": 1,
+    },
+]
+
 
 def get_auth_serializer():
     return URLSafeTimedSerializer(app.config["AUTH_SECRET"], salt="cealeg-auth")
@@ -2094,6 +2142,187 @@ def respond_scan_limit(scan_gate):
     }), 402
 
 
+def parse_usage_metadata(event):
+    if not event or not event.metadata_json:
+        return {}
+
+    try:
+        data = json.loads(event.metadata_json)
+    except (TypeError, ValueError):
+        return {}
+
+    return data if isinstance(data, dict) else {}
+
+
+def get_user_gamification_metrics(user_id):
+    scan_count = UsageEvent.query.filter_by(
+        user_id=user_id,
+        event_type="scan",
+    ).count()
+    history_count = ScanHistory.query.filter_by(user_id=user_id).count()
+    favorites_count = Favorite.query.filter_by(user_id=user_id).count()
+    cart_count = (
+        db.session.query(func.coalesce(func.sum(CartItem.quantity), 0))
+        .filter(CartItem.user_id == user_id)
+        .scalar()
+        or 0
+    )
+    approved_submissions = ProductSubmission.query.filter_by(
+        user_id=user_id,
+        status="approved",
+    ).count()
+    confirmed_invites = UsageEvent.query.filter_by(
+        user_id=user_id,
+        event_type="bonus_unlimited",
+        source="referral_inviter",
+    ).count()
+
+    return {
+        "scanCount": max(scan_count, history_count),
+        "historyCount": history_count,
+        "favoritesCount": favorites_count,
+        "cartCount": int(cart_count or 0),
+        "approvedSubmissions": approved_submissions,
+        "confirmedInvites": confirmed_invites,
+    }
+
+
+def get_claimed_mission_events(user_id):
+    events = UsageEvent.query.filter_by(
+        user_id=user_id,
+        event_type="mission_claim",
+    ).all()
+    return {event.source: event for event in events if event.source}
+
+
+def calculate_claimed_mission_coins(user_id):
+    total = 0
+
+    for event in get_claimed_mission_events(user_id).values():
+        reward = parse_usage_metadata(event).get("reward") or {}
+        total += int(reward.get("coins") or 0)
+
+    return total
+
+
+def calculate_user_coins(user_id, metrics=None):
+    metrics = metrics or get_user_gamification_metrics(user_id)
+    base_total = (
+        int(metrics["scanCount"]) * 3
+        + int(metrics["favoritesCount"]) * 5
+        + min(int(metrics["cartCount"]) * 2, 50)
+        + int(metrics["approvedSubmissions"]) * 60
+        + int(metrics["confirmedInvites"]) * 100
+    )
+    return base_total + calculate_claimed_mission_coins(user_id)
+
+
+def build_mission_statuses(user_id, metrics=None):
+    metrics = metrics or get_user_gamification_metrics(user_id)
+    claimed_events = get_claimed_mission_events(user_id)
+    missions = []
+
+    for mission in MISSION_CATALOG:
+        current = int(metrics.get(mission["metric"], 0) or 0)
+        target = int(mission["target"])
+        claimed_event = claimed_events.get(mission["id"])
+        completed = current >= target
+        reward = {
+            "coins": mission.get("coins", 0),
+            "bonusScans": mission.get("bonusScans", 0),
+            "bonusDays": mission.get("bonusDays", 0),
+        }
+
+        missions.append({
+            "id": mission["id"],
+            "title": mission["title"],
+            "description": mission["description"],
+            "current": min(current, target),
+            "target": target,
+            "progress": min(100, round((current / target) * 100)) if target else 100,
+            "completed": completed,
+            "claimed": bool(claimed_event),
+            "claimable": completed and not claimed_event,
+            "reward": reward,
+        })
+
+    return missions
+
+
+def build_user_leaderboard(current_user_id=None, limit=10):
+    users = User.query.order_by(User.created_at.asc()).all()
+    rows = []
+
+    for user in users:
+        metrics = get_user_gamification_metrics(user.id)
+        coins = calculate_user_coins(user.id, metrics)
+
+        rows.append({
+            "userId": user.id,
+            "name": (user.name or "Utilizator").split()[0],
+            "coins": coins,
+            "scanCount": metrics["scanCount"],
+            "approvedSubmissions": metrics["approvedSubmissions"],
+            "isCurrentUser": user.id == current_user_id,
+        })
+
+    rows.sort(key=lambda item: (item["coins"], item["scanCount"], item["approvedSubmissions"]), reverse=True)
+
+    for index, row in enumerate(rows, start=1):
+        row["rank"] = index
+
+    top_rows = rows[:max(1, min(limit, 25))]
+    current_row = next((row for row in rows if row["isCurrentUser"]), None)
+
+    return {
+        "top": top_rows,
+        "currentUser": current_row,
+    }
+
+
+def get_gamification_summary_for_user(user):
+    metrics = get_user_gamification_metrics(user.id)
+    missions = build_mission_statuses(user.id, metrics)
+    completed_count = sum(1 for mission in missions if mission["completed"])
+    claimed_count = sum(1 for mission in missions if mission["claimed"])
+    coins = calculate_user_coins(user.id, metrics)
+
+    return {
+        "coins": coins,
+        "level": (
+            "Expert la raft"
+            if coins >= 500
+            else "Cumpărător avansat"
+            if coins >= 250
+            else "În creștere"
+            if coins >= 100
+            else "Start bun"
+        ),
+        "metrics": metrics,
+        "missions": missions,
+        "completedMissions": completed_count,
+        "claimedMissions": claimed_count,
+        "leaderboard": build_user_leaderboard(user.id),
+        "nextRewards": [
+            {
+                "title": "Pro",
+                "description": "Scanări nelimitate și căutare după preferințe.",
+                "href": "/pricing",
+            },
+            {
+                "title": "Family",
+                "description": "Profiluri separate pentru fiecare persoană din casă.",
+                "href": "/pricing",
+            },
+            {
+                "title": "Contribuie produse",
+                "description": "Produsele aprobate îți aduc scanări bonus.",
+                "href": "/submit-product",
+            },
+        ],
+    }
+
+
 ADMIN_ENDPOINTS = {
     "init_db",
     "get_users",
@@ -2136,6 +2365,8 @@ AUTH_ENDPOINTS = {
     "logout",
     "get_open_food_facts_alternatives",
     "get_billing_status",
+    "get_gamification_summary",
+    "claim_gamification_mission",
     "start_checkout",
     "start_billing_portal",
     "get_family_profiles",
@@ -5205,6 +5436,81 @@ def stripe_webhook():
         sync_stripe_subscription_by_id(get_invoice_subscription_id(event_object))
 
     return jsonify({"received": True})
+
+
+# =========================
+# Gamification
+# =========================
+
+@app.route("/gamification/summary", methods=["GET"])
+def get_gamification_summary():
+    return jsonify(get_gamification_summary_for_user(g.current_user))
+
+
+@app.route("/gamification/claim", methods=["POST"])
+def claim_gamification_mission():
+    data = request.get_json(silent=True) or {}
+    mission_id = str(data.get("missionId") or "").strip()
+    mission = next((item for item in MISSION_CATALOG if item["id"] == mission_id), None)
+
+    if not mission:
+        return jsonify({"error": "Misiune invalidă."}), 400
+
+    claimed_events = get_claimed_mission_events(g.current_user.id)
+
+    if mission_id in claimed_events:
+        return jsonify({
+            "error": "Recompensa a fost revendicată deja.",
+            "summary": get_gamification_summary_for_user(g.current_user),
+        }), 409
+
+    metrics = get_user_gamification_metrics(g.current_user.id)
+    current = int(metrics.get(mission["metric"], 0) or 0)
+    target = int(mission["target"])
+
+    if current < target:
+        return jsonify({
+            "error": "Misiunea nu este finalizată încă.",
+            "summary": get_gamification_summary_for_user(g.current_user),
+        }), 400
+
+    reward = {
+        "coins": mission.get("coins", 0),
+        "bonusScans": mission.get("bonusScans", 0),
+        "bonusDays": mission.get("bonusDays", 0),
+    }
+
+    if reward["bonusScans"]:
+        add_bonus_scan_credits(
+            g.current_user,
+            reward["bonusScans"],
+            "mission_reward",
+            {"missionId": mission_id},
+        )
+
+    if reward["bonusDays"]:
+        extend_bonus_unlimited(
+            g.current_user,
+            reward["bonusDays"],
+            "mission_reward",
+            {"missionId": mission_id},
+        )
+
+    db.session.add(
+        UsageEvent(
+            user_id=g.current_user.id,
+            event_type="mission_claim",
+            source=mission_id,
+            metadata_json=json.dumps({"reward": reward}),
+        )
+    )
+    db.session.commit()
+
+    return jsonify({
+        "message": "Recompensă revendicată.",
+        "reward": reward,
+        "summary": get_gamification_summary_for_user(g.current_user),
+    })
 
 
 # =========================
