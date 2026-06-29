@@ -61,8 +61,8 @@ const fallbackPlans = {
 
 const fallbackCoinPacks = [
   {
-    id: "starter",
-    title: "Start CeCoins",
+    id: "bronze",
+    title: "Bronze CeCoins",
     coins: 500,
     priceText: "9,99 lei",
     configured: false,
@@ -72,8 +72,8 @@ const fallbackCoinPacks = [
     descriptionEn: "For a few bonus scans and quick rewards.",
   },
   {
-    id: "boost",
-    title: "Boost CeCoins",
+    id: "gold",
+    title: "Gold CeCoins",
     coins: 1200,
     priceText: "19,99 lei",
     configured: false,
@@ -83,8 +83,8 @@ const fallbackCoinPacks = [
     descriptionEn: "More points for weeks with heavier shopping.",
   },
   {
-    id: "power",
-    title: "Power CeCoins",
+    id: "diamond",
+    title: "Diamond CeCoins",
     coins: 3000,
     priceText: "39,99 lei",
     configured: false,
@@ -96,9 +96,9 @@ const fallbackCoinPacks = [
 ];
 
 const CECOIN_PACK_VISUALS = {
-  starter: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
-  boost: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
-  power: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
+  bronze: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
+  gold: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
+  diamond: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
 };
 
 const featureLabels = {

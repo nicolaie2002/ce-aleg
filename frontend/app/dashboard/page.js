@@ -57,9 +57,9 @@ const ACTION_TONES = {
 };
 
 const CECOIN_PACK_VISUALS = {
-  starter: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
-  boost: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
-  power: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
+  bronze: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
+  gold: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
+  diamond: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
 };
 
 export default function DashboardPage() {
@@ -490,31 +490,31 @@ export default function DashboardPage() {
   const shopItems = gamification?.shopItems?.length ? gamification.shopItems : fallbackShopItems;
   const fallbackCoinPacks = [
     {
-      id: "starter",
-      title: "Start CeCoins",
+      id: "bronze",
+      title: "Bronze CeCoins",
       coins: 500,
       priceText: "9,99 lei",
       configured: false,
-      image: CECOIN_PACK_VISUALS.starter.image,
-      icon: CECOIN_PACK_VISUALS.starter.icon,
+      image: CECOIN_PACK_VISUALS.bronze.image,
+      icon: CECOIN_PACK_VISUALS.bronze.icon,
     },
     {
-      id: "boost",
-      title: "Boost CeCoins",
+      id: "gold",
+      title: "Gold CeCoins",
       coins: 1200,
       priceText: "19,99 lei",
       configured: false,
-      image: CECOIN_PACK_VISUALS.boost.image,
-      icon: CECOIN_PACK_VISUALS.boost.icon,
+      image: CECOIN_PACK_VISUALS.gold.image,
+      icon: CECOIN_PACK_VISUALS.gold.icon,
     },
     {
-      id: "power",
-      title: "Power CeCoins",
+      id: "diamond",
+      title: "Diamond CeCoins",
       coins: 3000,
       priceText: "39,99 lei",
       configured: false,
-      image: CECOIN_PACK_VISUALS.power.image,
-      icon: CECOIN_PACK_VISUALS.power.icon,
+      image: CECOIN_PACK_VISUALS.diamond.image,
+      icon: CECOIN_PACK_VISUALS.diamond.icon,
     },
   ];
   const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;

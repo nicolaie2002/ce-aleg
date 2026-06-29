@@ -106,9 +106,9 @@ STRIPE_PRO_PRICE_ID=<price id lunar Pro>
 STRIPE_PRO_YEARLY_PRICE_ID=<price id anual Pro>
 STRIPE_FAMILY_PRICE_ID=<price id lunar Family>
 STRIPE_FAMILY_YEARLY_PRICE_ID=<price id anual Family>
-STRIPE_CECOINS_STARTER_PRICE_ID=<price id pachet 500 CeCoins>
-STRIPE_CECOINS_BOOST_PRICE_ID=<price id pachet 1200 CeCoins>
-STRIPE_CECOINS_POWER_PRICE_ID=<price id pachet 3000 CeCoins>
+STRIPE_CECOINS_BRONZE_PRICE_ID=<price id pachet Bronze CeCoins>
+STRIPE_CECOINS_GOLD_PRICE_ID=<price id pachet Gold CeCoins>
+STRIPE_CECOINS_DIAMOND_PRICE_ID=<price id pachet Diamond CeCoins>
 STRIPE_AUTOMATIC_TAX=false
 STRIPE_TAX_ID_COLLECTION=false
 ```
@@ -160,22 +160,22 @@ sincronizeaza la urmatorul deploy.
    - Pro anual: `149 RON / year`
    - Family lunar: `29.99 RON / month`
    - Family anual: `249 RON / year`
-   - Start CeCoins: `9.99 RON`, plata unica
-   - Boost CeCoins: `19.99 RON`, plata unica
-   - Power CeCoins: `39.99 RON`, plata unica
+   - Bronze CeCoins: `9.99 RON`, plata unica
+   - Gold CeCoins: `19.99 RON`, plata unica
+   - Diamond CeCoins: `39.99 RON`, plata unica
 
 Descrieri recomandate pentru produsele CeCoins din Stripe:
 
 ```text
-Start CeCoins
+Bronze CeCoins
 500 CeCoins pentru scanari bonus si activari rapide in Magazinul CeCoins. Potrivit pentru testare fara abonament.
 Icon: frontend/public/brand/Bronze_icon.png
 
-Boost CeCoins
+Gold CeCoins
 1.200 CeCoins pentru scanari bonus, activari temporare si recompense utile cand folosesti aplicatia mai des.
 Icon: frontend/public/brand/Gold_icon.png
 
-Power CeCoins
+Diamond CeCoins
 3.000 CeCoins pentru utilizatori activi care vor mai multe scanari bonus si flexibilitate maxima fara sa astepte recompense.
 Icon: frontend/public/brand/Diamond_icon.png
 ```
@@ -185,9 +185,9 @@ Icon: frontend/public/brand/Diamond_icon.png
    - `STRIPE_PRO_YEARLY_PRICE_ID`
    - `STRIPE_FAMILY_PRICE_ID`
    - `STRIPE_FAMILY_YEARLY_PRICE_ID`
-   - `STRIPE_CECOINS_STARTER_PRICE_ID`
-   - `STRIPE_CECOINS_BOOST_PRICE_ID`
-   - `STRIPE_CECOINS_POWER_PRICE_ID`
+   - `STRIPE_CECOINS_BRONZE_PRICE_ID`
+   - `STRIPE_CECOINS_GOLD_PRICE_ID`
+   - `STRIPE_CECOINS_DIAMOND_PRICE_ID`
 4. Lasa momentan:
 
 ```text

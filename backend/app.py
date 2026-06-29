@@ -497,29 +497,32 @@ CECOIN_SHOP_ITEMS = [
 
 CECOIN_PACKS = [
     {
-        "id": "starter",
-        "title": "Start CeCoins",
+        "id": "bronze",
+        "title": "Bronze CeCoins",
         "coins": 500,
         "priceText": "9,99 lei",
-        "priceEnv": "STRIPE_CECOINS_STARTER_PRICE_ID",
+        "priceEnv": "STRIPE_CECOINS_BRONZE_PRICE_ID",
+        "legacyPriceEnv": "STRIPE_CECOINS_STARTER_PRICE_ID",
         "image": "/brand/Bronze.png",
         "icon": "/brand/Bronze_icon.png",
     },
     {
-        "id": "boost",
-        "title": "Boost CeCoins",
+        "id": "gold",
+        "title": "Gold CeCoins",
         "coins": 1200,
         "priceText": "19,99 lei",
-        "priceEnv": "STRIPE_CECOINS_BOOST_PRICE_ID",
+        "priceEnv": "STRIPE_CECOINS_GOLD_PRICE_ID",
+        "legacyPriceEnv": "STRIPE_CECOINS_BOOST_PRICE_ID",
         "image": "/brand/Gold.png",
         "icon": "/brand/Gold_icon.png",
     },
     {
-        "id": "power",
-        "title": "Power CeCoins",
+        "id": "diamond",
+        "title": "Diamond CeCoins",
         "coins": 3000,
         "priceText": "39,99 lei",
-        "priceEnv": "STRIPE_CECOINS_POWER_PRICE_ID",
+        "priceEnv": "STRIPE_CECOINS_DIAMOND_PRICE_ID",
+        "legacyPriceEnv": "STRIPE_CECOINS_POWER_PRICE_ID",
         "image": "/brand/Diamond.png",
         "icon": "/brand/Diamond_icon.png",
     },
@@ -1622,7 +1625,7 @@ def get_publication_readiness():
         missing_cecoin_prices = [
             pack["priceEnv"]
             for pack in CECOIN_PACKS
-            if not os.environ.get(pack["priceEnv"], "").strip()
+            if not get_cecoin_pack_price_id(pack)
         ]
 
         if missing_cecoin_prices:
@@ -1993,7 +1996,21 @@ def sync_stripe_subscription(stripe_subscription, deleted=False):
 
 def get_cecoin_pack(pack_id):
     normalized_id = str(pack_id or "").strip().lower()
+    normalized_id = {
+        "starter": "bronze",
+        "boost": "gold",
+        "power": "diamond",
+    }.get(normalized_id, normalized_id)
     return next((pack for pack in CECOIN_PACKS if pack["id"] == normalized_id), None)
+
+
+def get_cecoin_pack_price_id(pack):
+    for env_name in [pack.get("priceEnv"), pack.get("legacyPriceEnv")]:
+        price_id = os.environ.get(str(env_name or ""), "").strip()
+        if price_id:
+            return price_id
+
+    return ""
 
 
 def handle_stripe_cecoin_checkout_completed(session):
@@ -2580,8 +2597,13 @@ def get_gamification_summary_for_user(user):
         "shopItems": CECOIN_SHOP_ITEMS,
         "coinPacks": [
             {
-                **pack,
-                "configured": bool(os.environ.get(pack["priceEnv"], "").strip()),
+                "id": pack["id"],
+                "title": pack["title"],
+                "coins": pack["coins"],
+                "priceText": pack["priceText"],
+                "image": pack.get("image"),
+                "icon": pack.get("icon"),
+                "configured": bool(get_cecoin_pack_price_id(pack)),
             }
             for pack in CECOIN_PACKS
         ],
@@ -5866,7 +5888,7 @@ def start_cecoin_checkout():
     if not pack:
         return jsonify({"error": "Pachet CeCoins invalid."}), 400
 
-    price_id = os.environ.get(pack["priceEnv"], "").strip()
+    price_id = get_cecoin_pack_price_id(pack)
 
     if not configure_stripe() or not price_id:
         return jsonify({
