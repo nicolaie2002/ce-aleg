@@ -58,6 +58,8 @@ OPEN_PRICES_CACHE = {}
 OPEN_PRICES_CACHE_TTL = 30 * 60
 AI_STATUS_CACHE = {"created_at": 0, "data": None}
 AI_STATUS_CACHE_TTL = 30
+LEADERBOARD_CACHE = {}
+LEADERBOARD_CACHE_TTL = int(os.environ.get("LEADERBOARD_CACHE_TTL", "60"))
 APPROX_RON_EXCHANGE_RATES = {
     "RON": 1.0,
     "EUR": 5.0,
@@ -2013,6 +2015,29 @@ def get_cecoin_pack_price_id(pack):
     return ""
 
 
+def validate_cecoin_price_for_checkout(price_id):
+    if not configure_stripe():
+        return "Stripe nu este configurat complet."
+
+    try:
+        price = stripe.Price.retrieve(price_id)
+    except Exception as error:
+        app.logger.warning("Stripe CeCoins price validation failed: %s", error)
+        return "Prețul Stripe pentru acest pachet nu a putut fi verificat."
+
+    if not price.get("active", True):
+        return "Prețul Stripe pentru acest pachet este inactiv."
+
+    if price.get("recurring"):
+        return (
+            "Pachetele CeCoins trebuie să folosească un preț Stripe one-time, "
+            "nu un preț de abonament. Creează un price one-time pentru acest pachet "
+            "și actualizează variabila din Render."
+        )
+
+    return ""
+
+
 def handle_stripe_cecoin_checkout_completed(session):
     metadata = session.get("metadata") or {}
     user_id = metadata.get("user_id")
@@ -2523,37 +2548,52 @@ def count_completed_catalog_missions(metrics):
 
 
 def build_user_leaderboard(current_user_id=None, limit=10, since=None):
-    users = User.query.order_by(User.created_at.asc()).all()
-    rows = []
+    safe_limit = max(1, min(limit, 25))
+    since_key = since.isoformat() if since else "all_time"
+    cache_key = (safe_limit, since_key)
+    cached = LEADERBOARD_CACHE.get(cache_key)
 
-    for user in users:
-        metrics = get_user_gamification_metrics(user.id, since=since)
-        score = calculate_activity_score(metrics)
-        coins = calculate_user_coins(user.id) if since is None else score
+    if cached and time.time() - cached["created_at"] < LEADERBOARD_CACHE_TTL:
+        rows = [dict(row) for row in cached["rows"]]
+    else:
+        users = User.query.order_by(User.created_at.asc()).all()
+        rows = []
 
-        rows.append({
-            "userId": user.id,
-            "name": (user.name or "Utilizator").split()[0],
-            "coins": coins,
-            "score": score,
-            "scanCount": metrics["scanCount"],
-            "approvedSubmissions": metrics["approvedSubmissions"],
-            "isCurrentUser": user.id == current_user_id,
-        })
+        for user in users:
+            metrics = get_user_gamification_metrics(user.id, since=since)
+            score = calculate_activity_score(metrics)
+            coins = calculate_user_coins(user.id) if since is None else score
 
-    rows.sort(
-        key=lambda item: (
-            item["coins"],
-            item["scanCount"],
-            item["approvedSubmissions"],
-        ),
-        reverse=True,
-    )
+            rows.append({
+                "userId": user.id,
+                "name": (user.name or "Utilizator").split()[0],
+                "coins": coins,
+                "score": score,
+                "scanCount": metrics["scanCount"],
+                "approvedSubmissions": metrics["approvedSubmissions"],
+            })
 
-    for index, row in enumerate(rows, start=1):
-        row["rank"] = index
+        rows.sort(
+            key=lambda item: (
+                item["coins"],
+                item["scanCount"],
+                item["approvedSubmissions"],
+            ),
+            reverse=True,
+        )
 
-    top_rows = rows[:max(1, min(limit, 25))]
+        for index, row in enumerate(rows, start=1):
+            row["rank"] = index
+
+        LEADERBOARD_CACHE[cache_key] = {
+            "created_at": time.time(),
+            "rows": [dict(row) for row in rows],
+        }
+
+    for row in rows:
+        row["isCurrentUser"] = row["userId"] == current_user_id
+
+    top_rows = rows[:safe_limit]
     current_row = next((row for row in rows if row["isCurrentUser"]), None)
 
     return {
@@ -5905,6 +5945,15 @@ def start_cecoin_checkout():
             "code": "cecoins_checkout_not_configured",
             "required": ["STRIPE_SECRET_KEY", pack["priceEnv"], "STRIPE_WEBHOOK_SECRET"],
         }), 503
+
+    price_error = validate_cecoin_price_for_checkout(price_id)
+
+    if price_error:
+        return jsonify({
+            "error": price_error,
+            "code": "cecoins_price_invalid",
+            "required": [pack["priceEnv"]],
+        }), 400
 
     user = g.current_user
     subscription = get_or_create_subscription(user)

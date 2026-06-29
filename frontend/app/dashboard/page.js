@@ -32,6 +32,7 @@ import { InteractiveSurface } from "../components/InteractiveSurface";
 import { FamilyProfiles } from "../components/FamilyProfiles";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile } from "../utils/profilePreferences";
+import { readApiJson } from "../utils/apiResponse";
 
 const ACTION_TONES = {
   emerald: {
@@ -79,6 +80,8 @@ export default function DashboardPage() {
   const [isInviteVisible, setIsInviteVisible] = useState(false);
   const [inviteCopyNotice, setInviteCopyNotice] = useState("");
   const [gamification, setGamification] = useState(null);
+  const [coinPackCatalog, setCoinPackCatalog] = useState([]);
+  const [isGamificationLoading, setIsGamificationLoading] = useState(false);
   const [claimMessage, setClaimMessage] = useState("");
   const [claimingMissionId, setClaimingMissionId] = useState("");
   const [claimedMissionId, setClaimedMissionId] = useState("");
@@ -106,10 +109,9 @@ export default function DashboardPage() {
         fetch(`${API_URL}/history/${userId}`),
         fetch(`${API_URL}/favorites/${userId}`),
         fetch(`${API_URL}/billing/status`),
-        fetch(`${API_URL}/gamification/summary`),
       ]);
-      const [cart, history, favorites, billingData, gamificationData] = await Promise.all(
-        responses.map((response) => response.json())
+      const [cart, history, favorites, billingData] = await Promise.all(
+        responses.map((response) => readApiJson(response))
       );
 
       if (responses.slice(0, 3).some((response) => !response.ok)) {
@@ -123,13 +125,42 @@ export default function DashboardPage() {
       });
       setLastScannedProduct(history[0]?.name || "-");
       if (responses[3].ok) setBilling(billingData);
-      if (responses[4].ok) setGamification(gamificationData);
     } catch (error) {
       setLoadError(error.message);
     } finally {
       setIsLoading(false);
     }
   }, [pick]);
+
+  const loadCoinPacks = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/gamification/coin-packs`);
+      const data = await readApiJson(response);
+
+      if (response.ok && data.coinPacks?.length) {
+        setCoinPackCatalog(data.coinPacks);
+      }
+    } catch {
+      setCoinPackCatalog([]);
+    }
+  }, []);
+
+  const loadGamificationData = useCallback(async () => {
+    setIsGamificationLoading(true);
+
+    try {
+      const response = await fetch(`${API_URL}/gamification/summary`);
+      const data = await readApiJson(response);
+
+      if (response.ok) {
+        setGamification(data);
+      }
+    } catch {
+      setGamification(null);
+    } finally {
+      setIsGamificationLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -138,6 +169,7 @@ export default function DashboardPage() {
     function handleProfileChange(event) {
       if (!isMounted || !currentUserId) return;
       loadDashboardData(currentUserId, event.detail || getActiveProfile());
+      loadGamificationData();
     }
 
     window.addEventListener("cealeg:profile-change", handleProfileChange);
@@ -153,6 +185,7 @@ export default function DashboardPage() {
       localStorage.setItem("cealeg_user", JSON.stringify(data.user));
       currentUserId = data.user.id;
       setUser(data.user);
+      loadCoinPacks();
 
       const savedEmailStatus = localStorage.getItem("cealeg_email_status");
 
@@ -181,14 +214,15 @@ export default function DashboardPage() {
         }
       }
 
-      loadDashboardData(data.user.id, getActiveProfile());
+      await loadDashboardData(data.user.id, getActiveProfile());
+      loadGamificationData();
     });
 
     return () => {
       isMounted = false;
       window.removeEventListener("cealeg:profile-change", handleProfileChange);
     };
-  }, [loadDashboardData, pick]);
+  }, [loadCoinPacks, loadDashboardData, loadGamificationData, pick]);
 
   async function logout() {
     await fetch(`${API_URL}/logout`, { method: "POST" }).catch(() => null);
@@ -316,7 +350,7 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ packId }),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
@@ -517,7 +551,11 @@ export default function DashboardPage() {
       icon: CECOIN_PACK_VISUALS.diamond.icon,
     },
   ];
-  const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;
+  const coinPacks = coinPackCatalog.length
+    ? coinPackCatalog
+    : gamification?.coinPacks?.length
+      ? gamification.coinPacks
+      : fallbackCoinPacks;
   const missionCopy = {
     first_scan: {
       title: pick("Prima scanare", "First scan"),
@@ -738,6 +776,12 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
+
+                {isGamificationLoading && !gamification && (
+                  <p className="mt-4 rounded-lg border border-white/10 bg-black/20 px-4 py-3 text-sm font-bold text-gray-300">
+                    {pick("Se încarcă misiunile și recompensele...", "Loading missions and rewards...")}
+                  </p>
+                )}
 
                 {claimMessage && (
                   <p
