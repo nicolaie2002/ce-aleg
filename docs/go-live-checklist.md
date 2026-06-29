@@ -96,6 +96,7 @@ SUPABASE_SERVICE_ROLE_KEY=<service role key>
 FRONTEND_PUBLIC_URL=https://www.cealeg.shop
 FRONTEND_ORIGINS=https://www.cealeg.shop,https://cealeg.shop,https://ce-aleg.vercel.app
 ADMIN_EMAIL=<emailul tau>
+FREE_MONTHLY_SCAN_LIMIT=5
 EMAIL_PROVIDER=brevo
 EMAIL_FROM=<expeditor verificat in Brevo>
 BREVO_API_KEY=<cheia Brevo>

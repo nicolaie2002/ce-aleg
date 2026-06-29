@@ -156,7 +156,7 @@ export default function Home() {
             <div className="ce-hero-copy ce-reveal ce-reveal-delay-1">
               <div className="ce-hero-pill inline-flex items-center gap-2 rounded-full border border-cyan-300/30 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
                 <BadgeCheck size={17} />
-                {pick("Verdict rapid înainte să cumperi", "Quick verdict before you buy")}
+                {pick("Viitorul cumpărăturilor este aici", "The future of shopping is here")}
               </div>
               <h1 className="mt-6 max-w-5xl text-5xl font-black leading-[1.02] md:text-7xl xl:text-8xl">
                 {pick(

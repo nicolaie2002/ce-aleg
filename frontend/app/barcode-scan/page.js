@@ -1386,9 +1386,9 @@ export default function BarcodeScanPage() {
                 Limita gratuita a fost atinsa
               </h2>
               <p className="mt-2 text-sm leading-6">
-                Ai folosit {billingGate.usage?.weeklyScansUsed || 0}/
-                  {billingGate.usage?.weeklyScanLimit || 5} scanări gratuite în
-                  această săptămână. Pro deblochează scanări nelimitate.
+                Ai folosit {billingGate.usage?.monthlyScansUsed ?? billingGate.usage?.weeklyScansUsed ?? 0}/
+                  {billingGate.usage?.monthlyScanLimit ?? billingGate.usage?.weeklyScanLimit ?? 5} scanări gratuite luna aceasta.
+                  Pro deblochează scanări nelimitate.
               </p>
               <Link
                 href="/pricing"

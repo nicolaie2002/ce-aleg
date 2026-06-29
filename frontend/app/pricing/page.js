@@ -16,9 +16,10 @@ const fallbackPlans = {
     name: "Free",
     monthlyPrice: 0,
     yearlyPrice: 0,
+    monthlyScanLimit: 5,
     weeklyScanLimit: 5,
     features: [
-      "5 scanari pe saptamana",
+      "5 scanari pe luna",
       "2 alternative pentru fiecare produs",
       "scanare cod de bare si cautare manuala",
       "verdict rapid",
@@ -89,9 +90,13 @@ const fallbackCoinPacks = [
 ];
 
 const featureLabels = {
+  "5 scanari pe luna": {
+    ro: "5 scanări pe lună",
+    en: "5 scans per month",
+  },
   "5 scanari pe saptamana": {
-    ro: "5 scanări pe săptămână",
-    en: "5 scans per week",
+    ro: "5 scanări pe lună",
+    en: "5 scans per month",
   },
   "2 alternative pentru fiecare produs": {
     ro: "2 alternative pentru fiecare produs",
@@ -635,8 +640,8 @@ export default function PricingPage() {
                     `${currentPlanName} is active.`
                   )
               : pick(
-                  `Ai folosit ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} scanări gratuite săptămâna aceasta.`,
-                  `You used ${billing.usage.weeklyScansUsed}/${billing.usage.weeklyScanLimit} free scans this week.`
+                  `Ai folosit ${billing.usage.monthlyScansUsed ?? billing.usage.weeklyScansUsed}/${billing.usage.monthlyScanLimit ?? billing.usage.weeklyScanLimit} scanări gratuite luna aceasta.`,
+                  `You used ${billing.usage.monthlyScansUsed ?? billing.usage.weeklyScansUsed}/${billing.usage.monthlyScanLimit ?? billing.usage.weeklyScanLimit} free scans this month.`
                 )}
           </div>
         )}

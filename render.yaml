@@ -28,6 +28,8 @@ services:
         value: "true"
       - key: PAYMENT_PROVIDER
         value: stripe
+      - key: FREE_MONTHLY_SCAN_LIMIT
+        value: "5"
       - key: FRONTEND_PUBLIC_URL
         value: https://www.cealeg.shop
       - key: FRONTEND_ORIGINS
@@ -47,6 +49,12 @@ services:
       - key: STRIPE_FAMILY_PRICE_ID
         sync: false
       - key: STRIPE_FAMILY_YEARLY_PRICE_ID
+        sync: false
+      - key: STRIPE_CECOINS_STARTER_PRICE_ID
+        sync: false
+      - key: STRIPE_CECOINS_BOOST_PRICE_ID
+        sync: false
+      - key: STRIPE_CECOINS_POWER_PRICE_ID
         sync: false
       - key: STRIPE_AUTOMATIC_TAX
         value: "false"

@@ -302,7 +302,13 @@ ALLOW_DEV_TUNNEL_ORIGINS = os.environ.get(
 
 AUTH_COOKIE_NAME = "cealeg_session"
 AUTH_MAX_AGE = 60 * 60 * 24 * 30
-FREE_WEEKLY_SCAN_LIMIT = int(os.environ.get("FREE_WEEKLY_SCAN_LIMIT", "5"))
+FREE_MONTHLY_SCAN_LIMIT = int(
+    os.environ.get(
+        "FREE_MONTHLY_SCAN_LIMIT",
+        os.environ.get("FREE_WEEKLY_SCAN_LIMIT", "5"),
+    )
+)
+FREE_WEEKLY_SCAN_LIMIT = FREE_MONTHLY_SCAN_LIMIT
 INVITE_BONUS_DAYS = int(os.environ.get("INVITE_BONUS_DAYS", "2"))
 SUBMISSION_APPROVAL_BONUS_CREDITS = int(
     os.environ.get("SUBMISSION_APPROVAL_BONUS_CREDITS", "1")
@@ -348,9 +354,10 @@ PLAN_CATALOG = {
         "name": "Free",
         "monthlyPrice": 0,
         "yearlyPrice": 0,
+        "monthlyScanLimit": FREE_MONTHLY_SCAN_LIMIT,
         "weeklyScanLimit": FREE_WEEKLY_SCAN_LIMIT,
         "features": [
-            "5 scanari pe saptamana",
+            "5 scanari pe luna",
             "2 alternative pentru fiecare produs",
             "scanare cod de bare si cautare manuala",
             "verdict rapid",
@@ -362,6 +369,7 @@ PLAN_CATALOG = {
         "name": "Pro",
         "monthlyPrice": 19.99,
         "yearlyPrice": 149,
+        "monthlyScanLimit": None,
         "weeklyScanLimit": None,
         "features": [
             "scanari nelimitate",
@@ -377,6 +385,7 @@ PLAN_CATALOG = {
         "name": "Family",
         "monthlyPrice": 29.99,
         "yearlyPrice": 249,
+        "monthlyScanLimit": None,
         "weeklyScanLimit": None,
         "features": [
             "scanari nelimitate",
@@ -1604,6 +1613,19 @@ def get_publication_readiness():
                 + "."
             )
 
+        missing_cecoin_prices = [
+            pack["priceEnv"]
+            for pack in CECOIN_PACKS
+            if not os.environ.get(pack["priceEnv"], "").strip()
+        ]
+
+        if missing_cecoin_prices:
+            warnings.append(
+                "Pachetele CeCoins nu pot fi cumparate inca. Lipsesc: "
+                + ", ".join(missing_cecoin_prices)
+                + "."
+            )
+
         if PRODUCTION_MODE and stripe_secret_key.startswith("sk_test_"):
             blockers.append(
                 "Stripe este in modul test. Configureaza STRIPE_SECRET_KEY live si price id-uri live."
@@ -1651,6 +1673,20 @@ def get_week_start(reference=None):
     reference = reference or datetime.utcnow()
     start = reference - timedelta(days=reference.weekday())
     return start.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_month_start(reference=None):
+    reference = reference or datetime.utcnow()
+    return reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_next_month_start(reference=None):
+    month_start = get_month_start(reference)
+
+    if month_start.month == 12:
+        return month_start.replace(year=month_start.year + 1, month=1)
+
+    return month_start.replace(month=month_start.month + 1)
 
 
 def get_or_create_subscription(user):
@@ -2172,31 +2208,42 @@ def cart_query_for_profile(user, profile=None):
     return query.filter(CartItem.family_profile_id == profile.id)
 
 
-def get_weekly_scan_count(user_id):
-    week_start = get_week_start()
+def get_monthly_scan_count(user_id):
+    month_start = get_month_start()
     return UsageEvent.query.filter(
         UsageEvent.user_id == user_id,
         UsageEvent.event_type == "scan",
-        UsageEvent.created_at >= week_start,
+        UsageEvent.created_at >= month_start,
     ).count()
+
+
+def get_weekly_scan_count(user_id):
+    return get_monthly_scan_count(user_id)
 
 
 def get_usage_summary(user):
     subscription = get_or_create_subscription(user)
     has_paid_plan = is_paid_subscription(subscription)
     has_bonus_unlimited = bonus_unlimited_is_active(user)
-    limit = None if has_paid_plan or has_bonus_unlimited else FREE_WEEKLY_SCAN_LIMIT
-    used = get_weekly_scan_count(user.id)
-    week_start = get_week_start()
-    reset_at = week_start + timedelta(days=7)
+    limit = None if has_paid_plan or has_bonus_unlimited else FREE_MONTHLY_SCAN_LIMIT
+    used = get_monthly_scan_count(user.id)
+    reset_at = get_next_month_start()
     bonus_credits = max(0, int(user.bonus_scan_credits or 0))
+    remaining = None if limit is None else max(limit - used, 0)
 
     return {
         "plan": subscription.plan,
         "status": subscription.status,
+        "monthlyScanLimit": limit,
+        "monthlyScansUsed": used,
+        "monthlyScansRemaining": remaining,
         "weeklyScanLimit": limit,
         "weeklyScansUsed": used,
-        "weeklyScansRemaining": None if limit is None else max(limit - used, 0),
+        "weeklyScansRemaining": remaining,
+        "freeScanLimit": limit,
+        "freeScansUsed": used,
+        "freeScansRemaining": remaining,
+        "scanLimitPeriod": "month",
         "bonusScanCredits": bonus_credits,
         "bonusUnlimitedUntil": (
             user.bonus_unlimited_until.isoformat() + "Z"
@@ -2213,7 +2260,7 @@ def get_usage_summary(user):
 def get_scan_limit_error():
     return {
         "code": "scan_limit_reached",
-        "message": "Ai folosit scanările gratuite din această săptămână. Poți trece la Pro sau folosi scanări bonus.",
+        "message": "Ai folosit scanările gratuite din această lună. Poți trece la Pro sau folosi scanări bonus.",
     }
 
 
@@ -2229,9 +2276,9 @@ def check_scan_usage_allowed(user):
     if bonus_unlimited_is_active(user):
         return {"allowed": True, "usage": get_usage_summary(user)}
 
-    used = get_weekly_scan_count(user.id)
+    used = get_monthly_scan_count(user.id)
 
-    if used >= FREE_WEEKLY_SCAN_LIMIT:
+    if used >= FREE_MONTHLY_SCAN_LIMIT:
         if max(0, int(user.bonus_scan_credits or 0)) > 0:
             return {"allowed": True, "usage": get_usage_summary(user)}
 
@@ -2255,7 +2302,7 @@ def consume_scan_usage(user, source, metadata=None):
     should_use_bonus_credit = (
         not is_paid_subscription(subscription)
         and not bonus_unlimited_is_active(user)
-        and get_weekly_scan_count(user.id) >= FREE_WEEKLY_SCAN_LIMIT
+        and get_monthly_scan_count(user.id) >= FREE_MONTHLY_SCAN_LIMIT
         and max(0, int(user.bonus_scan_credits or 0)) > 0
     )
 

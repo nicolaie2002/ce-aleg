@@ -358,16 +358,16 @@ export default function DashboardPage() {
   const bonusCredits = billing?.usage?.bonusScanCredits ?? user.bonusScanCredits ?? 0;
   const usage = billing?.usage || {};
   const hasUnlimitedScans = Boolean(usage.isUnlimited);
-  const weeklyLimit = usage.weeklyScanLimit;
-  const weeklyRemaining = usage.weeklyScansRemaining;
+  const monthlyLimit = usage.monthlyScanLimit ?? usage.weeklyScanLimit;
+  const monthlyRemaining = usage.monthlyScansRemaining ?? usage.weeklyScansRemaining;
   const freeScanValue = hasUnlimitedScans
     ? pick("Nelimitat", "Unlimited")
-    : Number.isFinite(weeklyLimit)
-      ? `${weeklyRemaining ?? 0}/${weeklyLimit}`
+    : Number.isFinite(monthlyLimit)
+      ? `${monthlyRemaining ?? 0}/${monthlyLimit}`
       : "-";
   const freeScanDetail = hasUnlimitedScans
     ? pick("scanări prin plan", "plan scans")
-    : pick("rămase săptămâna aceasta", "left this week");
+    : pick("rămase luna aceasta", "left this month");
   const fallbackMissions = [
     {
       id: "first_scan",
@@ -465,7 +465,7 @@ export default function DashboardPage() {
     {
       id: "bonus_scan_1",
       title: pick("1 scanare bonus", "1 bonus scan"),
-      description: pick("Adaugă o scanare extra peste limita săptămânală.", "Add one extra scan over the weekly limit."),
+      description: pick("Adaugă o scanare extra peste limita lunară.", "Add one extra scan over the monthly limit."),
       cost: 80,
     },
     {
@@ -539,7 +539,7 @@ export default function DashboardPage() {
     {
       label: pick("Plan", "Plan"),
       value: String(usage.plan || "free").toUpperCase(),
-      detail: hasUnlimitedScans ? pick("scanări nelimitate", "unlimited scans") : pick("5 scanări gratuite", "5 free scans"),
+      detail: hasUnlimitedScans ? pick("scanări nelimitate", "unlimited scans") : pick("5 scanări gratuite lunar", "5 free scans monthly"),
       icon: Trophy,
       tone: "border-violet-300/25 bg-violet-300/[0.08] text-violet-100",
     },
@@ -620,8 +620,8 @@ export default function DashboardPage() {
                   {billing.usage.isUnlimited
                     ? pick("Ai scanări nelimitate active.", "Unlimited scans are active.")
                     : pick(
-                        `Mai ai ${billing.usage.weeklyScansRemaining}/${billing.usage.weeklyScanLimit} scanări gratuite săptămâna aceasta.`,
-                        `${billing.usage.weeklyScansRemaining}/${billing.usage.weeklyScanLimit} free scans left this week.`
+                        `Mai ai ${billing.usage.monthlyScansRemaining ?? billing.usage.weeklyScansRemaining}/${billing.usage.monthlyScanLimit ?? billing.usage.weeklyScanLimit} scanări gratuite luna aceasta.`,
+                        `${billing.usage.monthlyScansRemaining ?? billing.usage.weeklyScansRemaining}/${billing.usage.monthlyScanLimit ?? billing.usage.weeklyScanLimit} free scans left this month.`
                       )}
                 </p>
               </div>
