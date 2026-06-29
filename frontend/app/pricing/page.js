@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Check, CreditCard, Crown, Sparkles, Zap } from "lucide-react";
 import { API_URL } from "../config";
@@ -56,6 +57,36 @@ const fallbackPlans = {
     ],
   },
 };
+
+const fallbackCoinPacks = [
+  {
+    id: "starter",
+    title: "Start CeCoins",
+    coins: 500,
+    priceText: "9,99 lei",
+    configured: false,
+    descriptionRo: "Pentru cateva scanari bonus si recompense rapide.",
+    descriptionEn: "For a few bonus scans and quick rewards.",
+  },
+  {
+    id: "boost",
+    title: "Boost CeCoins",
+    coins: 1200,
+    priceText: "19,99 lei",
+    configured: false,
+    descriptionRo: "Mai multe puncte pentru saptamanile cu multe cumparaturi.",
+    descriptionEn: "More points for weeks with heavier shopping.",
+  },
+  {
+    id: "power",
+    title: "Power CeCoins",
+    coins: 3000,
+    priceText: "39,99 lei",
+    configured: false,
+    descriptionRo: "Cel mai bun pachet pentru scanari bonus si activari dese.",
+    descriptionEn: "The best pack for bonus scans and frequent unlocks.",
+  },
+];
 
 const featureLabels = {
   "5 scanari pe saptamana": {
@@ -279,6 +310,9 @@ export default function PricingPage() {
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState("info");
   const [busyPlan, setBusyPlan] = useState("");
+  const [coinPacks, setCoinPacks] = useState(fallbackCoinPacks);
+  const [busyCoinPack, setBusyCoinPack] = useState("");
+  const [coinPackMessage, setCoinPackMessage] = useState("");
   const [isOpeningPortal, setIsOpeningPortal] = useState(false);
   const [billingCycle, setBillingCycle] = useState("monthly");
   const plans = billing?.plans || fallbackPlans;
@@ -303,6 +337,33 @@ export default function PricingPage() {
 
   useEffect(() => {
     loadBillingStatus({ syncStripe: true });
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    fetch(`${API_URL}/gamification/summary`)
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (isMounted && response.ok && data.coinPacks?.length) {
+          setCoinPacks(
+            data.coinPacks.map((pack) => ({
+              ...pack,
+              descriptionRo:
+                fallbackCoinPacks.find((fallbackPack) => fallbackPack.id === pack.id)?.descriptionRo ||
+                "CeCoins pentru bonusuri si activari in aplicatie.",
+              descriptionEn:
+                fallbackCoinPacks.find((fallbackPack) => fallbackPack.id === pack.id)?.descriptionEn ||
+                "CeCoins for bonuses and in-app unlocks.",
+            }))
+          );
+        }
+      })
+      .catch(() => null);
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -403,6 +464,59 @@ export default function PricingPage() {
       );
     } finally {
       setBusyPlan("");
+    }
+  }
+
+  async function buyCoinPack(packId) {
+    if (!packId || busyCoinPack) return;
+
+    setBusyCoinPack(packId);
+    setCoinPackMessage("");
+
+    try {
+      const response = await fetch(`${API_URL}/gamification/coin-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId }),
+      });
+      const data = await readApiJson(response);
+
+      if (response.status === 401 || response.status === 403) {
+        window.location.assign("/login?next=/pricing");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data.error ||
+            pick(
+              "Pachetul CeCoins nu poate fi cumpărat acum.",
+              "This CeCoins pack cannot be purchased right now."
+            )
+        );
+      }
+
+      if (data.checkoutUrl) {
+        window.location.assign(data.checkoutUrl);
+        return;
+      }
+
+      throw new Error(
+        pick(
+          "Stripe nu a trimis linkul de plată.",
+          "Stripe did not return a payment link."
+        )
+      );
+    } catch (error) {
+      setCoinPackMessage(
+        error.message ||
+          pick(
+            "Cumpărarea de CeCoins nu poate fi pornită acum.",
+            "CeCoins checkout cannot start right now."
+          )
+      );
+    } finally {
+      setBusyCoinPack("");
     }
   }
 
@@ -587,6 +701,87 @@ export default function PricingPage() {
             />
           ))}
         </div>
+
+        <section className="mt-10 rounded-2xl border border-cyan-300/20 bg-black/30 p-5 shadow-2xl backdrop-blur md:p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                <Image
+                  src="/brand/CeCoin.png"
+                  alt=""
+                  width={28}
+                  height={28}
+                  className="rounded-full"
+                />
+                {pick("CeCoins", "CeCoins")}
+              </p>
+              <h2 className="mt-3 text-3xl font-black">
+                {pick("Cumpără CeCoins pentru bonusuri rapide.", "Buy CeCoins for quick bonuses.")}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">
+                {pick(
+                  "Folosești CeCoins pentru scanări bonus și activări temporare în magazinul de recompense. Abonamentele rămân cea mai bună opțiune pentru utilizare constantă.",
+                  "Use CeCoins for bonus scans and temporary unlocks in the rewards shop. Subscriptions remain the best option for regular use."
+                )}
+              </p>
+            </div>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10"
+            >
+              {pick("Vezi soldul în dashboard", "See balance in dashboard")}
+            </Link>
+          </div>
+
+          {coinPackMessage && (
+            <p className="mt-4 rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-3 text-sm font-bold text-yellow-100">
+              {coinPackMessage}
+            </p>
+          )}
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {coinPacks.map((pack) => (
+              <InteractiveSurface
+                key={pack.id}
+                className="flex h-full flex-col rounded-xl border border-white/10 bg-white/[0.045] p-5 shadow-xl"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <Image
+                      src="/brand/CeCoin.png"
+                      alt=""
+                      width={42}
+                      height={42}
+                      className="rounded-full shadow-[0_0_24px_rgba(250,204,21,.18)]"
+                    />
+                    <div>
+                      <h3 className="text-lg font-black">{pack.title}</h3>
+                      <p className="text-sm font-bold text-yellow-100">{pack.coins} CeCoins</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-xs font-black text-yellow-100">
+                    {pack.priceText}
+                  </span>
+                </div>
+                <p className="mt-4 flex-1 text-sm leading-6 text-gray-300">
+                  {pick(pack.descriptionRo, pack.descriptionEn)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => buyCoinPack(pack.id)}
+                  disabled={!pack.configured || busyCoinPack === pack.id}
+                  className="mt-5 rounded-lg bg-white px-4 py-3 font-black text-black transition hover:bg-yellow-100 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-400"
+                >
+                  {busyCoinPack === pack.id
+                    ? pick("Se deschide plata...", "Opening checkout...")
+                    : pack.configured
+                      ? pick("Cumpără acum", "Buy now")
+                      : pick("În curând", "Coming soon")}
+                </button>
+              </InteractiveSurface>
+            ))}
+          </div>
+        </section>
       </section>
     </main>
   );

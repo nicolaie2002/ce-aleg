@@ -313,6 +313,11 @@ export default function DashboardPage() {
       const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          window.location.assign("/login?next=/dashboard");
+          return;
+        }
+
         throw new Error(data.error || "Pachetul CeCoins nu poate fi cumpărat acum.");
       }
 
@@ -477,7 +482,30 @@ export default function DashboardPage() {
     },
   ];
   const shopItems = gamification?.shopItems?.length ? gamification.shopItems : fallbackShopItems;
-  const coinPacks = gamification?.coinPacks || [];
+  const fallbackCoinPacks = [
+    {
+      id: "starter",
+      title: "Start CeCoins",
+      coins: 500,
+      priceText: "9,99 lei",
+      configured: false,
+    },
+    {
+      id: "boost",
+      title: "Boost CeCoins",
+      coins: 1200,
+      priceText: "19,99 lei",
+      configured: false,
+    },
+    {
+      id: "power",
+      title: "Power CeCoins",
+      coins: 3000,
+      priceText: "39,99 lei",
+      configured: false,
+    },
+  ];
+  const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;
   const missionCopy = {
     first_scan: {
       title: pick("Prima scanare", "First scan"),
