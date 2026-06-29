@@ -54,6 +54,14 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
     return pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
   }
 
+  function getNavigationLabel(label, href) {
+    if (href === "/cart" && cartCount > 0) {
+      return `${label}: ${cartCount} ${pick("produse", "items")}`;
+    }
+
+    return label;
+  }
+
   useEffect(() => {
     document.body.classList.add("ce-has-mobile-dock");
     return () => document.body.classList.remove("ce-has-mobile-dock");
@@ -158,6 +166,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
               <Link
                 key={href}
                 href={href}
+                aria-label={getNavigationLabel(desktopLabel, href)}
                 aria-current={isActive(href) ? "page" : undefined}
                 className={`ce-nav-link inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold ${
                   isActive(href)
@@ -203,6 +212,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
           <Link
             key={href}
             href={href}
+            aria-label={getNavigationLabel(label, href)}
             aria-current={isActive(href) ? "page" : undefined}
             className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-bold ${
               isActive(href)

@@ -23,6 +23,35 @@ const criteriaLabels = {
   value: "best value",
 };
 
+const goalCriteriaMap = {
+  balanced: ["value"],
+  budget: ["cheap"],
+  fitness: ["protein", "low_sugar", "low_calorie"],
+  clean: ["natural"],
+};
+
+const allergenKeywords = {
+  gluten: ["gluten", "grau", "wheat", "barley", "orz", "rye", "secara"],
+  lactose: ["lapte", "milk", "lactoza", "lactose", "whey", "zer", "smantana", "cream"],
+  peanuts: ["arahide", "peanuts", "peanut"],
+  nuts: ["alune", "hazelnut", "hazelnuts", "migdale", "almond", "cashew", "nuci", "walnut"],
+  soy: ["soia", "soy", "soya"],
+  egg: ["ou", "egg", "eggs"],
+  fish: ["peste", "fish", "ton", "tuna", "somon", "salmon"],
+  sesame: ["susan", "sesame"],
+};
+
+const allergyLabels = {
+  gluten: "Gluten",
+  lactose: "Lactoză",
+  peanuts: "Arahide",
+  nuts: "Fructe cu coajă",
+  soy: "Soia",
+  egg: "Ou",
+  fish: "Pește",
+  sesame: "Susan",
+};
+
 function getStoreName(storeId) {
   const stores = {
     lidl: "Lidl",
@@ -51,8 +80,52 @@ function normalizeCategory(category) {
   if (text.includes("lactate")) return "lactate";
   if (text.includes("snacks")) return "snacks";
   if (text.includes("bauturi")) return "bauturi";
+  if (text.includes("carne")) return "carne";
+  if (text.includes("paste") || text.includes("noodles")) return "noodles";
 
   return text;
+}
+
+function getProductFamily(product) {
+  const text = productSearchText(product);
+
+  if (/\b(apa|water|mineral)\b/.test(text)) return "water";
+  if (text.includes("energy") || text.includes("energiz") || text.includes("taurina")) return "energy_drink";
+  if (text.includes("cafea") || text.includes("coffee") || text.includes("cappuccino") || text.includes("latte")) return "coffee_drink";
+  if (text.includes("cola") || text.includes("pepsi")) return "cola";
+  if (text.includes("suc") || text.includes("juice") || text.includes("soft drink")) return "soft_drink";
+  if (text.includes("iaurt") || text.includes("yogurt") || text.includes("yoghurt")) return "yogurt";
+  if (text.includes("lapte") || text.includes("milk") || text.includes("branza") || text.includes("cheese")) return "dairy";
+  if (text.includes("muschi") || text.includes("sunca") || text.includes("ham") || text.includes("salam") || text.includes("prosciutto")) return "meat";
+  if (text.includes("buldak") || text.includes("noodle") || text.includes("noodles") || text.includes("ramen")) return "noodles";
+  if (text.includes("ciocolata") || text.includes("chocolate") || text.includes("nutella")) return "sweets";
+  if (text.includes("biscuit") || text.includes("wafer") || text.includes("napolit")) return "biscuits";
+  if (text.includes("chips") || text.includes("snack") || text.includes("crisps")) return "snacks";
+  if (text.includes("inghetata") || text.includes("ice cream") || text.includes("gelato")) return "ice_cream";
+  if (text.includes("sos") || text.includes("sauce") || text.includes("ketchup") || text.includes("mustar")) return "sauce";
+  if (text.includes("cereale") || text.includes("cereal") || text.includes("granola")) return "cereal";
+
+  return normalizeCategory(product.category || "");
+}
+
+function areCompatibleFamilies(scannedProduct, candidate) {
+  if (!scannedProduct) return true;
+
+  const scannedFamily = getProductFamily(scannedProduct);
+  const candidateFamily = getProductFamily(candidate);
+
+  if (!scannedFamily || !candidateFamily) return true;
+  if (scannedFamily === candidateFamily) return true;
+
+  const familyGroups = [
+    ["energy_drink", "coffee_drink", "cola", "soft_drink"],
+    ["yogurt", "dairy"],
+    ["snacks", "biscuits", "sweets"],
+  ];
+
+  return familyGroups.some(
+    (group) => group.includes(scannedFamily) && group.includes(candidateFamily)
+  );
 }
 
 function normalizeProductName(name) {
@@ -322,6 +395,51 @@ function productSearchText(product) {
   );
 }
 
+function productIngredientText(product) {
+  return normalizeText(
+    [
+      product.ingredients,
+      product.reason,
+      product.name,
+      product.category,
+      product.labels,
+      product.tag,
+    ]
+      .filter(Boolean)
+      .join(" ")
+  );
+}
+
+function splitAvoidIngredients(value) {
+  return normalizeText(value)
+    .split(/[,;\n]+/)
+    .map((item) => item.trim())
+    .filter((item) => item.length >= 3);
+}
+
+function getCriteriaFromGoal(goal) {
+  return goalCriteriaMap[goal] || [];
+}
+
+function productViolatesPreferences(product, preferences) {
+  if (!preferences) return false;
+
+  const text = productIngredientText(product);
+  const selectedAllergies = Array.isArray(preferences.allergies)
+    ? preferences.allergies
+    : [];
+  const avoids = splitAvoidIngredients(preferences.avoidIngredients || "");
+
+  for (const allergy of selectedAllergies) {
+    const keywords = allergenKeywords[allergy] || [];
+    if (keywords.some((keyword) => text.includes(keyword))) {
+      return true;
+    }
+  }
+
+  return avoids.some((keyword) => text.includes(keyword));
+}
+
 function filterProductsBySearch(products, requestText) {
   const text = normalizeText(requestText).trim();
   if (!text) return products;
@@ -499,7 +617,8 @@ function filterProductsByCriteria(
   allProducts,
   storeName,
   criteriaList,
-  scannedProduct
+  scannedProduct,
+  profilePreferences = null
 ) {
   let filteredProducts = [...allProducts];
 
@@ -511,6 +630,24 @@ function filterProductsByCriteria(
 
       return !hasSameId && !isSameProductVariant(product, scannedProduct);
     });
+
+    const compatibleProducts = filteredProducts.filter((product) =>
+      areCompatibleFamilies(scannedProduct, product)
+    );
+
+    if (compatibleProducts.length >= 2) {
+      filteredProducts = compatibleProducts;
+    }
+  }
+
+  if (profilePreferences) {
+    const safeProducts = filteredProducts.filter(
+      (product) => !productViolatesPreferences(product, profilePreferences)
+    );
+
+    if (safeProducts.length > 0) {
+      filteredProducts = safeProducts;
+    }
   }
 
   if (
@@ -618,18 +755,30 @@ function AlternativesPageContent() {
   const profileCriteriaIds = Array.isArray(profilePreferences?.criteria)
     ? profilePreferences.criteria
     : [];
+  const profileGoalCriteriaIds = getCriteriaFromGoal(profilePreferences?.goal || "balanced");
   const profileRequest = profilePreferences?.request || "";
   const preferenceRequest = [customRequest, profileRequest].filter(Boolean).join(" ");
 
   const inferredCriteria = inferCriteriaFromRequest(preferenceRequest);
 
   const finalCriteriaIds = Array.from(
-    new Set([...profileCriteriaIds, ...selectedCriteriaIds, ...inferredCriteria])
+    new Set([
+      ...profileCriteriaIds,
+      ...profileGoalCriteriaIds,
+      ...selectedCriteriaIds,
+      ...inferredCriteria,
+    ])
   );
 
   const selectedCriteria = finalCriteriaIds.map(
     (item) => criteriaLabels[item] || item
   );
+  const selectedAllergyLabels = Array.isArray(profilePreferences?.allergies)
+    ? profilePreferences.allergies
+        .map((item) => allergyLabels[item] || item)
+        .filter(Boolean)
+    : [];
+  const selectedAvoidIngredients = splitAvoidIngredients(profilePreferences?.avoidIngredients || "");
 
   const currentPlan = billing?.usage?.plan || "free";
   const isPaidPlan = currentPlan === "pro" || currentPlan === "family";
@@ -752,6 +901,7 @@ function AlternativesPageContent() {
       const savedProfileCriteriaIds = Array.isArray(savedPreferences?.criteria)
         ? savedPreferences.criteria
         : [];
+      const savedGoalCriteriaIds = getCriteriaFromGoal(savedPreferences?.goal || "balanced");
       const savedPreferenceRequest = [
         customRequest,
         savedPreferences?.request || "",
@@ -761,6 +911,7 @@ function AlternativesPageContent() {
       const savedCriteriaIds = Array.from(
         new Set([
           ...savedProfileCriteriaIds,
+          ...savedGoalCriteriaIds,
           ...selectedCriteriaIds,
           ...inferCriteriaFromRequest(savedPreferenceRequest),
         ])
@@ -810,7 +961,8 @@ function AlternativesPageContent() {
     products,
     storeName,
     combinedCriteriaIds,
-    scannedProduct
+    scannedProduct,
+    profilePreferences
   );
   const recommendedProducts =
     isPaidPlan && alternativeSearch.trim() && !searchWarning
@@ -972,26 +1124,26 @@ function AlternativesPageContent() {
         </div>
 
         {addedProduct && (
-          <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
+          <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
             Produs adăugat în coș:{" "}
             <span className="font-bold">{addedProduct}</span>
           </div>
         )}
 
         {favoriteProduct && (
-          <div className="mb-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-300">
+          <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-300">
             {favoriteProduct}
           </div>
         )}
 
         {errorMessage && (
-          <div className="mb-6 rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-red-300">
+          <div role="alert" className="mb-6 rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-red-300">
             {errorMessage}
           </div>
         )}
 
         {lookupNotice && (
-          <div className="mb-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-100">
+          <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-100">
             {lookupNotice}
           </div>
         )}
@@ -1029,7 +1181,7 @@ function AlternativesPageContent() {
             </div>
           </div>
 
-          {(selectedCriteria.length > 0 || customRequest) && (
+          {(selectedCriteria.length > 0 || selectedAllergyLabels.length > 0 || selectedAvoidIngredients.length > 0 || customRequest) && (
             <div className="mt-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5">
               <h2 className="font-bold text-emerald-300">Criterii folosite</h2>
 
@@ -1049,6 +1201,24 @@ function AlternativesPageContent() {
                     Ordinea recomandărilor combină toate criteriile selectate.
                   </p>
                 </>
+              )}
+
+              {(selectedAllergyLabels.length > 0 || selectedAvoidIngredients.length > 0) && (
+                <div className="mt-4">
+                  <p className="text-sm font-bold text-yellow-100">Filtre de siguranță</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedAllergyLabels.map((item) => (
+                      <span key={item} className="rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-sm font-semibold text-yellow-100">
+                        {item}
+                      </span>
+                    ))}
+                    {selectedAvoidIngredients.map((item) => (
+                      <span key={item} className="rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-sm font-semibold text-yellow-100">
+                        Evită {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {customRequest && (
@@ -1079,7 +1249,7 @@ function AlternativesPageContent() {
                 </p>
                 <h2 className="mt-1 text-2xl font-black">
                   {isPaidPlan
-                    ? "Cere alternative dupa gustul tau."
+                    ? "Caută alternative potrivite."
                     : "Primele 2 alternative sunt incluse gratis."}
                 </h2>
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-300">

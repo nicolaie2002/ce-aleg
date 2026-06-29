@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, ScanLine, SlidersHorizontal, UserRound } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  Check,
+  ScanLine,
+  SlidersHorizontal,
+  Target,
+  UserRound,
+} from "lucide-react";
 import { AppHeader } from "../components/AppHeader";
 import { FamilyProfiles } from "../components/FamilyProfiles";
 import { InteractiveSurface } from "../components/InteractiveSurface";
@@ -73,9 +81,54 @@ const criteria = [
   },
 ];
 
+const goals = [
+  {
+    id: "balanced",
+    ro: "Echilibru",
+    en: "Balanced",
+    detailRo: "Recomandări care combină scorul, ingredientele și valorile nutriționale.",
+    detailEn: "Recommendations that balance score, ingredients and nutrition.",
+  },
+  {
+    id: "budget",
+    ro: "Buget",
+    en: "Budget",
+    detailRo: "Prioritizează variante mai avantajoase când există prețuri comparabile.",
+    detailEn: "Prioritize better value when comparable prices are available.",
+  },
+  {
+    id: "fitness",
+    ro: "Proteină și sațietate",
+    en: "Protein and satiety",
+    detailRo: "Caută produse cu proteină mai bună și zahăr/calorii controlate.",
+    detailEn: "Look for better protein with controlled sugar and calories.",
+  },
+  {
+    id: "clean",
+    ro: "Ingrediente simple",
+    en: "Simple ingredients",
+    detailRo: "Favorizează produse cu etichete mai scurte și mai ușor de înțeles.",
+    detailEn: "Favor products with shorter, clearer labels.",
+  },
+];
+
+const allergyOptions = [
+  { id: "gluten", ro: "Gluten", en: "Gluten" },
+  { id: "lactose", ro: "Lactoză", en: "Lactose" },
+  { id: "peanuts", ro: "Arahide", en: "Peanuts" },
+  { id: "nuts", ro: "Fructe cu coajă", en: "Tree nuts" },
+  { id: "soy", ro: "Soia", en: "Soy" },
+  { id: "egg", ro: "Ou", en: "Egg" },
+  { id: "fish", ro: "Pește", en: "Fish" },
+  { id: "sesame", ro: "Susan", en: "Sesame" },
+];
+
 export default function PreferencesPage() {
   const { pick, locale } = useLocale();
   const [selectedCriteria, setSelectedCriteria] = useState([]);
+  const [selectedGoal, setSelectedGoal] = useState("balanced");
+  const [selectedAllergies, setSelectedAllergies] = useState([]);
+  const [avoidIngredients, setAvoidIngredients] = useState("");
   const [request, setRequest] = useState("");
   const [saved, setSaved] = useState(false);
   const [activeProfile, setActiveProfileState] = useState(null);
@@ -90,11 +143,17 @@ export default function PreferencesPage() {
 
     if (!savedPreferences) {
       setSelectedCriteria([]);
+      setSelectedGoal("balanced");
+      setSelectedAllergies([]);
+      setAvoidIngredients("");
       setRequest("");
       return;
     }
 
     setSelectedCriteria(Array.isArray(savedPreferences.criteria) ? savedPreferences.criteria : []);
+    setSelectedGoal(savedPreferences.goal || "balanced");
+    setSelectedAllergies(Array.isArray(savedPreferences.allergies) ? savedPreferences.allergies : []);
+    setAvoidIngredients(savedPreferences.avoidIngredients || "");
     setRequest(savedPreferences.request || "");
   }
 
@@ -125,11 +184,23 @@ export default function PreferencesPage() {
     );
   }
 
+  function toggleAllergy(id) {
+    setSaved(false);
+    setSelectedAllergies((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id]
+    );
+  }
+
   function savePreferences() {
     saveProfilePreferences(activeProfile?.id, {
       profileId: activeProfile?.id || null,
       profileName: activeProfile?.name || "",
       criteria: selectedCriteria,
+      goal: selectedGoal,
+      allergies: selectedAllergies,
+      avoidIngredients,
       request,
     });
     setSaved(true);
@@ -137,6 +208,9 @@ export default function PreferencesPage() {
 
   function resetPreferences() {
     setSelectedCriteria([]);
+    setSelectedGoal("balanced");
+    setSelectedAllergies([]);
+    setAvoidIngredients("");
     setRequest("");
     clearProfilePreferences(activeProfile?.id);
     setSaved(false);
@@ -165,6 +239,43 @@ export default function PreferencesPage() {
               )}
             </p>
 
+            <div className="mt-7 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                <Target size={17} />
+                {pick("Obiectiv principal", "Main goal")}
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {goals.map((goal) => {
+                  const selected = selectedGoal === goal.id;
+
+                  return (
+                    <button
+                      key={goal.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => {
+                        setSaved(false);
+                        setSelectedGoal(goal.id);
+                      }}
+                      className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
+                        selected
+                          ? "border-cyan-200 bg-cyan-200 text-black shadow-[0_18px_38px_-28px_rgba(103,232,249,.7)]"
+                          : "border-white/10 bg-white/[0.035] hover:border-cyan-200/45 hover:bg-white/[0.07]"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-3">
+                        <span className="font-black">{locale === "en" ? goal.en : goal.ro}</span>
+                        {selected && <Check size={17} />}
+                      </span>
+                      <span className={`mt-2 block text-sm leading-6 ${selected ? "text-black/70" : "text-gray-400"}`}>
+                        {locale === "en" ? goal.detailEn : goal.detailRo}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="mt-7 grid gap-3 sm:grid-cols-2">
               {criteria.map((item) => {
                 const selected = selectedCriteria.includes(item.id);
@@ -173,6 +284,7 @@ export default function PreferencesPage() {
                   <button
                     key={item.id}
                     type="button"
+                    aria-pressed={selected}
                     onClick={() => toggleCriterion(item.id)}
                     className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
                       selected
@@ -190,6 +302,54 @@ export default function PreferencesPage() {
                   </button>
                 );
               })}
+            </div>
+
+            <div className="mt-7 rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="flex items-center gap-2 text-sm font-black text-yellow-200">
+                <AlertTriangle size={17} />
+                {pick("Alergii și ingrediente de evitat", "Allergies and ingredients to avoid")}
+              </p>
+              <p className="mt-2 text-sm leading-6 text-gray-400">
+                {pick(
+                  "Le folosim ca filtru de siguranță pentru alternative. Verifică totuși eticheta în magazin înainte să cumperi.",
+                  "We use these as a safety filter for alternatives. Still check the label in store before buying."
+                )}
+              </p>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {allergyOptions.map((item) => {
+                  const selected = selectedAllergies.includes(item.id);
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={selected}
+                      onClick={() => toggleAllergy(item.id)}
+                      className={`rounded-lg border px-3 py-2 text-left text-sm font-black transition hover:-translate-y-0.5 ${
+                        selected
+                          ? "border-yellow-200 bg-yellow-200 text-black"
+                          : "border-white/10 bg-white/[0.035] text-gray-200 hover:border-yellow-200/50"
+                      }`}
+                    >
+                      {locale === "en" ? item.en : item.ro}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <label className="mt-4 block text-sm font-bold text-gray-300">
+                {pick("Alte ingrediente de evitat", "Other ingredients to avoid")}
+                <input
+                  value={avoidIngredients}
+                  onChange={(event) => {
+                    setSaved(false);
+                    setAvoidIngredients(event.target.value);
+                  }}
+                  placeholder={pick("Ex: palmier, aspartam, coloranți", "Example: palm oil, aspartame, colorants")}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-black/25 px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
+                />
+              </label>
             </div>
 
             <label className="mt-7 block text-sm font-bold text-gray-300">
@@ -218,7 +378,7 @@ export default function PreferencesPage() {
             </div>
 
             {saved && (
-              <p className="mt-4 rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm text-cyan-100">
+              <p role="status" aria-live="polite" className="mt-4 rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm text-cyan-100">
                 {pick("Preferintele au fost salvate pentru profilul activ.", "Preferences were saved for the active profile.")}
               </p>
             )}
@@ -234,22 +394,42 @@ export default function PreferencesPage() {
               <h2 className="mt-2 text-2xl font-black">
                 {activeProfile?.name || pick("Profil principal", "Main profile")}
               </h2>
+              <p className="mt-3 inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-sm font-black text-cyan-100">
+                {locale === "en"
+                  ? goals.find((goal) => goal.id === selectedGoal)?.en
+                  : goals.find((goal) => goal.id === selectedGoal)?.ro}
+              </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {selectedSummary.map((item) => (
                   <span key={item.id} className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-sm text-cyan-100">
                     {locale === "en" ? item.en : item.ro}
                   </span>
                 ))}
-                {!selectedSummary.length && (
+                {selectedAllergies.map((id) => {
+                  const option = allergyOptions.find((item) => item.id === id);
+                  if (!option) return null;
+
+                  return (
+                    <span key={id} className="inline-flex rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-sm text-yellow-100">
+                      {locale === "en" ? option.en : option.ro}
+                    </span>
+                  );
+                })}
+                {!selectedSummary.length && !selectedAllergies.length && (
                   <p className="text-sm leading-6 text-gray-400">
                     {pick("Nu ai selectat inca prioritati.", "No priorities selected yet.")}
                   </p>
                 )}
               </div>
+              {avoidIngredients && (
+                <p className="mt-4 rounded-xl border border-yellow-300/20 bg-yellow-300/10 p-4 text-sm leading-6 text-yellow-50">
+                  {pick("Evită:", "Avoid:")} {avoidIngredients}
+                </p>
+              )}
               {request && <p className="mt-5 rounded-xl border border-white/10 bg-black/24 p-4 text-sm leading-6 text-gray-300">{request}</p>}
-              <Link href="/live-assistant" className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100">
+              <Link href="/barcode-scan" className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100">
                 <ScanLine size={17} />
-                {pick("Testeaza cu asistentul live", "Try with live assistant")}
+                {pick("Scaneaza cu profilul activ", "Scan with active profile")}
               </Link>
             </InteractiveSurface>
           </aside>

@@ -195,7 +195,7 @@ function SubmitProductPageContent() {
         throw new Error(data.error || "Nu s-a putut trimite produsul.");
       }
 
-      setMessage("Produsul a fost trimis ca propunere.");
+      setMessage("Produsul a fost trimis ca propunere. După verificare și aprobare, primești o scanare bonus.");
 
       setForm({
         productName: "",

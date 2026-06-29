@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  Award,
   ArrowLeft,
   ArrowRight,
   Barcode,
@@ -18,7 +19,9 @@ import {
   ShieldCheck,
   ShoppingCart,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
+  Trophy,
 } from "lucide-react";
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
@@ -255,6 +258,41 @@ export default function DashboardPage() {
       : pick("Se generează...", "Generating...");
   const bonusUntil = billing?.usage?.bonusUnlimitedUntil || user.bonusUnlimitedUntil;
   const bonusCredits = billing?.usage?.bonusScanCredits ?? user.bonusScanCredits ?? 0;
+  const rewardBadges = [
+    {
+      label: pick("Prima scanare", "First scan"),
+      detail: pick("Ai început istoricul de produse.", "You started your product history."),
+      done: counts.history >= 1,
+    },
+    {
+      label: pick("10 scanări", "10 scans"),
+      detail: pick("Ai comparat deja mai multe alegeri.", "You have compared several choices."),
+      done: counts.history >= 10,
+    },
+    {
+      label: pick("Favorite utile", "Useful favorites"),
+      detail: pick("Ai salvat produse pe care merită să revii.", "You saved products worth revisiting."),
+      done: counts.favorites >= 3,
+    },
+    {
+      label: pick("Coș pregătit", "Cart ready"),
+      detail: pick("Lista ta are produse pentru următoarea cumpărătură.", "Your list has products for the next trip."),
+      done: counts.cart >= 5,
+    },
+    {
+      label: pick("Invită un prieten", "Invite a friend"),
+      detail: pick("Bonusurile cresc când un prieten confirmă contul.", "Rewards grow when a friend verifies their account."),
+      done: Boolean(bonusUntil) || bonusCredits > 0,
+    },
+  ];
+  const completedRewards = rewardBadges.filter((badge) => badge.done).length;
+  const rewardLevel =
+    completedRewards >= 4
+      ? pick("Avansat", "Advanced")
+      : completedRewards >= 2
+        ? pick("În creștere", "Building")
+        : pick("Start bun", "Good start");
+  const rewardProgress = Math.round((completedRewards / rewardBadges.length) * 100);
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
@@ -358,6 +396,57 @@ export default function DashboardPage() {
 
           <div className="mt-6">
             <FamilyProfiles />
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-violet-300/20 bg-violet-300/[0.055] p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="inline-flex items-center gap-2 text-sm font-black text-violet-200">
+                  <Trophy size={17} />
+                  {pick("Progresul tău", "Your progress")}
+                </p>
+                <h2 className="mt-2 text-2xl font-black">
+                  {pick("Nivel", "Level")}: {rewardLevel}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-gray-300">
+                  {pick(
+                    "Scanează, salvează favorite și invită prieteni ca să deblochezi bonusuri utile.",
+                    "Scan, save favorites and invite friends to unlock useful rewards."
+                  )}
+                </p>
+              </div>
+              <div className="w-full rounded-xl border border-white/10 bg-black/25 p-4 lg:w-[320px]">
+                <div className="flex items-center justify-between text-sm font-black">
+                  <span className="inline-flex items-center gap-2 text-cyan-200">
+                    <Sparkles size={16} />
+                    {pick("Badge-uri", "Badges")}
+                  </span>
+                  <span>{completedRewards}/{rewardBadges.length}</span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                  <div className="h-full rounded-full bg-cyan-300 transition-all" style={{ width: `${rewardProgress}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              {rewardBadges.map((badge) => (
+                <div
+                  key={badge.label}
+                  className={`rounded-xl border p-4 ${
+                    badge.done
+                      ? "border-cyan-300/35 bg-cyan-300/10"
+                      : "border-white/10 bg-white/[0.035]"
+                  }`}
+                >
+                  <p className={`flex items-center gap-2 text-sm font-black ${badge.done ? "text-cyan-100" : "text-gray-300"}`}>
+                    <Award size={16} />
+                    {badge.label}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-gray-400">{badge.detail}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
