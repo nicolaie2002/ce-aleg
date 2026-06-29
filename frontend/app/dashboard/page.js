@@ -7,6 +7,10 @@ import {
   ArrowRight,
   Barcode,
   Clock3,
+  Copy,
+  Eye,
+  EyeOff,
+  Gift,
   Heart,
   ListPlus,
   LogOut,
@@ -61,6 +65,8 @@ export default function DashboardPage() {
   const [lastScannedProduct, setLastScannedProduct] = useState("-");
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [isInviteVisible, setIsInviteVisible] = useState(false);
+  const [inviteCopyNotice, setInviteCopyNotice] = useState("");
 
   const actions = [
     { href: "/barcode-scan", title: pick("Scanează codul", "Scan barcode"), description: pick("Identifică rapid produsul cu telefonul și vezi verdictul.", "Identify the product quickly with your phone and see the verdict."), icon: Barcode, tone: "emerald" },
@@ -208,6 +214,31 @@ export default function DashboardPage() {
     }
   }
 
+  async function copyInviteCode() {
+    if (!user?.inviteCode) return;
+
+    try {
+      await navigator.clipboard.writeText(user.inviteCode);
+      setInviteCopyNotice(pick("Cod copiat.", "Code copied."));
+    } catch {
+      setInviteCopyNotice(pick("Copiază manual codul afișat.", "Copy the displayed code manually."));
+    }
+
+    setTimeout(() => setInviteCopyNotice(""), 2200);
+  }
+
+  function formatBonusDate(value) {
+    if (!value) return "";
+
+    return new Intl.DateTimeFormat("ro-RO", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(value));
+  }
+
   if (!user || isLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
@@ -215,6 +246,15 @@ export default function DashboardPage() {
       </main>
     );
   }
+
+  const inviteCode = user.inviteCode || "";
+  const displayedInviteCode = isInviteVisible && inviteCode
+    ? inviteCode
+    : inviteCode
+      ? "•".repeat(inviteCode.length)
+      : pick("Se generează...", "Generating...");
+  const bonusUntil = billing?.usage?.bonusUnlimitedUntil || user.bonusUnlimitedUntil;
+  const bonusCredits = billing?.usage?.bonusScanCredits ?? user.bonusScanCredits ?? 0;
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
@@ -258,6 +298,63 @@ export default function DashboardPage() {
               </Link>
             </div>
           )}
+
+          <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-3xl">
+                <p className="inline-flex items-center gap-2 text-sm font-black text-cyan-200">
+                  <Gift size={17} />
+                  {pick("Invită prieteni", "Invite friends")}
+                </p>
+                <h2 className="mt-2 text-2xl font-black">
+                  {pick("Primești scanări nelimitate pentru invitații confirmate.", "Get unlimited scans for confirmed invites.")}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-gray-300">
+                  {pick(
+                    "Când cineva își creează cont cu codul tău și confirmă emailul, amândoi primiți 2 zile de scanări nelimitate.",
+                    "When someone creates an account with your code and confirms their email, both of you get 2 days of unlimited scans."
+                  )}
+                </p>
+                <p className="mt-3 text-sm text-gray-400">
+                  {bonusUntil
+                    ? pick(`Bonus activ până la ${formatBonusDate(bonusUntil)}.`, `Bonus active until ${formatBonusDate(bonusUntil)}.`)
+                    : pick("Nu ai bonus temporar activ acum.", "No temporary bonus is active right now.")}
+                  {bonusCredits > 0 ? ` ${pick(`Ai și ${bonusCredits} scanări bonus.`, `You also have ${bonusCredits} bonus scans.`)}` : ""}
+                </p>
+              </div>
+
+              <div className="w-full rounded-xl border border-white/10 bg-black/25 p-4 lg:w-[360px]">
+                <p className="text-xs font-black uppercase tracking-wide text-gray-400">
+                  {pick("Codul tău", "Your code")}
+                </p>
+                <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-black/35 p-2">
+                  <code className="min-w-0 flex-1 truncate px-2 font-mono text-lg font-black tracking-[0.18em] text-white">
+                    {displayedInviteCode}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => setIsInviteVisible((value) => !value)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/10 text-gray-200 hover:bg-white/10"
+                    aria-label={pick("Afișează codul", "Reveal code")}
+                  >
+                    {isInviteVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={copyInviteCode}
+                    disabled={!inviteCode}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-white text-black hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label={pick("Copiază codul", "Copy code")}
+                  >
+                    <Copy size={18} />
+                  </button>
+                </div>
+                {inviteCopyNotice && (
+                  <p className="mt-2 text-sm font-bold text-cyan-200">{inviteCopyNotice}</p>
+                )}
+              </div>
+            </div>
+          </div>
 
           <div className="mt-6">
             <FamilyProfiles />

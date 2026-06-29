@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Heart, Search, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Heart, Loader2, Search, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
 import { ExpandableText } from "../components/ExpandableText";
@@ -125,6 +125,61 @@ function isSameProductVariant(product, scannedProduct) {
     shorterNameIsContained ||
     calculateTokenSimilarity(product.name, scannedProduct.name) >= 0.8
   );
+}
+
+function getProductIdentityKey(product) {
+  const barcode = String(product.barcode || "").trim();
+  if (barcode) return `barcode:${barcode}`;
+
+  const name = normalizeProductName(product.name || "");
+  const brand = normalizeText(product.brand || "");
+  const quantity = normalizeText(product.quantity || "");
+  const category = normalizeCategory(product.category || "");
+
+  return [brand, name, quantity, category].filter(Boolean).join("|");
+}
+
+function areDuplicateProducts(firstProduct, secondProduct) {
+  if (!firstProduct || !secondProduct) return false;
+
+  const firstKey = getProductIdentityKey(firstProduct);
+  const secondKey = getProductIdentityKey(secondProduct);
+
+  if (firstKey && secondKey && firstKey === secondKey) return true;
+
+  const sameBrand =
+    normalizeText(firstProduct.brand || "") &&
+    normalizeText(firstProduct.brand || "") === normalizeText(secondProduct.brand || "");
+  const sameQuantity =
+    normalizeText(firstProduct.quantity || "") &&
+    normalizeText(firstProduct.quantity || "") === normalizeText(secondProduct.quantity || "");
+  const sameCategory =
+    normalizeCategory(firstProduct.category || "") &&
+    normalizeCategory(firstProduct.category || "") === normalizeCategory(secondProduct.category || "");
+  const verySimilarName =
+    calculateTokenSimilarity(firstProduct.name || "", secondProduct.name || "") >= 0.76;
+
+  return verySimilarName && (sameBrand || sameQuantity || sameCategory);
+}
+
+function dedupeProductList(productList, scannedProduct = null) {
+  const uniqueProducts = [];
+
+  for (const product of productList) {
+    if (scannedProduct && isSameProductVariant(product, scannedProduct)) {
+      continue;
+    }
+
+    const duplicate = uniqueProducts.some((existingProduct) =>
+      areDuplicateProducts(existingProduct, product)
+    );
+
+    if (!duplicate) {
+      uniqueProducts.push(product);
+    }
+  }
+
+  return uniqueProducts;
 }
 
 function inferCriteriaFromRequest(requestText) {
@@ -530,7 +585,7 @@ function filterProductsByCriteria(
       calculateAlternativeScore(filteredProducts, a, criteriaList)
   );
 
-  return filteredProducts.slice(0, 6);
+  return dedupeProductList(filteredProducts, scannedProduct).slice(0, 18);
 }
 
 function AlternativesPageContent() {
@@ -540,6 +595,8 @@ function AlternativesPageContent() {
   const [products, setProducts] = useState([]);
   const [addedProduct, setAddedProduct] = useState("");
   const [favoriteProduct, setFavoriteProduct] = useState("");
+  const [pendingCartProductKey, setPendingCartProductKey] = useState("");
+  const [pendingFavoriteProductKey, setPendingFavoriteProductKey] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [lookupNotice, setLookupNotice] = useState("");
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -765,13 +822,22 @@ function AlternativesPageContent() {
   const visibleProducts = recommendedProducts.slice(0, visibleAlternativeLimit);
   const canShowMoreAlternatives = isPaidPlan && recommendedProducts.length > 3;
 
+  function getProductActionKey(product) {
+    return String(product.barcode || product.id || product.name || "");
+  }
+
   async function addToCart(product) {
+    const actionKey = getProductActionKey(product);
+
+    if (pendingCartProductKey === actionKey) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
 
     setErrorMessage("");
+    setPendingCartProductKey(actionKey);
 
     try {
       const response = await fetch(`${API_URL}/cart/add`, {
@@ -799,22 +865,30 @@ function AlternativesPageContent() {
       }
 
       setAddedProduct(`${product.name} - ${storeName}`);
+      window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
 
       setTimeout(() => {
         setAddedProduct("");
       }, 2500);
     } catch (error) {
       setErrorMessage(error.message);
+    } finally {
+      setPendingCartProductKey("");
     }
   }
 
   async function addToFavorites(product) {
+    const actionKey = getProductActionKey(product);
+
+    if (pendingFavoriteProductKey === actionKey) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
 
     setErrorMessage("");
+    setPendingFavoriteProductKey(actionKey);
 
     try {
       const response = await fetch(`${API_URL}/favorites/add`, {
@@ -853,6 +927,8 @@ function AlternativesPageContent() {
       }, 2500);
     } catch (error) {
       setErrorMessage(error.message);
+    } finally {
+      setPendingFavoriteProductKey("");
     }
   }
 
@@ -1182,18 +1258,32 @@ function AlternativesPageContent() {
                 <div className="mt-5 grid gap-3">
                   <button
                     onClick={() => addToCart(product)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
+                    disabled={pendingCartProductKey === getProductActionKey(product)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 py-3 font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-70"
                   >
-                    <ShoppingCart size={18} />
-                    Adaugă în coș
+                    {pendingCartProductKey === getProductActionKey(product) ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <ShoppingCart size={18} />
+                    )}
+                    {pendingCartProductKey === getProductActionKey(product)
+                      ? "Se adaugă..."
+                      : "Adaugă în coș"}
                   </button>
 
                   <button
                     onClick={() => addToFavorites(product)}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-4 py-3 font-semibold text-yellow-300 transition hover:-translate-y-0.5 hover:bg-yellow-300/10"
+                    disabled={pendingFavoriteProductKey === getProductActionKey(product)}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-4 py-3 font-semibold text-yellow-300 transition hover:-translate-y-0.5 hover:bg-yellow-300/10 disabled:cursor-wait disabled:opacity-70"
                   >
-                    <Heart size={18} />
-                    Adaugă la favorite
+                    {pendingFavoriteProductKey === getProductActionKey(product) ? (
+                      <Loader2 size={18} className="animate-spin" />
+                    ) : (
+                      <Heart size={18} />
+                    )}
+                    {pendingFavoriteProductKey === getProductActionKey(product)
+                      ? "Se salvează..."
+                      : "Adaugă la favorite"}
                   </button>
                 </div>
               </div>

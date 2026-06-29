@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Crown, MailCheck, UserPlus } from "lucide-react";
 import { API_URL } from "../config";
@@ -20,6 +20,7 @@ export default function RegisterPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,6 +28,16 @@ export default function RegisterPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [devVerificationLink, setDevVerificationLink] = useState("");
   const strength = useMemo(() => getPasswordStrength(password), [password]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      const params = new URLSearchParams(window.location.search);
+      const codeFromUrl = params.get("invite") || params.get("ref") || "";
+      if (codeFromUrl) {
+        setInviteCode(codeFromUrl.toUpperCase());
+      }
+    });
+  }, []);
 
   async function handleRegister(event) {
     event.preventDefault();
@@ -43,6 +54,7 @@ export default function RegisterPage() {
           name: name.trim(),
           email: email.trim().toLowerCase(),
           password,
+          inviteCode: inviteCode.trim().toUpperCase() || undefined,
           ageConfirmed,
           acceptedTerms,
         }),
@@ -137,6 +149,23 @@ export default function RegisterPage() {
                   className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 text-white outline-none focus:border-emerald-400"
                   required
                 />
+              </label>
+
+              <label className="block text-sm font-semibold text-gray-300">
+                {pick("Cod invitație", "Invite code")}{" "}
+                <span className="text-gray-500">{pick("opțional", "optional")}</span>
+                <input
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                  placeholder="CE-XXXXXX"
+                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/30 px-4 py-3 font-mono uppercase tracking-[0.12em] text-white outline-none focus:border-emerald-400"
+                />
+                <span className="mt-2 block text-xs leading-5 text-gray-500">
+                  {pick(
+                    "Dacă ai primit un cod de la un prieten, amândoi primiți 2 zile de scanări nelimitate după confirmarea emailului.",
+                    "If you received a code from a friend, both of you get 2 days of unlimited scans after email confirmation."
+                  )}
+                </span>
               </label>
 
               <PasswordField

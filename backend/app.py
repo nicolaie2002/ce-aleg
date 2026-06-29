@@ -303,6 +303,10 @@ ALLOW_DEV_TUNNEL_ORIGINS = os.environ.get(
 AUTH_COOKIE_NAME = "cealeg_session"
 AUTH_MAX_AGE = 60 * 60 * 24 * 30
 FREE_WEEKLY_SCAN_LIMIT = int(os.environ.get("FREE_WEEKLY_SCAN_LIMIT", "5"))
+INVITE_BONUS_DAYS = int(os.environ.get("INVITE_BONUS_DAYS", "2"))
+SUBMISSION_APPROVAL_BONUS_CREDITS = int(
+    os.environ.get("SUBMISSION_APPROVAL_BONUS_CREDITS", "1")
+)
 PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", "8"))
 PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "manual").strip().lower()
 FRONTEND_PUBLIC_URL = (
@@ -1073,7 +1077,114 @@ def delete_account_data(user):
     db.session.commit()
 
 
+def normalize_invite_code(code):
+    return re.sub(r"[^A-Z0-9]", "", str(code or "").upper())[:24]
+
+
+def generate_invite_code():
+    return f"CEA{uuid4().hex[:8].upper()}"
+
+
+def ensure_user_invite_code(user):
+    if getattr(user, "invite_code", None):
+        return user.invite_code
+
+    for _attempt in range(12):
+        user.invite_code = generate_invite_code()
+
+        try:
+            db.session.commit()
+            return user.invite_code
+        except IntegrityError:
+            db.session.rollback()
+            user = db.session.get(User, user.id)
+
+    app.logger.warning("Could not generate invite code for user %s", user.id)
+    return None
+
+
+def find_inviter_by_code(code):
+    normalized_code = normalize_invite_code(code)
+
+    if not normalized_code:
+        return None
+
+    return User.query.filter(func.upper(User.invite_code) == normalized_code).first()
+
+
+def bonus_unlimited_is_active(user, now=None):
+    now = now or datetime.utcnow()
+    return bool(user.bonus_unlimited_until and user.bonus_unlimited_until > now)
+
+
+def extend_bonus_unlimited(user, days=INVITE_BONUS_DAYS, source="invite", metadata=None):
+    if not user or days <= 0:
+        return
+
+    now = datetime.utcnow()
+    current_end = user.bonus_unlimited_until if bonus_unlimited_is_active(user, now) else now
+    user.bonus_unlimited_until = current_end + timedelta(days=days)
+    db.session.add(
+        UsageEvent(
+            user_id=user.id,
+            event_type="bonus_unlimited",
+            source=source,
+            metadata_json=json.dumps(metadata or {}),
+        )
+    )
+
+
+def add_bonus_scan_credits(user, credits=SUBMISSION_APPROVAL_BONUS_CREDITS, source="submission", metadata=None):
+    if not user or credits <= 0:
+        return
+
+    user.bonus_scan_credits = max(0, int(user.bonus_scan_credits or 0)) + credits
+    db.session.add(
+        UsageEvent(
+            user_id=user.id,
+            event_type="bonus_scan_credit",
+            source=source,
+            metadata_json=json.dumps(metadata or {}),
+        )
+    )
+
+
+def apply_referral_bonus_after_verification(user):
+    if not user or not user.referred_by_user_id:
+        return False
+
+    already_rewarded = UsageEvent.query.filter(
+        UsageEvent.user_id == user.id,
+        UsageEvent.event_type == "bonus_unlimited",
+        UsageEvent.source == "referral_new_user",
+    ).first()
+
+    if already_rewarded:
+        return False
+
+    inviter = db.session.get(User, user.referred_by_user_id)
+
+    if not inviter or inviter.id == user.id:
+        return False
+
+    extend_bonus_unlimited(
+        user,
+        INVITE_BONUS_DAYS,
+        "referral_new_user",
+        {"inviterUserId": inviter.id},
+    )
+    extend_bonus_unlimited(
+        inviter,
+        INVITE_BONUS_DAYS,
+        "referral_inviter",
+        {"invitedUserId": user.id},
+    )
+    db.session.commit()
+    return True
+
+
 def user_to_dict(user):
+    invite_code = ensure_user_invite_code(user)
     subscription = get_or_create_subscription(user)
 
     return {
@@ -1084,6 +1195,13 @@ def user_to_dict(user):
         "emailVerified": bool(getattr(user, "email_verified", True)),
         "plan": subscription.plan,
         "subscriptionStatus": subscription.status,
+        "inviteCode": invite_code,
+        "bonusScanCredits": max(0, int(user.bonus_scan_credits or 0)),
+        "bonusUnlimitedUntil": (
+            user.bonus_unlimited_until.isoformat() + "Z"
+            if user.bonus_unlimited_until
+            else None
+        ),
     }
 
 
@@ -1871,10 +1989,13 @@ def get_weekly_scan_count(user_id):
 
 def get_usage_summary(user):
     subscription = get_or_create_subscription(user)
-    limit = None if is_paid_subscription(subscription) else FREE_WEEKLY_SCAN_LIMIT
+    has_paid_plan = is_paid_subscription(subscription)
+    has_bonus_unlimited = bonus_unlimited_is_active(user)
+    limit = None if has_paid_plan or has_bonus_unlimited else FREE_WEEKLY_SCAN_LIMIT
     used = get_weekly_scan_count(user.id)
     week_start = get_week_start()
     reset_at = week_start + timedelta(days=7)
+    bonus_credits = max(0, int(user.bonus_scan_credits or 0))
 
     return {
         "plan": subscription.plan,
@@ -1882,6 +2003,14 @@ def get_usage_summary(user):
         "weeklyScanLimit": limit,
         "weeklyScansUsed": used,
         "weeklyScansRemaining": None if limit is None else max(limit - used, 0),
+        "bonusScanCredits": bonus_credits,
+        "bonusUnlimitedUntil": (
+            user.bonus_unlimited_until.isoformat() + "Z"
+            if user.bonus_unlimited_until
+            else None
+        ),
+        "bonusUnlimitedActive": has_bonus_unlimited,
+        "unlimitedSource": "plan" if has_paid_plan else ("invite" if has_bonus_unlimited else None),
         "resetsAt": reset_at.isoformat() + "Z",
         "isUnlimited": limit is None,
     }
@@ -1890,7 +2019,7 @@ def get_usage_summary(user):
 def get_scan_limit_error():
     return {
         "code": "scan_limit_reached",
-        "message": "Ai folosit cele 5 scanari gratuite din aceasta saptamana. Treci la Pro pentru scanari nelimitate.",
+        "message": "Ai folosit scanările gratuite din această săptămână. Poți trece la Pro sau folosi scanări bonus.",
     }
 
 
@@ -1903,9 +2032,15 @@ def check_scan_usage_allowed(user):
     if is_paid_subscription(subscription):
         return {"allowed": True, "usage": get_usage_summary(user)}
 
+    if bonus_unlimited_is_active(user):
+        return {"allowed": True, "usage": get_usage_summary(user)}
+
     used = get_weekly_scan_count(user.id)
 
     if used >= FREE_WEEKLY_SCAN_LIMIT:
+        if max(0, int(user.bonus_scan_credits or 0)) > 0:
+            return {"allowed": True, "usage": get_usage_summary(user)}
+
         return {
             "allowed": False,
             "usage": get_usage_summary(user),
@@ -1921,12 +2056,25 @@ def consume_scan_usage(user, source, metadata=None):
     if not scan_gate["allowed"] or user.is_admin:
         return scan_gate
 
+    usage_metadata = metadata or {}
+    subscription = get_or_create_subscription(user)
+    should_use_bonus_credit = (
+        not is_paid_subscription(subscription)
+        and not bonus_unlimited_is_active(user)
+        and get_weekly_scan_count(user.id) >= FREE_WEEKLY_SCAN_LIMIT
+        and max(0, int(user.bonus_scan_credits or 0)) > 0
+    )
+
+    if should_use_bonus_credit:
+        user.bonus_scan_credits = max(0, int(user.bonus_scan_credits or 0) - 1)
+        usage_metadata = {**usage_metadata, "usedBonusScanCredit": True}
+
     db.session.add(
         UsageEvent(
             user_id=user.id,
             event_type="scan",
             source=source,
-            metadata_json=json.dumps(metadata or {}),
+            metadata_json=json.dumps(usage_metadata),
         )
     )
     db.session.commit()
@@ -4060,6 +4208,26 @@ def ensure_database_columns():
                 "ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMP NULL",
             ),
             (
+                "users invite_code",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS invite_code VARCHAR(30)",
+            ),
+            (
+                "users referred_by_user_id",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS referred_by_user_id INTEGER REFERENCES users(id)",
+            ),
+            (
+                "users bonus_unlimited_until",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS bonus_unlimited_until TIMESTAMP NULL",
+            ),
+            (
+                "users bonus_scan_credits",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS bonus_scan_credits INTEGER NOT NULL DEFAULT 0",
+            ),
+            (
                 "cart family_profile_id",
                 "ALTER TABLE cart_items "
                 "ADD COLUMN IF NOT EXISTS family_profile_id INTEGER REFERENCES family_profiles(id)",
@@ -4074,6 +4242,10 @@ def ensure_database_columns():
     add_column_if_missing("users", "is_admin", "BOOLEAN NOT NULL DEFAULT 0")
     add_column_if_missing("users", "email_verified", "BOOLEAN NOT NULL DEFAULT 1")
     add_column_if_missing("users", "email_verified_at", "DATETIME")
+    add_column_if_missing("users", "invite_code", "VARCHAR(30)")
+    add_column_if_missing("users", "referred_by_user_id", "INTEGER")
+    add_column_if_missing("users", "bonus_unlimited_until", "DATETIME")
+    add_column_if_missing("users", "bonus_scan_credits", "INTEGER NOT NULL DEFAULT 0")
     add_column_if_missing("products", "barcode", "VARCHAR(80)")
     add_column_if_missing("products", "ingredients", "TEXT")
     add_column_if_missing("product_submissions", "barcode", "VARCHAR(80)")
@@ -4150,6 +4322,11 @@ def ensure_database_indexes():
             "CREATE INDEX IF NOT EXISTS ix_search_events_user_created "
             "ON search_events (user_id, created_at)",
         ),
+        (
+            "users invite code",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_invite_code "
+            "ON users (invite_code)",
+        ),
     ]
 
     for label, statement in common_indexes:
@@ -4178,6 +4355,15 @@ def ensure_configured_admin():
     if user and not user.is_admin:
         user.is_admin = True
         db.session.commit()
+
+
+def ensure_invite_codes_for_existing_users():
+    users_without_codes = User.query.filter(
+        or_(User.invite_code.is_(None), User.invite_code == "")
+    ).limit(200).all()
+
+    for user in users_without_codes:
+        ensure_user_invite_code(user)
 
 # =========================
 # Main routes
@@ -4330,6 +4516,7 @@ def init_db():
     db.create_all()
     ensure_database_columns()
     ensure_database_indexes()
+    ensure_invite_codes_for_existing_users()
 
     return jsonify({
         "message": "Baza de date a fost creată cu succes."
@@ -4349,6 +4536,9 @@ def register():
     password = data.get("password", "")
     age_confirmed = bool(data.get("ageConfirmed"))
     accepted_terms = bool(data.get("acceptedTerms"))
+    invite_code = normalize_invite_code(
+        data.get("inviteCode") or data.get("invite_code") or ""
+    )
 
     if not name or not email or not password:
         return jsonify({"error": "Numele, emailul și parola sunt obligatorii."}), 400
@@ -4376,16 +4566,26 @@ def register():
     if existing_user:
         return jsonify({"error": "Exista deja un cont cu acest email."}), 409
 
+    inviter = None
+
+    if invite_code:
+        inviter = find_inviter_by_code(invite_code)
+
+        if not inviter:
+            return jsonify({"error": "Codul de invitație nu este valid."}), 400
+
     new_user = User(
         name=name,
         email=email,
         password_hash=generate_password_hash(password),
         email_verified=False,
         email_verified_at=None,
+        referred_by_user_id=inviter.id if inviter else None,
     )
 
     db.session.add(new_user)
     db.session.commit()
+    ensure_user_invite_code(new_user)
     verification_sent, verification_url = send_email_verification_email(new_user)
     email_status = {
         "verificationSent": verification_sent,
@@ -4425,12 +4625,18 @@ def verify_email():
     user.email_verified_at = datetime.utcnow()
     db.session.commit()
 
+    referralRewardApplied = False
+
+    if not was_already_verified:
+        referralRewardApplied = apply_referral_bonus_after_verification(user)
+
     welcome_sent = True if was_already_verified else send_welcome_email(user)
     response = jsonify({
         "message": "Email confirmat. Contul este activ.",
         "user": user_to_dict(user),
         "emailStatus": {
             "welcomeSent": welcome_sent,
+            "referralRewardApplied": referralRewardApplied,
             "configured": is_email_configured(),
             "provider": EMAIL_PROVIDER,
         },
@@ -6110,10 +6316,17 @@ def approve_product_submission(submission_id):
 
     if existing_product:
         submission.status = "approved"
+        contributor = db.session.get(User, submission.user_id)
+        add_bonus_scan_credits(
+            contributor,
+            SUBMISSION_APPROVAL_BONUS_CREDITS,
+            "submission_approved",
+            {"submissionId": submission.id, "productId": existing_product.id},
+        )
         db.session.commit()
 
         return jsonify({
-            "message": "Produsul pare să existe deja în baza oficială. Propunerea a fost marcată ca aprobată, fără să se creeze duplicat.",
+            "message": "Produsul exista deja în baza oficială. Propunerea a fost aprobată, iar utilizatorul a primit o scanare bonus.",
             "product": product_to_dict(existing_product),
             "submission": product_submission_to_dict(submission),
         })
@@ -6174,10 +6387,17 @@ def approve_product_submission(submission_id):
 
     db.session.add(new_product)
     submission.status = "approved"
+    contributor = db.session.get(User, submission.user_id)
+    add_bonus_scan_credits(
+        contributor,
+        SUBMISSION_APPROVAL_BONUS_CREDITS,
+        "submission_approved",
+        {"submissionId": submission.id},
+    )
     db.session.commit()
 
     return jsonify({
-        "message": "Produsul a fost publicat în baza oficială cu scor și verdict generate automat.",
+        "message": "Produsul a fost publicat în baza oficială, iar utilizatorul a primit o scanare bonus.",
         "product": product_to_dict(new_product),
         "submission": product_submission_to_dict(submission),
     })
@@ -8618,6 +8838,7 @@ with app.app_context():
     db.create_all()
     ensure_database_columns()
     ensure_database_indexes()
+    ensure_invite_codes_for_existing_users()
     ensure_configured_admin()
 
 

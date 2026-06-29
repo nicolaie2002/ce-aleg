@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, FileClock, Heart, ScanLine, ShoppingCart } from "lucide-react";
+import { ArrowLeft, FileClock, Heart, Loader2, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
 import { getActiveProfilePayload } from "../utils/profilePreferences";
@@ -16,6 +16,8 @@ export default function HistoryPage() {
   const [history, setHistory] = useState([]);
   const [message, setMessage] = useState("");
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [pendingCartItemId, setPendingCartItemId] = useState(null);
+  const [pendingFavoriteItemId, setPendingFavoriteItemId] = useState(null);
 
   async function loadHistory(userId) {
     try {
@@ -93,10 +95,14 @@ export default function HistoryPage() {
   }
 
   async function addToCart(item) {
+    if (pendingCartItemId === item.id) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
+
+    setPendingCartItemId(item.id);
 
     try {
       const response = await fetch(`${API_URL}/cart/add`, {
@@ -124,17 +130,24 @@ export default function HistoryPage() {
       }
 
       setMessage(`Produs adăugat în coș: ${item.name}`);
+      window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
       setTimeout(() => setMessage(""), 2500);
     } catch (error) {
       setMessage(error.message);
+    } finally {
+      setPendingCartItemId(null);
     }
   }
 
   async function addToFavorites(item) {
+    if (pendingFavoriteItemId === item.id) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
+
+    setPendingFavoriteItemId(item.id);
 
     try {
       const response = await fetch(`${API_URL}/favorites/add`, {
@@ -164,6 +177,8 @@ export default function HistoryPage() {
       setTimeout(() => setMessage(""), 2500);
     } catch (error) {
       setMessage(error.message);
+    } finally {
+      setPendingFavoriteItemId(null);
     }
   }
 
@@ -335,18 +350,28 @@ export default function HistoryPage() {
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => addToCart(item)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
+                      disabled={pendingCartItemId === item.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-70"
                     >
-                      <ShoppingCart size={18} />
-                      Adaugă în coș
+                      {pendingCartItemId === item.id ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <ShoppingCart size={18} />
+                      )}
+                      {pendingCartItemId === item.id ? "Se adaugă..." : "Adaugă în coș"}
                     </button>
 
                     <button
                       onClick={() => addToFavorites(item)}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-5 py-3 font-semibold text-yellow-300 hover:bg-yellow-300/10"
+                      disabled={pendingFavoriteItemId === item.id}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-5 py-3 font-semibold text-yellow-300 hover:bg-yellow-300/10 disabled:cursor-wait disabled:opacity-70"
                     >
-                      <Heart size={18} />
-                      Favorite
+                      {pendingFavoriteItemId === item.id ? (
+                        <Loader2 size={18} className="animate-spin" />
+                      ) : (
+                        <Heart size={18} />
+                      )}
+                      {pendingFavoriteItemId === item.id ? "Se salvează..." : "Favorite"}
                     </button>
 
                     <button

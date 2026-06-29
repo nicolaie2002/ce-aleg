@@ -26,6 +26,10 @@ function getImageUrl(path) {
   return path;
 }
 
+function notifyCartUpdated() {
+  window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
+}
+
 export default function CartPage() {
   const [user, setUser] = useState(null);
   const [cartItems, setCartItems] = useState([]);
@@ -54,6 +58,7 @@ export default function CartPage() {
       }
 
       setCartItems(data);
+      notifyCartUpdated();
     } catch (error) {
       showError(error.message);
     }
@@ -154,6 +159,7 @@ export default function CartPage() {
 
       setCartItems((current) => current.filter((item) => item.id !== id));
       removeExpandedReason(id);
+      notifyCartUpdated();
     } catch (error) {
       showError(error.message);
     }
@@ -182,6 +188,7 @@ export default function CartPage() {
           cartItem.id === item.id ? data.item : cartItem
         )
       );
+      notifyCartUpdated();
     } catch (error) {
       showError(error.message);
     }
@@ -210,6 +217,7 @@ export default function CartPage() {
           cartItem.id === item.id ? data.item : cartItem
         )
       );
+      notifyCartUpdated();
     } catch (error) {
       showError(error.message);
     }
@@ -245,6 +253,7 @@ export default function CartPage() {
           )
         );
       }
+      notifyCartUpdated();
     } catch (error) {
       showError(error.message);
     }
@@ -272,6 +281,7 @@ export default function CartPage() {
       setMessageTone("success");
       setMessage("Coșul a fost golit.");
       setIsClearModalOpen(false);
+      notifyCartUpdated();
     } catch (error) {
       showError(error.message);
     }

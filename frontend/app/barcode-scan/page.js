@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrowserMultiFormatReader } from "@zxing/browser";
 import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import Link from "next/link";
-import { ArrowLeft, Search, SwitchCamera } from "lucide-react";
+import { ArrowLeft, Loader2, Search, SwitchCamera } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
@@ -202,6 +202,7 @@ export default function BarcodeScanPage() {
   const [isScanning, setIsScanning] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [scanStatus, setScanStatus] = useState("Camera este oprită.");
@@ -1075,10 +1076,15 @@ export default function BarcodeScanPage() {
   }
 
   async function addToCart(product) {
+    if (isAddingToCart) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
+
+    setIsAddingToCart(true);
+    setMessage("");
 
     try {
       const response = await fetch(`${API_URL}/cart/add`, {
@@ -1106,8 +1112,11 @@ export default function BarcodeScanPage() {
       }
 
       setMessage(`Produs adăugat în coș: ${product.name}`);
+      window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
     } catch (error) {
       setMessage(error.message);
+    } finally {
+      setIsAddingToCart(false);
     }
   }
 
@@ -1529,9 +1538,11 @@ export default function BarcodeScanPage() {
 
                     <button
                       onClick={() => addToCart(foundProduct)}
-                      className="rounded-2xl border border-white/10 px-6 py-3 font-semibold hover:bg-white/10"
+                      disabled={isAddingToCart}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-6 py-3 font-semibold hover:bg-white/10 disabled:cursor-wait disabled:opacity-70"
                     >
-                      Adaugă în coș
+                      {isAddingToCart && <Loader2 size={18} className="animate-spin" />}
+                      {isAddingToCart ? "Se adaugă..." : "Adaugă în coș"}
                     </button>
 
                     {(productSource === "openfoodfacts" ||

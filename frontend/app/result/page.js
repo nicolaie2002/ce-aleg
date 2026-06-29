@@ -11,6 +11,7 @@ import {
   Flame,
   Heart,
   Leaf,
+  Loader2,
   MilkOff,
   Search,
   ShoppingCart,
@@ -106,6 +107,8 @@ function ResultPageContent() {
   const [customRequest, setCustomRequest] = useState("");
   const [addedToCart, setAddedToCart] = useState(false);
   const [addedToFavorites, setAddedToFavorites] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [isAddingToFavorites, setIsAddingToFavorites] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [scannedProduct, setScannedProduct] = useState(null);
   const [preferencesReady, setPreferencesReady] = useState(false);
@@ -203,12 +206,15 @@ function ResultPageContent() {
   }
 
   async function addScannedProductToCart() {
+    if (isAddingToCart) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
 
     setErrorMessage("");
+    setIsAddingToCart(true);
 
     try {
       const response = await fetch(`${API_URL}/cart/add`, {
@@ -236,19 +242,25 @@ function ResultPageContent() {
       }
 
       setAddedToCart(true);
+      window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
       setTimeout(() => setAddedToCart(false), 2500);
     } catch (error) {
       setErrorMessage(error.message);
+    } finally {
+      setIsAddingToCart(false);
     }
   }
 
   async function addScannedProductToFavorites() {
+    if (isAddingToFavorites) return;
+
     if (!user) {
       window.location.assign("/login");
       return;
     }
 
     setErrorMessage("");
+    setIsAddingToFavorites(true);
 
     try {
       const response = await fetch(`${API_URL}/favorites/add`, {
@@ -278,6 +290,8 @@ function ResultPageContent() {
       setTimeout(() => setAddedToFavorites(false), 2500);
     } catch (error) {
       setErrorMessage(error.message);
+    } finally {
+      setIsAddingToFavorites(false);
     }
   }
 
@@ -353,18 +367,20 @@ function ResultPageContent() {
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <button
                   onClick={addScannedProductToCart}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-center text-lg font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
+                  disabled={isAddingToCart}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-4 text-center text-lg font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-70"
                 >
-                  <ShoppingCart size={20} />
-                  Adaugă în coș
+                  {isAddingToCart ? <Loader2 size={20} className="animate-spin" /> : <ShoppingCart size={20} />}
+                  {isAddingToCart ? "Se adaugă..." : "Adaugă în coș"}
                 </button>
 
                 <button
                   onClick={addScannedProductToFavorites}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-6 py-4 text-center text-lg font-semibold text-yellow-300 transition hover:-translate-y-0.5 hover:bg-yellow-300/10"
+                  disabled={isAddingToFavorites}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-6 py-4 text-center text-lg font-semibold text-yellow-300 transition hover:-translate-y-0.5 hover:bg-yellow-300/10 disabled:cursor-wait disabled:opacity-70"
                 >
-                  <Heart size={20} />
-                  Adaugă la favorite
+                  {isAddingToFavorites ? <Loader2 size={20} className="animate-spin" /> : <Heart size={20} />}
+                  {isAddingToFavorites ? "Se salvează..." : "Adaugă la favorite"}
                 </button>
 
           <Link

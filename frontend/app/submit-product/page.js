@@ -350,6 +350,11 @@ function SubmitProductPageContent() {
             fotografie clară a etichetei nutriționale.
           </p>
 
+          <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
+            Produsele acceptate primesc o scanare bonus. Verificăm propunerile
+            înainte să ajungă în catalog, ca recomandările să rămână curate.
+          </div>
+
           {(suggestedName || suggestedStore) && (
             <div className="mt-6 rounded-3xl border border-yellow-300/20 bg-yellow-300/10 p-5">
               <h2 className="text-xl font-bold text-yellow-300">

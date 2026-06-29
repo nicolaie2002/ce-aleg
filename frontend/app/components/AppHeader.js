@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
   Barcode,
   Crown,
@@ -16,10 +16,13 @@ import {
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { useLocale } from "./LocaleProvider";
+import { API_URL } from "../config";
+import { getActiveProfile } from "../utils/profilePreferences";
 
 export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
   const { pick } = useLocale();
   const pathname = usePathname();
+  const [cartCount, setCartCount] = useState(0);
   const navigation = [
     {
       href: "/dashboard",
@@ -55,6 +58,73 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
     document.body.classList.add("ce-has-mobile-dock");
     return () => document.body.classList.remove("ce-has-mobile-dock");
   }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadCartCount() {
+      try {
+        const savedUser = window.localStorage.getItem("cealeg_user");
+
+        if (!savedUser) {
+          if (isMounted) setCartCount(0);
+          return;
+        }
+
+        const user = JSON.parse(savedUser);
+        const activeProfile = getActiveProfile();
+        const profileQuery = activeProfile?.id
+          ? `?profile_id=${encodeURIComponent(activeProfile.id)}`
+          : "";
+        const response = await fetch(`${API_URL}/cart/${user.id}${profileQuery}`);
+
+        if (!response.ok) {
+          if (isMounted) setCartCount(0);
+          return;
+        }
+
+        const items = await response.json();
+        const nextCount = Array.isArray(items)
+          ? items.reduce((total, item) => total + (item.quantity || 1), 0)
+          : 0;
+
+        if (isMounted) setCartCount(nextCount);
+      } catch {
+        if (isMounted) setCartCount(0);
+      }
+    }
+
+    function handleCartUpdate() {
+      void loadCartCount();
+    }
+
+    queueMicrotask(loadCartCount);
+    window.addEventListener("cealeg:cart-updated", handleCartUpdate);
+    window.addEventListener("cealeg:profile-change", handleCartUpdate);
+    window.addEventListener("storage", handleCartUpdate);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("cealeg:cart-updated", handleCartUpdate);
+      window.removeEventListener("cealeg:profile-change", handleCartUpdate);
+      window.removeEventListener("storage", handleCartUpdate);
+    };
+  }, []);
+
+  function renderIconWithBadge(Icon, href) {
+    const showBadge = href === "/cart" && cartCount > 0;
+
+    return (
+      <span className="relative inline-flex">
+        <Icon size={18} />
+        {showBadge && (
+          <span className="absolute -right-2.5 -top-2.5 flex h-5 min-w-5 items-center justify-center rounded-full border border-[#0b1118] bg-yellow-300 px-1 text-[10px] font-black leading-none text-black shadow-[0_0_16px_rgba(250,204,21,0.45)]">
+            {cartCount > 99 ? "99+" : cartCount}
+          </span>
+        )}
+      </span>
+    );
+  }
 
   return (
     <>
@@ -95,7 +165,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
                     : "text-gray-300 hover:bg-white/[0.07] hover:text-white"
                 }`}
               >
-                <Icon size={16} />
+                {renderIconWithBadge(Icon, href)}
                 <span>{desktopLabel}</span>
               </Link>
             ))}
@@ -140,7 +210,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
                 : "text-gray-300 hover:bg-white/10 hover:text-white"
             }`}
           >
-            <Icon size={18} />
+            {renderIconWithBadge(Icon, href)}
             <span className="max-w-full truncate">{label}</span>
           </Link>
         ))}

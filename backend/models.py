@@ -13,6 +13,10 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     email_verified = db.Column(db.Boolean, default=True, nullable=False)
     email_verified_at = db.Column(db.DateTime, nullable=True)
+    invite_code = db.Column(db.String(30), unique=True, nullable=True, index=True)
+    referred_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
+    bonus_unlimited_until = db.Column(db.DateTime, nullable=True)
+    bonus_scan_credits = db.Column(db.Integer, default=0, nullable=False)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
