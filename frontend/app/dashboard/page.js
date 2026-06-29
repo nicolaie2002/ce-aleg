@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Award,
   ArrowLeft,
@@ -75,6 +76,10 @@ export default function DashboardPage() {
   const [claimMessage, setClaimMessage] = useState("");
   const [claimingMissionId, setClaimingMissionId] = useState("");
   const [claimedMissionId, setClaimedMissionId] = useState("");
+  const [leaderboardMode, setLeaderboardMode] = useState("weekly");
+  const [redeemingItemId, setRedeemingItemId] = useState("");
+  const [buyingPackId, setBuyingPackId] = useState("");
+  const [shopMessage, setShopMessage] = useState("");
 
   const actions = [
     { href: "/barcode-scan", title: pick("Scanează codul", "Scan barcode"), description: pick("Identifică rapid produsul cu telefonul și vezi verdictul.", "Identify the product quickly with your phone and see the verdict."), icon: Barcode, tone: "emerald" },
@@ -266,6 +271,58 @@ export default function DashboardPage() {
     }
   }
 
+  async function redeemShopItem(itemId) {
+    if (!itemId || redeemingItemId) return;
+
+    setRedeemingItemId(itemId);
+    setShopMessage("");
+
+    try {
+      const response = await fetch(`${API_URL}/gamification/redeem`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ itemId }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "Recompensa nu a putut fi activată.");
+      }
+
+      setGamification(data.summary);
+      setShopMessage(data.message || "Recompensa a fost activată.");
+    } catch (error) {
+      setShopMessage(error.message);
+    } finally {
+      setRedeemingItemId("");
+    }
+  }
+
+  async function buyCoinPack(packId) {
+    if (!packId || buyingPackId) return;
+
+    setBuyingPackId(packId);
+    setShopMessage("");
+
+    try {
+      const response = await fetch(`${API_URL}/gamification/coin-checkout`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ packId }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data.error || "Pachetul CeCoins nu poate fi cumpărat acum.");
+      }
+
+      window.location.assign(data.checkoutUrl);
+    } catch (error) {
+      setShopMessage(error.message);
+      setBuyingPackId("");
+    }
+  }
+
   function formatBonusDate(value) {
     if (!value) return "";
 
@@ -388,12 +445,19 @@ export default function DashboardPage() {
         ? pick("În creștere", "Building")
         : pick("Start bun", "Good start")
   );
-  const rewardProgress = Math.round((completedRewards / Math.max(missions.length, 1)) * 100);
+  const totalMissionCount = gamification?.totalMissions || missions.length;
+  const rewardProgress = Math.round((completedRewards / Math.max(totalMissionCount, 1)) * 100);
   const coinBalance = gamification?.coins ?? (
     counts.history * 3 + counts.favorites * 5 + Math.min(counts.cart * 2, 50)
   );
-  const leaderboard = gamification?.leaderboard?.top || [];
-  const currentLeaderboardRow = gamification?.leaderboard?.currentUser;
+  const leaderboardData = gamification?.leaderboard || {};
+  const selectedLeaderboard = leaderboardMode === "weekly"
+    ? leaderboardData.weekly
+    : leaderboardData.allTime;
+  const leaderboard = selectedLeaderboard?.top || leaderboardData.top || [];
+  const currentLeaderboardRow = selectedLeaderboard?.currentUser || leaderboardData.currentUser;
+  const shopItems = gamification?.shopItems || [];
+  const coinPacks = gamification?.coinPacks || [];
   const nextRewards = gamification?.nextRewards || [
     { title: "Pro", description: pick("Scanări nelimitate și căutare după preferințe.", "Unlimited scans and preference search."), href: "/pricing" },
     { title: "Family", description: pick("Profiluri separate pentru fiecare persoană din casă.", "Separate profiles for each person at home."), href: "/pricing" },
@@ -420,6 +484,13 @@ export default function DashboardPage() {
       title: pick("Invită un prieten", "Invite a friend"),
       description: pick("Un prieten își creează cont și confirmă emailul cu codul tău.", "A friend creates an account and verifies their email with your code."),
     },
+  };
+  const missionIcons = {
+    scan: ScanLine,
+    cart: ShoppingCart,
+    favorite: Heart,
+    catalog: ListPlus,
+    invite: Gift,
   };
   const walletCards = [
     {
@@ -448,6 +519,7 @@ export default function DashboardPage() {
       value: coinBalance,
       detail: pick("soldul tău", "your balance"),
       icon: Coins,
+      image: "/brand/CeCoin.png",
       tone: "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100",
     },
   ];
@@ -476,11 +548,15 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-[560px]">
-              {walletCards.map(({ label, value, detail, icon: Icon, tone }) => (
+              {walletCards.map(({ label, value, detail, icon: Icon, image, tone }) => (
                 <div key={label} className={`rounded-xl border p-4 ${tone}`}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-black uppercase tracking-wide opacity-80">{label}</p>
-                    <Icon size={17} />
+                    {image ? (
+                      <Image src={image} alt="" width={24} height={24} className="rounded-full object-cover" />
+                    ) : (
+                      <Icon size={17} />
+                    )}
                   </div>
                   <p className="mt-2 truncate text-2xl font-black">{value}</p>
                   <p className="mt-1 text-xs font-bold opacity-75">{detail}</p>
@@ -597,13 +673,13 @@ export default function DashboardPage() {
                         <Sparkles size={16} />
                         {pick("Progres general", "Overall progress")}
                       </span>
-                      <span>{completedRewards}/{missions.length}</span>
+                      <span>{completedRewards}/{totalMissionCount}</span>
                     </div>
                     <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                       <div className="h-full rounded-full bg-cyan-300 transition-all" style={{ width: `${rewardProgress}%` }} />
                     </div>
                     <p className="mt-3 text-xs font-bold text-gray-400">
-                      {pick("Revendicate", "Claimed")}: {claimedRewards}/{missions.length}
+                      {pick("Revendicate", "Claimed")}: {claimedRewards}/{totalMissionCount}
                     </p>
                   </div>
                 </div>
@@ -619,6 +695,7 @@ export default function DashboardPage() {
 
                 <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                   {missions.map((mission) => {
+                    const MissionIcon = missionIcons[mission.icon] || Award;
                     const rewardParts = [
                       mission.reward?.coins ? `${mission.reward.coins} CeCoins` : "",
                       mission.reward?.bonusScans ? `+${mission.reward.bonusScans} ${pick("scanări bonus", "bonus scans")}` : "",
@@ -638,7 +715,7 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <p className={`flex items-center gap-2 text-sm font-black ${mission.completed ? "text-cyan-100" : "text-gray-300"}`}>
-                            <Award size={16} />
+                            <MissionIcon size={16} />
                             {copy.title || mission.title || mission.label}
                           </p>
                           {mission.claimed && (
@@ -706,6 +783,25 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/25 p-1">
+                    {[
+                      ["weekly", pick("Săptămânal", "Weekly")],
+                      ["allTime", pick("All-time", "All-time")],
+                    ].map(([mode, label]) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setLeaderboardMode(mode)}
+                        className={`rounded-md px-3 py-2 text-xs font-black transition ${
+                          leaderboardMode === mode
+                            ? "bg-white text-black"
+                            : "text-gray-400 hover:bg-white/10 hover:text-white"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   <div className="mt-4 space-y-2">
                     {leaderboard.length ? leaderboard.slice(0, 5).map((row) => (
                       <div
@@ -730,12 +826,57 @@ export default function DashboardPage() {
                 </div>
 
                 <div className="rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5">
-                  <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
-                    <Gift size={17} />
-                    {pick("Deblochează mai mult", "Unlock more")}
-                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
+                      <Image src="/brand/CeCoin.png" alt="" width={28} height={28} className="rounded-full object-cover" />
+                      {pick("Magazin CeCoins", "CeCoins shop")}
+                    </p>
+                    <span className="rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
+                      {coinBalance} CC
+                    </span>
+                  </div>
+
+                  {shopMessage && (
+                    <p className="mt-4 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100">
+                      {shopMessage}
+                    </p>
+                  )}
+
                   <div className="mt-4 space-y-3">
-                    {nextRewards.map((reward) => (
+                    {shopItems.map((item) => {
+                      const canAfford = coinBalance >= item.cost;
+
+                      return (
+                        <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-black text-white">{item.title}</p>
+                              <p className="mt-1 text-xs leading-5 text-gray-400">{item.description}</p>
+                            </div>
+                            <span className="shrink-0 rounded-full bg-yellow-200 px-2 py-1 text-xs font-black text-black">
+                              {item.cost} CC
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => redeemShopItem(item.id)}
+                            disabled={!canAfford || redeemingItemId === item.id}
+                            className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black transition ${
+                              canAfford
+                                ? "bg-white text-black hover:bg-yellow-100"
+                                : "cursor-not-allowed border border-white/10 text-gray-500"
+                            }`}
+                          >
+                            {redeemingItemId === item.id
+                              ? pick("Se activează...", "Activating...")
+                              : canAfford
+                                ? pick("Activează", "Redeem")
+                                : pick("Strânge mai multe", "Earn more")}
+                          </button>
+                        </div>
+                      );
+                    })}
+                    {shopItems.length === 0 && nextRewards.map((reward) => (
                       <Link
                         key={`${reward.title}-${reward.href}`}
                         href={reward.href || "/pricing"}
@@ -746,6 +887,37 @@ export default function DashboardPage() {
                       </Link>
                     ))}
                   </div>
+
+                  {coinPacks.length > 0 && (
+                    <div className="mt-5 border-t border-white/10 pt-4">
+                      <p className="text-xs font-black uppercase tracking-wide text-gray-400">
+                        {pick("Cumpără CeCoins", "Buy CeCoins")}
+                      </p>
+                      <div className="mt-3 space-y-2">
+                        {coinPacks.map((pack) => (
+                          <button
+                            key={pack.id}
+                            type="button"
+                            onClick={() => buyCoinPack(pack.id)}
+                            disabled={!pack.configured || buyingPackId === pack.id}
+                            className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-yellow-300/35 disabled:cursor-not-allowed disabled:opacity-55"
+                          >
+                            <span>
+                              <span className="block text-sm font-black text-white">{pack.title}</span>
+                              <span className="block text-xs text-gray-400">{pack.coins} CeCoins</span>
+                            </span>
+                            <span className="text-sm font-black text-yellow-100">
+                              {buyingPackId === pack.id
+                                ? pick("Se deschide...", "Opening...")
+                                : pack.configured
+                                  ? pack.priceText
+                                  : pick("În curând", "Soon")}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -404,53 +404,136 @@ STRIPE_PRICE_ENV_BY_PLAN = {
 }
 PLAN_RANK = {"free": 0, "pro": 1, "family": 2}
 
-MISSION_CATALOG = [
+MISSION_SERIES = [
     {
-        "id": "first_scan",
-        "title": "Prima scanare",
-        "description": "Scanează primul produs și începe istoricul tău.",
+        "seriesId": "scan",
         "metric": "scanCount",
-        "target": 1,
-        "coins": 20,
+        "icon": "scan",
+        "titleTemplate": "Scanează {target} produs(e)",
+        "description": "Fiecare scanare corectă îți crește nivelul și istoricul.",
+        "targets": [1, 5, 10, 20, 50, 100, 250, 500, 1000],
+        "baseCoins": 20,
+        "coinStep": 15,
         "bonusScans": 1,
     },
     {
-        "id": "smart_cart",
-        "title": "Coș pregătit",
-        "description": "Adaugă 3 produse în coșul activ.",
+        "seriesId": "cart",
         "metric": "cartCount",
-        "target": 3,
-        "coins": 35,
+        "icon": "cart",
+        "titleTemplate": "Pune {target} produs(e) în coș",
+        "description": "Construiește liste utile pentru cumpărăturile următoare.",
+        "targets": [3, 10, 25, 50, 100],
+        "baseCoins": 35,
+        "coinStep": 20,
         "bonusScans": 1,
     },
     {
-        "id": "favorites_keeper",
-        "title": "Favorite utile",
-        "description": "Salvează 3 produse la favorite.",
+        "seriesId": "favorite",
         "metric": "favoritesCount",
-        "target": 3,
-        "coins": 35,
+        "icon": "favorite",
+        "titleTemplate": "Salvează {target} favorite",
+        "description": "Păstrează produsele și alternativele la care vrei să revii.",
+        "targets": [1, 3, 10, 25, 50],
+        "baseCoins": 30,
+        "coinStep": 20,
         "bonusScans": 1,
     },
     {
-        "id": "catalog_helper",
-        "title": "Ajutor pentru catalog",
-        "description": "Trimite un produs care este aprobat în catalog.",
+        "seriesId": "catalog",
         "metric": "approvedSubmissions",
-        "target": 1,
-        "coins": 80,
+        "icon": "catalog",
+        "titleTemplate": "Adaugă {target} produs(e) aprobate",
+        "description": "Produsele aprobate ajută comunitatea și îți aduc bonusuri mai mari.",
+        "targets": [1, 3, 10, 25, 50],
+        "baseCoins": 80,
+        "coinStep": 45,
         "bonusScans": 2,
     },
     {
-        "id": "invite_starter",
-        "title": "Invită un prieten",
-        "description": "Un prieten își creează cont și confirmă emailul cu codul tău.",
+        "seriesId": "invite",
         "metric": "confirmedInvites",
-        "target": 1,
-        "coins": 120,
+        "icon": "invite",
+        "titleTemplate": "Invită {target} prieten(i)",
+        "description": "Primești recompense când prietenii confirma emailul cu codul tău.",
+        "targets": [1, 3, 5, 10, 25],
+        "baseCoins": 120,
+        "coinStep": 60,
         "bonusDays": 1,
     },
 ]
+
+CECOIN_SHOP_ITEMS = [
+    {
+        "id": "bonus_scan_1",
+        "title": "1 scanare bonus",
+        "description": "Adaugă o scanare extra peste limita săptămânală.",
+        "cost": 80,
+        "bonusScans": 1,
+    },
+    {
+        "id": "bonus_scan_5",
+        "title": "5 scanări bonus",
+        "description": "Pachet bun pentru o tură de cumpărături mai lungă.",
+        "cost": 350,
+        "bonusScans": 5,
+    },
+    {
+        "id": "unlimited_day_1",
+        "title": "1 zi de scanări nelimitate",
+        "description": "Activează scanări nelimitate pentru o zi.",
+        "cost": 700,
+        "bonusDays": 1,
+    },
+]
+
+CECOIN_PACKS = [
+    {
+        "id": "starter",
+        "title": "Start CeCoins",
+        "coins": 500,
+        "priceText": "9,99 lei",
+        "priceEnv": "STRIPE_CECOINS_STARTER_PRICE_ID",
+    },
+    {
+        "id": "boost",
+        "title": "Boost CeCoins",
+        "coins": 1200,
+        "priceText": "19,99 lei",
+        "priceEnv": "STRIPE_CECOINS_BOOST_PRICE_ID",
+    },
+    {
+        "id": "power",
+        "title": "Power CeCoins",
+        "coins": 3000,
+        "priceText": "39,99 lei",
+        "priceEnv": "STRIPE_CECOINS_POWER_PRICE_ID",
+    },
+]
+
+
+def build_mission_catalog():
+    missions = []
+
+    for series in MISSION_SERIES:
+        for index, target in enumerate(series["targets"], start=1):
+            missions.append({
+                "id": f"{series['seriesId']}_{target}",
+                "seriesId": series["seriesId"],
+                "tier": index,
+                "title": series["titleTemplate"].format(target=target),
+                "description": series["description"],
+                "metric": series["metric"],
+                "target": target,
+                "icon": series["icon"],
+                "coins": series["baseCoins"] + (index - 1) * series["coinStep"],
+                "bonusScans": series.get("bonusScans", 0),
+                "bonusDays": series.get("bonusDays", 0),
+            })
+
+    return missions
+
+
+MISSION_CATALOG = build_mission_catalog()
 
 
 def get_auth_serializer():
@@ -1866,8 +1949,71 @@ def sync_stripe_subscription(stripe_subscription, deleted=False):
     )
 
 
+def get_cecoin_pack(pack_id):
+    normalized_id = str(pack_id or "").strip().lower()
+    return next((pack for pack in CECOIN_PACKS if pack["id"] == normalized_id), None)
+
+
+def handle_stripe_cecoin_checkout_completed(session):
+    metadata = session.get("metadata") or {}
+    user_id = metadata.get("user_id")
+    pack_id = metadata.get("pack_id")
+    payment_status = session.get("payment_status")
+    session_id = session.get("id")
+    pack = get_cecoin_pack(pack_id)
+
+    if not pack or not user_id:
+        app.logger.warning("Stripe CeCoins checkout ignored: missing metadata.")
+        return None
+
+    if payment_status not in {"paid", "no_payment_required"}:
+        app.logger.warning(
+            "Stripe CeCoins checkout ignored: payment status %s.",
+            payment_status,
+        )
+        return None
+
+    try:
+        user = db.session.get(User, int(user_id))
+    except (TypeError, ValueError):
+        user = None
+
+    if not user:
+        app.logger.warning("Stripe CeCoins checkout ignored: user %s not found.", user_id)
+        return None
+
+    existing_events = UsageEvent.query.filter_by(
+        user_id=user.id,
+        event_type="cecoin_purchase",
+        source=pack["id"],
+    ).all()
+
+    if any(parse_usage_metadata(event).get("sessionId") == session_id for event in existing_events):
+        return None
+
+    db.session.add(
+        UsageEvent(
+            user_id=user.id,
+            event_type="cecoin_purchase",
+            source=pack["id"],
+            metadata_json=json.dumps({
+                "coins": int(pack["coins"]),
+                "sessionId": session_id,
+                "paymentStatus": payment_status,
+                "priceEnv": pack["priceEnv"],
+            }),
+        )
+    )
+    db.session.commit()
+    return user
+
+
 def handle_stripe_checkout_completed(session):
     metadata = session.get("metadata") or {}
+
+    if metadata.get("type") == "cecoins":
+        return handle_stripe_cecoin_checkout_completed(session)
+
     plan = metadata.get("plan")
     user_id = metadata.get("user_id")
     subscription_id = session.get("subscription")
@@ -2154,28 +2300,40 @@ def parse_usage_metadata(event):
     return data if isinstance(data, dict) else {}
 
 
-def get_user_gamification_metrics(user_id):
-    scan_count = UsageEvent.query.filter_by(
+def get_user_gamification_metrics(user_id, since=None):
+    scan_query = UsageEvent.query.filter_by(
         user_id=user_id,
         event_type="scan",
-    ).count()
-    history_count = ScanHistory.query.filter_by(user_id=user_id).count()
-    favorites_count = Favorite.query.filter_by(user_id=user_id).count()
-    cart_count = (
-        db.session.query(func.coalesce(func.sum(CartItem.quantity), 0))
-        .filter(CartItem.user_id == user_id)
-        .scalar()
-        or 0
     )
-    approved_submissions = ProductSubmission.query.filter_by(
+    history_query = ScanHistory.query.filter_by(user_id=user_id)
+    favorites_query = Favorite.query.filter_by(user_id=user_id)
+    cart_query = db.session.query(func.coalesce(func.sum(CartItem.quantity), 0)).filter(
+        CartItem.user_id == user_id
+    )
+    submissions_query = ProductSubmission.query.filter_by(
         user_id=user_id,
         status="approved",
-    ).count()
-    confirmed_invites = UsageEvent.query.filter_by(
+    )
+    invites_query = UsageEvent.query.filter_by(
         user_id=user_id,
         event_type="bonus_unlimited",
         source="referral_inviter",
-    ).count()
+    )
+
+    if since:
+        scan_query = scan_query.filter(UsageEvent.created_at >= since)
+        history_query = history_query.filter(ScanHistory.scanned_at >= since)
+        favorites_query = favorites_query.filter(Favorite.created_at >= since)
+        cart_query = cart_query.filter(CartItem.created_at >= since)
+        submissions_query = submissions_query.filter(ProductSubmission.created_at >= since)
+        invites_query = invites_query.filter(UsageEvent.created_at >= since)
+
+    scan_count = scan_query.count()
+    history_count = history_query.count()
+    favorites_count = favorites_query.count()
+    cart_count = cart_query.scalar() or 0
+    approved_submissions = submissions_query.count()
+    confirmed_invites = invites_query.count()
 
     return {
         "scanCount": max(scan_count, history_count),
@@ -2205,16 +2363,39 @@ def calculate_claimed_mission_coins(user_id):
     return total
 
 
-def calculate_user_coins(user_id, metrics=None):
-    metrics = metrics or get_user_gamification_metrics(user_id)
-    base_total = (
+def calculate_event_coin_total(user_id, event_type):
+    total = 0
+    events = UsageEvent.query.filter_by(
+        user_id=user_id,
+        event_type=event_type,
+    ).all()
+
+    for event in events:
+        data = parse_usage_metadata(event)
+        total += int(data.get("coins") or data.get("cost") or 0)
+
+    return total
+
+
+def calculate_activity_score(metrics):
+    return (
         int(metrics["scanCount"]) * 3
         + int(metrics["favoritesCount"]) * 5
         + min(int(metrics["cartCount"]) * 2, 50)
         + int(metrics["approvedSubmissions"]) * 60
         + int(metrics["confirmedInvites"]) * 100
     )
-    return base_total + calculate_claimed_mission_coins(user_id)
+
+
+def calculate_user_coins(user_id, metrics=None):
+    metrics = metrics or get_user_gamification_metrics(user_id)
+    earned = (
+        calculate_activity_score(metrics)
+        + calculate_claimed_mission_coins(user_id)
+        + calculate_event_coin_total(user_id, "cecoin_purchase")
+    )
+    spent = calculate_event_coin_total(user_id, "cecoin_spend")
+    return max(0, earned - spent)
 
 
 def build_mission_statuses(user_id, metrics=None):
@@ -2222,7 +2403,18 @@ def build_mission_statuses(user_id, metrics=None):
     claimed_events = get_claimed_mission_events(user_id)
     missions = []
 
-    for mission in MISSION_CATALOG:
+    for series in MISSION_SERIES:
+        series_missions = [
+            mission for mission in MISSION_CATALOG
+            if mission["seriesId"] == series["seriesId"]
+        ]
+        mission = next(
+            (
+                item for item in series_missions
+                if item["id"] not in claimed_events
+            ),
+            series_missions[-1],
+        )
         current = int(metrics.get(mission["metric"], 0) or 0)
         target = int(mission["target"])
         claimed_event = claimed_events.get(mission["id"])
@@ -2235,6 +2427,9 @@ def build_mission_statuses(user_id, metrics=None):
 
         missions.append({
             "id": mission["id"],
+            "seriesId": mission["seriesId"],
+            "tier": mission["tier"],
+            "icon": mission.get("icon"),
             "title": mission["title"],
             "description": mission["description"],
             "current": min(current, target),
@@ -2249,24 +2444,41 @@ def build_mission_statuses(user_id, metrics=None):
     return missions
 
 
-def build_user_leaderboard(current_user_id=None, limit=10):
+def count_completed_catalog_missions(metrics):
+    return sum(
+        1
+        for mission in MISSION_CATALOG
+        if int(metrics.get(mission["metric"], 0) or 0) >= int(mission["target"])
+    )
+
+
+def build_user_leaderboard(current_user_id=None, limit=10, since=None):
     users = User.query.order_by(User.created_at.asc()).all()
     rows = []
 
     for user in users:
-        metrics = get_user_gamification_metrics(user.id)
-        coins = calculate_user_coins(user.id, metrics)
+        metrics = get_user_gamification_metrics(user.id, since=since)
+        score = calculate_activity_score(metrics)
+        coins = calculate_user_coins(user.id) if since is None else score
 
         rows.append({
             "userId": user.id,
             "name": (user.name or "Utilizator").split()[0],
             "coins": coins,
+            "score": score,
             "scanCount": metrics["scanCount"],
             "approvedSubmissions": metrics["approvedSubmissions"],
             "isCurrentUser": user.id == current_user_id,
         })
 
-    rows.sort(key=lambda item: (item["coins"], item["scanCount"], item["approvedSubmissions"]), reverse=True)
+    rows.sort(
+        key=lambda item: (
+            item["coins"],
+            item["scanCount"],
+            item["approvedSubmissions"],
+        ),
+        reverse=True,
+    )
 
     for index, row in enumerate(rows, start=1):
         row["rank"] = index
@@ -2283,9 +2495,12 @@ def build_user_leaderboard(current_user_id=None, limit=10):
 def get_gamification_summary_for_user(user):
     metrics = get_user_gamification_metrics(user.id)
     missions = build_mission_statuses(user.id, metrics)
-    completed_count = sum(1 for mission in missions if mission["completed"])
-    claimed_count = sum(1 for mission in missions if mission["claimed"])
+    completed_count = count_completed_catalog_missions(metrics)
+    claimed_count = len(get_claimed_mission_events(user.id))
     coins = calculate_user_coins(user.id, metrics)
+    week_start = get_week_start()
+    all_time_leaderboard = build_user_leaderboard(user.id)
+    weekly_leaderboard = build_user_leaderboard(user.id, since=week_start)
 
     return {
         "coins": coins,
@@ -2302,7 +2517,21 @@ def get_gamification_summary_for_user(user):
         "missions": missions,
         "completedMissions": completed_count,
         "claimedMissions": claimed_count,
-        "leaderboard": build_user_leaderboard(user.id),
+        "totalMissions": len(MISSION_CATALOG),
+        "leaderboard": {
+            "allTime": all_time_leaderboard,
+            "weekly": weekly_leaderboard,
+            "top": all_time_leaderboard["top"],
+            "currentUser": all_time_leaderboard["currentUser"],
+        },
+        "shopItems": CECOIN_SHOP_ITEMS,
+        "coinPacks": [
+            {
+                **pack,
+                "configured": bool(os.environ.get(pack["priceEnv"], "").strip()),
+            }
+            for pack in CECOIN_PACKS
+        ],
         "nextRewards": [
             {
                 "title": "Pro",
@@ -2367,6 +2596,8 @@ AUTH_ENDPOINTS = {
     "get_billing_status",
     "get_gamification_summary",
     "claim_gamification_mission",
+    "redeem_cecoin_reward",
+    "start_cecoin_checkout",
     "start_checkout",
     "start_billing_portal",
     "get_family_profiles",
@@ -5513,6 +5744,132 @@ def claim_gamification_mission():
     })
 
 
+@app.route("/gamification/redeem", methods=["POST"])
+def redeem_cecoin_reward():
+    data = request.get_json(silent=True) or {}
+    item_id = str(data.get("itemId") or "").strip()
+    item = next((entry for entry in CECOIN_SHOP_ITEMS if entry["id"] == item_id), None)
+
+    if not item:
+        return jsonify({"error": "Recompensă invalidă."}), 400
+
+    current_coins = calculate_user_coins(g.current_user.id)
+    cost = int(item.get("cost") or 0)
+
+    if current_coins < cost:
+        return jsonify({
+            "error": "Nu ai suficiente CeCoins pentru această recompensă.",
+            "coins": current_coins,
+            "required": cost,
+            "summary": get_gamification_summary_for_user(g.current_user),
+        }), 402
+
+    if item.get("bonusScans"):
+        add_bonus_scan_credits(
+            g.current_user,
+            int(item["bonusScans"]),
+            "cecoin_shop",
+            {"itemId": item_id},
+        )
+
+    if item.get("bonusDays"):
+        extend_bonus_unlimited(
+            g.current_user,
+            int(item["bonusDays"]),
+            "cecoin_shop",
+            {"itemId": item_id},
+        )
+
+    db.session.add(
+        UsageEvent(
+            user_id=g.current_user.id,
+            event_type="cecoin_spend",
+            source=item_id,
+            metadata_json=json.dumps({
+                "cost": cost,
+                "item": {
+                    "id": item["id"],
+                    "title": item["title"],
+                    "bonusScans": item.get("bonusScans", 0),
+                    "bonusDays": item.get("bonusDays", 0),
+                },
+            }),
+        )
+    )
+    db.session.commit()
+
+    return jsonify({
+        "message": "Recompensa a fost activată.",
+        "item": item,
+        "summary": get_gamification_summary_for_user(g.current_user),
+    })
+
+
+@app.route("/gamification/coin-checkout", methods=["POST"])
+def start_cecoin_checkout():
+    data = request.get_json(silent=True) or {}
+    pack = get_cecoin_pack(data.get("packId"))
+
+    if not pack:
+        return jsonify({"error": "Pachet CeCoins invalid."}), 400
+
+    price_id = os.environ.get(pack["priceEnv"], "").strip()
+
+    if not configure_stripe() or not price_id:
+        return jsonify({
+            "error": "Pachetele CeCoins nu sunt configurate complet.",
+            "code": "cecoins_checkout_not_configured",
+            "required": ["STRIPE_SECRET_KEY", pack["priceEnv"], "STRIPE_WEBHOOK_SECRET"],
+        }), 503
+
+    user = g.current_user
+    subscription = get_or_create_subscription(user)
+    metadata = {
+        "type": "cecoins",
+        "user_id": str(user.id),
+        "pack_id": pack["id"],
+        "coins": str(pack["coins"]),
+        "price_env": pack["priceEnv"],
+        "app": "ce-aleg",
+    }
+    checkout_params = {
+        "mode": "payment",
+        "line_items": [{"price": price_id, "quantity": 1}],
+        "success_url": f"{FRONTEND_PUBLIC_URL}/dashboard?cecoins=success",
+        "cancel_url": f"{FRONTEND_PUBLIC_URL}/dashboard?cecoins=cancelled",
+        "client_reference_id": str(user.id),
+        "metadata": metadata,
+        "allow_promotion_codes": True,
+        "locale": "auto",
+        "billing_address_collection": "auto",
+        "automatic_tax": {"enabled": env_flag("STRIPE_AUTOMATIC_TAX", False)},
+    }
+
+    if (
+        subscription.provider == "stripe"
+        and subscription.provider_customer_id
+    ):
+        checkout_params["customer"] = subscription.provider_customer_id
+    else:
+        checkout_params["customer_email"] = user.email
+
+    try:
+        checkout_session = stripe.checkout.Session.create(**checkout_params)
+    except Exception as error:
+        app.logger.warning("Stripe CeCoins checkout failed: %s", error)
+        return jsonify({
+            "error": "Cumpărarea de CeCoins nu a putut fi pornită momentan.",
+            "code": "cecoins_checkout_failed",
+        }), 502
+
+    return jsonify({
+        "mode": "stripe",
+        "pack": pack["id"],
+        "checkoutUrl": checkout_session.url,
+        "sessionId": checkout_session.id,
+    })
+
+
 # =========================
 # Admin
 # =========================
@@ -5962,6 +6319,7 @@ def get_open_food_facts_alternatives():
         for product in alternatives
         if product.get("recommendationScore", 0) > -20
     ]
+    alternatives = dedupe_alternatives_by_identity(alternatives)
     photographed_alternatives = [
         product for product in alternatives if product.get("image")
     ]
@@ -8537,6 +8895,43 @@ def is_same_catalog_product(scanned_product, candidate):
     return SequenceMatcher(None, scanned_name, candidate_name).ratio() >= 0.88
 
 
+def get_alternative_identity_key(product_data):
+    barcode = str(product_data.get("barcode") or "").strip()
+
+    if barcode and re.fullmatch(r"\d{8,14}", barcode):
+        return f"barcode:{barcode}"
+
+    name = normalize_product_name_for_duplicate(product_data.get("name"))
+    brand = normalize_search_text(product_data.get("brand") or "")
+    quantity = normalize_search_text(product_data.get("quantity") or "")
+
+    if not name:
+        return ""
+
+    return f"name:{brand}:{name}:{quantity}"
+
+
+def dedupe_alternatives_by_identity(alternatives):
+    deduped = []
+    seen_keys = set()
+
+    for candidate in alternatives:
+        identity_key = get_alternative_identity_key(candidate)
+
+        if identity_key and identity_key in seen_keys:
+            continue
+
+        if any(is_same_catalog_product(existing, candidate) for existing in deduped):
+            continue
+
+        deduped.append(candidate)
+
+        if identity_key:
+            seen_keys.add(identity_key)
+
+    return deduped
+
+
 def get_known_catalog_alternatives(scanned_product, criteria):
     alternatives = []
     scanned_family = get_product_recommendation_family(scanned_product)
@@ -8981,6 +9376,31 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
     if not local_product and product_name:
         local_product, match_score = find_best_product_match(product_name)
 
+    try:
+        confidence = int(vision_result.get("confidence") or 0)
+    except (TypeError, ValueError):
+        confidence = 0
+
+    if not local_product:
+        return jsonify({
+            "identified": False,
+            "chargeable": False,
+            "message": (
+                "Nu am confirmat sigur produsul. Arată codul de bare ca să evităm un rezultat greșit."
+            ),
+            "candidate": {
+                "name": product_name or None,
+                "brand": vision_result.get("brand"),
+                "variant": vision_result.get("variant"),
+                "barcode": barcode or None,
+                "confidence": confidence,
+                "needs_barcode": True,
+                "message": vision_result.get("message")
+                or "Confirmă produsul prin codul de bare.",
+                "local_match_score": match_score,
+            },
+        })
+
     scan_gate = consume_scan_usage(
         g.current_user,
         "live_vision",
@@ -9004,7 +9424,7 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
             "brand": vision_result.get("brand"),
             "variant": vision_result.get("variant"),
             "barcode": barcode or None,
-            "confidence": vision_result.get("confidence", 0),
+            "confidence": confidence,
             "needs_barcode": vision_result.get("needs_barcode", not barcode),
             "message": vision_result.get("message")
             or "Produs identificat vizual. Confirmă ambalajul sau arată codul de bare.",

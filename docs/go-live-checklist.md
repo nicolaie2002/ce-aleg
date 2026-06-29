@@ -105,6 +105,9 @@ STRIPE_PRO_PRICE_ID=<price id lunar Pro>
 STRIPE_PRO_YEARLY_PRICE_ID=<price id anual Pro>
 STRIPE_FAMILY_PRICE_ID=<price id lunar Family>
 STRIPE_FAMILY_YEARLY_PRICE_ID=<price id anual Family>
+STRIPE_CECOINS_STARTER_PRICE_ID=<price id pachet 500 CeCoins>
+STRIPE_CECOINS_BOOST_PRICE_ID=<price id pachet 1200 CeCoins>
+STRIPE_CECOINS_POWER_PRICE_ID=<price id pachet 3000 CeCoins>
 STRIPE_AUTOMATIC_TAX=false
 STRIPE_TAX_ID_COLLECTION=false
 ```
@@ -156,11 +159,17 @@ sincronizeaza la urmatorul deploy.
    - Pro anual: `149 RON / year`
    - Family lunar: `29.99 RON / month`
    - Family anual: `249 RON / year`
+   - Start CeCoins: `9.99 RON`, plata unica
+   - Boost CeCoins: `19.99 RON`, plata unica
+   - Power CeCoins: `39.99 RON`, plata unica
 3. Copiaza ID-urile `price_...` in Render:
    - `STRIPE_PRO_PRICE_ID`
    - `STRIPE_PRO_YEARLY_PRICE_ID`
    - `STRIPE_FAMILY_PRICE_ID`
    - `STRIPE_FAMILY_YEARLY_PRICE_ID`
+   - `STRIPE_CECOINS_STARTER_PRICE_ID`
+   - `STRIPE_CECOINS_BOOST_PRICE_ID`
+   - `STRIPE_CECOINS_POWER_PRICE_ID`
 4. Lasa momentan:
 
 ```text
