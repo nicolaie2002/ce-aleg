@@ -2776,7 +2776,7 @@ def get_gamification_summary_for_user(user):
     claimed_count = sum(
         1
         for mission in missions
-        if mission.get("claimedToday") or mission.get("completed")
+        if mission.get("claimedToday") or mission.get("claimed")
     )
     coins = calculate_user_coins(user.id, metrics)
     week_start = get_week_start()
@@ -5965,7 +5965,14 @@ def get_cecoin_packs():
 
 @app.route("/gamification/summary", methods=["GET"])
 def get_gamification_summary():
-    return jsonify(get_gamification_summary_for_user(g.current_user))
+    try:
+        return jsonify(get_gamification_summary_for_user(g.current_user))
+    except Exception:
+        app.logger.exception("Gamification summary failed")
+        return jsonify({
+            "code": "gamification_summary_failed",
+            "error": "Misiunile nu s-au putut încărca momentan.",
+        }), 500
 
 
 @app.route("/gamification/claim", methods=["POST"])

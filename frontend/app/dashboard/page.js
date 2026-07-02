@@ -82,6 +82,7 @@ export default function DashboardPage() {
   const [gamification, setGamification] = useState(null);
   const [coinPackCatalog, setCoinPackCatalog] = useState([]);
   const [isGamificationLoading, setIsGamificationLoading] = useState(false);
+  const [gamificationError, setGamificationError] = useState("");
   const [claimMessage, setClaimMessage] = useState("");
   const [claimingMissionId, setClaimingMissionId] = useState("");
   const [claimedMissionId, setClaimedMissionId] = useState("");
@@ -147,20 +148,29 @@ export default function DashboardPage() {
 
   const loadGamificationData = useCallback(async () => {
     setIsGamificationLoading(true);
+    setGamificationError("");
 
     try {
-      const response = await fetch(`${API_URL}/gamification/summary`);
+      const response = await fetch(`${API_URL}/gamification/summary`, { cache: "no-store" });
       const data = await readApiJson(response);
 
-      if (response.ok) {
-        setGamification(data);
+      if (!response.ok) {
+        throw new Error(data.error || pick("Misiunile nu s-au putut încărca.", "Missions could not be loaded."));
       }
+
+      setGamification(data);
     } catch {
       setGamification(null);
+      setGamificationError(
+        pick(
+          "Misiunile nu s-au putut încărca. Reîncearcă în câteva secunde.",
+          "Missions could not be loaded. Try again in a few seconds."
+        )
+      );
     } finally {
       setIsGamificationLoading(false);
     }
-  }, []);
+  }, [pick]);
 
   useEffect(() => {
     let isMounted = true;
@@ -408,81 +418,9 @@ export default function DashboardPage() {
   const freeScanDetail = hasUnlimitedScans
     ? pick("scanări prin plan", "plan scans")
     : pick("rămase luna aceasta", "left this month");
-  const fallbackMissions = [
-    {
-      id: "first_scan",
-      label: pick("Prima scanare", "First scan"),
-      title: pick("Prima scanare", "First scan"),
-      detail: pick("Ai început istoricul de produse.", "You started your product history."),
-      description: pick("Ai început istoricul de produse.", "You started your product history."),
-      completed: counts.history >= 1,
-      claimed: false,
-      claimable: false,
-      current: Math.min(counts.history, 1),
-      target: 1,
-      progress: counts.history >= 1 ? 100 : 0,
-      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
-    },
-    {
-      id: "ten_scans",
-      label: pick("10 scanări", "10 scans"),
-      title: pick("10 scanări", "10 scans"),
-      detail: pick("Ai comparat deja mai multe alegeri.", "You have compared several choices."),
-      description: pick("Ai comparat deja mai multe alegeri.", "You have compared several choices."),
-      completed: counts.history >= 10,
-      claimed: false,
-      claimable: false,
-      current: Math.min(counts.history, 10),
-      target: 10,
-      progress: Math.min(100, Math.round((counts.history / 10) * 100)),
-      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
-    },
-    {
-      id: "favorites_keeper",
-      label: pick("Favorite utile", "Useful favorites"),
-      title: pick("Favorite utile", "Useful favorites"),
-      detail: pick("Ai salvat produse pe care merită să revii.", "You saved products worth revisiting."),
-      description: pick("Ai salvat produse pe care merită să revii.", "You saved products worth revisiting."),
-      completed: counts.favorites >= 3,
-      claimed: false,
-      claimable: false,
-      current: Math.min(counts.favorites, 3),
-      target: 3,
-      progress: Math.min(100, Math.round((counts.favorites / 3) * 100)),
-      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
-    },
-    {
-      id: "smart_cart",
-      label: pick("Coș pregătit", "Cart ready"),
-      title: pick("Coș pregătit", "Cart ready"),
-      detail: pick("Lista ta are produse pentru următoarea cumpărătură.", "Your list has products for the next trip."),
-      description: pick("Lista ta are produse pentru următoarea cumpărătură.", "Your list has products for the next trip."),
-      completed: counts.cart >= 3,
-      claimed: false,
-      claimable: false,
-      current: Math.min(counts.cart, 3),
-      target: 3,
-      progress: Math.min(100, Math.round((counts.cart / 3) * 100)),
-      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
-    },
-    {
-      id: "invite_starter",
-      label: pick("Invită un prieten", "Invite a friend"),
-      title: pick("Invită un prieten", "Invite a friend"),
-      detail: pick("Bonusurile cresc când un prieten confirmă contul.", "Rewards grow when a friend verifies their account."),
-      description: pick("Bonusurile cresc când un prieten confirmă contul.", "Rewards grow when a friend verifies their account."),
-      completed: Boolean(bonusUntil) || bonusCredits > 0,
-      claimed: false,
-      claimable: false,
-      current: Boolean(bonusUntil) || bonusCredits > 0 ? 1 : 0,
-      target: 1,
-      progress: Boolean(bonusUntil) || bonusCredits > 0 ? 100 : 0,
-      reward: { coins: 100, bonusScans: 0, bonusDays: 0 },
-    },
-  ];
-  const missions = gamification?.missions || fallbackMissions;
-  const completedRewards = gamification?.completedMissions ?? missions.filter((mission) => mission.completed).length;
-  const claimedRewards = gamification?.claimedMissions ?? missions.filter((mission) => mission.claimed || mission.claimedToday).length;
+  const missions = gamification?.missions || [];
+  const completedRewards = gamification?.completedMissions ?? 0;
+  const claimedRewards = gamification?.claimedMissions ?? 0;
   const rewardLevel = gamification?.level || (
     completedRewards >= 4
       ? pick("Avansat", "Advanced")
@@ -490,11 +428,9 @@ export default function DashboardPage() {
         ? pick("În creștere", "Building")
         : pick("Start bun", "Good start")
   );
-  const totalMissionCount = gamification?.totalMissions || missions.length;
+  const totalMissionCount = gamification?.totalMissions || 5;
   const rewardProgress = Math.round((completedRewards / Math.max(totalMissionCount, 1)) * 100);
-  const coinBalance = gamification?.coins ?? (
-    counts.history * 3 + counts.favorites * 5 + Math.min(counts.cart * 2, 50)
-  );
+  const coinBalance = gamification?.coins ?? 0;
   const dailyClaimedCoins = gamification?.dailyClaimedCoins ?? 0;
   const dailyCoinLimit = gamification?.dailyCoinLimit ?? 40;
   const leaderboardData = gamification?.leaderboard || {};
@@ -785,6 +721,19 @@ export default function DashboardPage() {
                   </p>
                 )}
 
+                {gamificationError && !isGamificationLoading && (
+                  <div className="mt-4 flex flex-col gap-3 rounded-lg border border-yellow-300/25 bg-yellow-300/10 px-4 py-3 text-sm text-yellow-50 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="font-bold">{gamificationError}</p>
+                    <button
+                      type="button"
+                      onClick={loadGamificationData}
+                      className="rounded-lg bg-white px-4 py-2 font-black text-black hover:bg-yellow-100"
+                    >
+                      {pick("Reîncearcă", "Retry")}
+                    </button>
+                  </div>
+                )}
+
                 {claimMessage && (
                   <p
                     role="status"
@@ -794,8 +743,9 @@ export default function DashboardPage() {
                   </p>
                 )}
 
-                <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                  {missions.map((mission) => {
+                {missions.length > 0 ? (
+                  <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                    {missions.map((mission) => {
                     const MissionIcon = missionIcons[mission.icon] || Award;
                     const rewardParts = [
                       mission.reward?.coins ? `${mission.reward.coins} CeCoins` : "",
@@ -871,8 +821,16 @@ export default function DashboardPage() {
                         )}
                       </div>
                     );
-                  })}
-                </div>
+                    })}
+                  </div>
+                ) : !isGamificationLoading && !gamificationError ? (
+                  <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.035] p-5 text-sm text-gray-300">
+                    {pick(
+                      "Misiunile apar aici după prima sincronizare a contului.",
+                      "Missions appear here after the first account sync."
+                    )}
+                  </div>
+                ) : null}
               </div>
 
               <div className="space-y-4">
