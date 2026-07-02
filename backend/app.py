@@ -421,11 +421,10 @@ MISSION_SERIES = [
         "metric": "scanCount",
         "icon": "scan",
         "titleTemplate": "Scanează {target} produs(e)",
-        "description": "Fiecare scanare corectă îți crește nivelul și istoricul.",
+        "description": "Scanează produse noi și construiește un istoric util.",
         "targets": [1, 5, 10, 20, 50, 100, 250, 500, 1000],
-        "baseCoins": 20,
-        "coinStep": 15,
-        "bonusScans": 1,
+        "coins": 10,
+        "daily": True,
     },
     {
         "seriesId": "cart",
@@ -433,10 +432,9 @@ MISSION_SERIES = [
         "icon": "cart",
         "titleTemplate": "Pune {target} produs(e) în coș",
         "description": "Construiește liste utile pentru cumpărăturile următoare.",
-        "targets": [3, 10, 25, 50, 100],
-        "baseCoins": 35,
-        "coinStep": 20,
-        "bonusScans": 1,
+        "targets": [1, 3, 5, 10, 20, 50, 100],
+        "coins": 10,
+        "daily": True,
     },
     {
         "seriesId": "favorite",
@@ -444,32 +442,29 @@ MISSION_SERIES = [
         "icon": "favorite",
         "titleTemplate": "Salvează {target} favorite",
         "description": "Păstrează produsele și alternativele la care vrei să revii.",
-        "targets": [1, 3, 10, 25, 50],
-        "baseCoins": 30,
-        "coinStep": 20,
-        "bonusScans": 1,
+        "targets": [1, 3, 5, 10, 20, 50, 100],
+        "coins": 10,
+        "daily": True,
     },
     {
         "seriesId": "catalog",
         "metric": "approvedSubmissions",
         "icon": "catalog",
         "titleTemplate": "Adaugă {target} produs(e) aprobate",
-        "description": "Produsele aprobate ajută comunitatea și îți aduc bonusuri mai mari.",
+        "description": "Produsele aprobate ajută catalogul și îți cresc recompensa.",
         "targets": [1, 3, 10, 25, 50],
-        "baseCoins": 80,
-        "coinStep": 45,
-        "bonusScans": 2,
+        "coins": 10,
+        "daily": True,
     },
     {
         "seriesId": "invite",
         "metric": "confirmedInvites",
         "icon": "invite",
-        "titleTemplate": "Invită {target} prieten(i)",
-        "description": "Primești recompense când prietenii confirma emailul cu codul tău.",
-        "targets": [1, 3, 5, 10, 25],
-        "baseCoins": 120,
-        "coinStep": 60,
-        "bonusDays": 1,
+        "titleTemplate": "Invită încă {target} prieten(i)",
+        "description": "Primești recompensa când prietenii confirmă emailul cu codul tău.",
+        "targets": list(range(1, 1001)),
+        "coins": 100,
+        "daily": False,
     },
 ]
 
@@ -477,7 +472,7 @@ CECOIN_SHOP_ITEMS = [
     {
         "id": "bonus_scan_1",
         "title": "1 scanare bonus",
-        "description": "Adaugă o scanare extra peste limita săptămânală.",
+        "description": "Adaugă o scanare extra peste limita lunară.",
         "cost": 80,
         "bonusScans": 1,
     },
@@ -545,9 +540,10 @@ def build_mission_catalog():
                 "metric": series["metric"],
                 "target": target,
                 "icon": series["icon"],
-                "coins": series["baseCoins"] + (index - 1) * series["coinStep"],
-                "bonusScans": series.get("bonusScans", 0),
-                "bonusDays": series.get("bonusDays", 0),
+                "coins": int(series.get("coins", 10) or 0),
+                "bonusScans": int(series.get("bonusScans", 0) or 0),
+                "bonusDays": int(series.get("bonusDays", 0) or 0),
+                "daily": bool(series.get("daily", False)),
             })
 
     return missions
@@ -1686,6 +1682,15 @@ def get_week_start(reference=None):
     return start.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
+def get_day_start(reference=None):
+    reference = reference or datetime.utcnow()
+    return reference.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def get_next_day_start(reference=None):
+    return get_day_start(reference) + timedelta(days=1)
+
+
 def get_month_start(reference=None):
     reference = reference or datetime.utcnow()
     return reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -2405,6 +2410,10 @@ def get_user_gamification_metrics(user_id, since=None):
     cart_query = db.session.query(func.coalesce(func.sum(CartItem.quantity), 0)).filter(
         CartItem.user_id == user_id
     )
+    cart_event_query = UsageEvent.query.filter_by(
+        user_id=user_id,
+        event_type="cart_add",
+    )
     submissions_query = ProductSubmission.query.filter_by(
         user_id=user_id,
         status="approved",
@@ -2420,6 +2429,7 @@ def get_user_gamification_metrics(user_id, since=None):
         history_query = history_query.filter(ScanHistory.scanned_at >= since)
         favorites_query = favorites_query.filter(Favorite.created_at >= since)
         cart_query = cart_query.filter(CartItem.created_at >= since)
+        cart_event_query = cart_event_query.filter(UsageEvent.created_at >= since)
         submissions_query = submissions_query.filter(ProductSubmission.created_at >= since)
         invites_query = invites_query.filter(UsageEvent.created_at >= since)
 
@@ -2427,6 +2437,7 @@ def get_user_gamification_metrics(user_id, since=None):
     history_count = history_query.count()
     favorites_count = favorites_query.count()
     cart_count = cart_query.scalar() or 0
+    cart_event_count = cart_event_query.count()
     approved_submissions = submissions_query.count()
     confirmed_invites = invites_query.count()
 
@@ -2434,24 +2445,54 @@ def get_user_gamification_metrics(user_id, since=None):
         "scanCount": max(scan_count, history_count),
         "historyCount": history_count,
         "favoritesCount": favorites_count,
-        "cartCount": int(cart_count or 0),
+        "cartCount": max(int(cart_count or 0), cart_event_count),
         "approvedSubmissions": approved_submissions,
         "confirmedInvites": confirmed_invites,
     }
 
 
-def get_claimed_mission_events(user_id):
-    events = UsageEvent.query.filter_by(
+def get_mission_claim_events(user_id, series_id=None, since=None):
+    query = UsageEvent.query.filter_by(
         user_id=user_id,
         event_type="mission_claim",
-    ).all()
+    )
+
+    if since:
+        query = query.filter(UsageEvent.created_at >= since)
+
+    events = query.order_by(UsageEvent.created_at.asc()).all()
+
+    if series_id:
+        prefix = f"{series_id}_"
+        events = [event for event in events if str(event.source or "").startswith(prefix)]
+
+    return events
+
+
+def get_claimed_mission_events(user_id):
+    events = get_mission_claim_events(user_id)
     return {event.source: event for event in events if event.source}
+
+
+def get_claimed_mission_ids(user_id, series_id=None):
+    return {
+        event.source
+        for event in get_mission_claim_events(user_id, series_id=series_id)
+        if event.source
+    }
+
+
+def mission_target_from_source(source):
+    try:
+        return int(str(source or "").rsplit("_", 1)[1])
+    except (IndexError, TypeError, ValueError):
+        return 0
 
 
 def calculate_claimed_mission_coins(user_id):
     total = 0
 
-    for event in get_claimed_mission_events(user_id).values():
+    for event in get_mission_claim_events(user_id):
         reward = parse_usage_metadata(event).get("reward") or {}
         total += int(reward.get("coins") or 0)
 
@@ -2483,67 +2524,124 @@ def calculate_activity_score(metrics):
 
 
 def calculate_user_coins(user_id, metrics=None):
-    metrics = metrics or get_user_gamification_metrics(user_id)
     earned = (
-        calculate_activity_score(metrics)
-        + calculate_claimed_mission_coins(user_id)
+        calculate_claimed_mission_coins(user_id)
         + calculate_event_coin_total(user_id, "cecoin_purchase")
     )
     spent = calculate_event_coin_total(user_id, "cecoin_spend")
     return max(0, earned - spent)
 
 
+def build_mission_title(series_id, target):
+    target = int(target or 0)
+
+    if series_id == "scan":
+        return f"Scanează {target} produs" if target == 1 else f"Scanează {target} produse"
+
+    if series_id == "cart":
+        return f"Pune {target} produs în coș" if target == 1 else f"Pune {target} produse în coș"
+
+    if series_id == "favorite":
+        return "Salvează 1 produs favorit" if target == 1 else f"Salvează {target} produse favorite"
+
+    if series_id == "catalog":
+        return "Adaugă 1 produs aprobat" if target == 1 else f"Adaugă {target} produse aprobate"
+
+    if series_id == "invite":
+        return "Invită încă un prieten" if target == 1 else f"Invită încă {target} prieteni"
+
+    return f"Misiune {target}"
+
+
 def build_mission_statuses(user_id, metrics=None):
-    metrics = metrics or get_user_gamification_metrics(user_id)
-    claimed_events = get_claimed_mission_events(user_id)
+    all_time_metrics = metrics or get_user_gamification_metrics(user_id)
+    day_start = get_day_start()
+    next_day_start = get_next_day_start()
+    daily_metrics = get_user_gamification_metrics(user_id, since=day_start)
     missions = []
 
     for series in MISSION_SERIES:
+        series_id = series["seriesId"]
+        is_daily = bool(series.get("daily", False))
         series_missions = [
             mission for mission in MISSION_CATALOG
-            if mission["seriesId"] == series["seriesId"]
+            if mission["seriesId"] == series_id
         ]
+        claimed_ids = get_claimed_mission_ids(user_id, series_id=series_id)
+        claimed_today = False
+
+        if is_daily:
+            claimed_today = bool(get_mission_claim_events(
+                user_id,
+                series_id=series_id,
+                since=day_start,
+            ))
+
         mission = next(
             (
                 item for item in series_missions
-                if item["id"] not in claimed_events
+                if item["id"] not in claimed_ids
             ),
             series_missions[-1],
         )
-        current = int(metrics.get(mission["metric"], 0) or 0)
-        target = int(mission["target"])
-        claimed_event = claimed_events.get(mission["id"])
-        completed = current >= target
+        previous_target = max(
+            [
+                mission_target_from_source(claimed_id)
+                for claimed_id in claimed_ids
+                if claimed_id != mission["id"]
+            ]
+            or [0]
+        )
+
+        if is_daily:
+            raw_current = 0 if claimed_today else int(daily_metrics.get(mission["metric"], 0) or 0)
+            display_target = int(mission["target"])
+            display_current = min(raw_current, display_target)
+        else:
+            cumulative_current = int(all_time_metrics.get(mission["metric"], 0) or 0)
+            display_target = max(1, int(mission["target"]) - previous_target)
+            raw_current = max(0, cumulative_current - previous_target)
+            display_current = min(raw_current, display_target)
+
+        completed = raw_current >= display_target and not (is_daily and claimed_today)
         reward = {
             "coins": mission.get("coins", 0),
             "bonusScans": mission.get("bonusScans", 0),
             "bonusDays": mission.get("bonusDays", 0),
         }
+        title = build_mission_title(series_id, display_target)
 
         missions.append({
             "id": mission["id"],
             "seriesId": mission["seriesId"],
             "tier": mission["tier"],
             "icon": mission.get("icon"),
-            "title": mission["title"],
+            "title": title,
             "description": mission["description"],
-            "current": min(current, target),
-            "target": target,
-            "progress": min(100, round((current / target) * 100)) if target else 100,
+            "current": display_current,
+            "target": display_target,
+            "progress": min(100, round((display_current / display_target) * 100)) if display_target else 100,
             "completed": completed,
-            "claimed": bool(claimed_event),
-            "claimable": completed and not claimed_event,
+            "claimed": False,
+            "claimedToday": claimed_today,
+            "claimable": completed,
+            "daily": is_daily,
+            "availableAt": (
+                next_day_start.isoformat() + "Z"
+                if claimed_today
+                else None
+            ),
             "reward": reward,
         })
 
     return missions
 
 
-def count_completed_catalog_missions(metrics):
+def count_completed_catalog_missions(user_id, metrics=None):
     return sum(
         1
-        for mission in MISSION_CATALOG
-        if int(metrics.get(mission["metric"], 0) or 0) >= int(mission["target"])
+        for mission in build_mission_statuses(user_id, metrics)
+        if mission.get("completed") or mission.get("claimedToday")
     )
 
 
@@ -2620,12 +2718,21 @@ def get_public_cecoin_packs():
 def get_gamification_summary_for_user(user):
     metrics = get_user_gamification_metrics(user.id)
     missions = build_mission_statuses(user.id, metrics)
-    completed_count = count_completed_catalog_missions(metrics)
-    claimed_count = len(get_claimed_mission_events(user.id))
+    completed_count = count_completed_catalog_missions(user.id, metrics)
+    claimed_count = sum(
+        1
+        for mission in missions
+        if mission.get("claimedToday") or mission.get("completed")
+    )
     coins = calculate_user_coins(user.id, metrics)
     week_start = get_week_start()
     all_time_leaderboard = build_user_leaderboard(user.id)
     weekly_leaderboard = build_user_leaderboard(user.id, since=week_start)
+    daily_claimed_coins = sum(
+        int((mission.get("reward") or {}).get("coins") or 0)
+        for mission in missions
+        if mission.get("daily") and mission.get("claimedToday")
+    )
 
     return {
         "coins": coins,
@@ -2642,7 +2749,10 @@ def get_gamification_summary_for_user(user):
         "missions": missions,
         "completedMissions": completed_count,
         "claimedMissions": claimed_count,
-        "totalMissions": len(MISSION_CATALOG),
+        "totalMissions": len(missions),
+        "dailyClaimedCoins": daily_claimed_coins,
+        "dailyCoinLimit": 40,
+        "missionsResetAt": get_next_day_start().isoformat() + "Z",
         "leaderboard": {
             "allTime": all_time_leaderboard,
             "weekly": weekly_leaderboard,
@@ -5806,47 +5916,41 @@ def get_gamification_summary():
 def claim_gamification_mission():
     data = request.get_json(silent=True) or {}
     mission_id = str(data.get("missionId") or "").strip()
-    mission = next((item for item in MISSION_CATALOG if item["id"] == mission_id), None)
+    missions = build_mission_statuses(g.current_user.id)
+    mission = next((item for item in missions if item["id"] == mission_id), None)
 
     if not mission:
-        return jsonify({"error": "Misiune invalidă."}), 400
-
-    claimed_events = get_claimed_mission_events(g.current_user.id)
-
-    if mission_id in claimed_events:
         return jsonify({
-            "error": "Recompensa a fost revendicată deja.",
+            "error": "Misiunea s-a actualizat. Reîncarcă pagina și încearcă din nou.",
+            "summary": get_gamification_summary_for_user(g.current_user),
+        }), 400
+
+    if mission.get("claimedToday"):
+        return jsonify({
+            "error": "Ai revendicat deja recompensa acestei misiuni azi. Revino mâine pentru următorul nivel.",
             "summary": get_gamification_summary_for_user(g.current_user),
         }), 409
 
-    metrics = get_user_gamification_metrics(g.current_user.id)
-    current = int(metrics.get(mission["metric"], 0) or 0)
-    target = int(mission["target"])
-
-    if current < target:
+    if not mission.get("claimable"):
         return jsonify({
             "error": "Misiunea nu este finalizată încă.",
             "summary": get_gamification_summary_for_user(g.current_user),
         }), 400
 
-    reward = {
-        "coins": mission.get("coins", 0),
-        "bonusScans": mission.get("bonusScans", 0),
-        "bonusDays": mission.get("bonusDays", 0),
-    }
+    reward = mission.get("reward") or {}
 
-    if reward["bonusScans"]:
+    if reward.get("bonusScans"):
         add_bonus_scan_credits(
             g.current_user,
-            reward["bonusScans"],
+            int(reward.get("bonusScans") or 0),
             "mission_reward",
             {"missionId": mission_id},
         )
 
-    if reward["bonusDays"]:
+    if reward.get("bonusDays"):
         extend_bonus_unlimited(
             g.current_user,
-            reward["bonusDays"],
+            int(reward.get("bonusDays") or 0),
             "mission_reward",
             {"missionId": mission_id},
         )
@@ -5856,7 +5960,19 @@ def claim_gamification_mission():
             user_id=g.current_user.id,
             event_type="mission_claim",
             source=mission_id,
-            metadata_json=json.dumps({"reward": reward}),
+            metadata_json=json.dumps({
+                "reward": reward,
+                "seriesId": mission.get("seriesId"),
+                "daily": bool(mission.get("daily")),
+                "current": mission.get("current"),
+                "target": mission.get("target"),
+                "claimedAt": datetime.utcnow().isoformat() + "Z",
+                "dayStart": (
+                    get_day_start().isoformat() + "Z"
+                    if mission.get("daily")
+                    else None
+                ),
+            }),
         )
     )
     db.session.commit()
@@ -5990,8 +6106,14 @@ def start_cecoin_checkout():
         checkout_session = stripe.checkout.Session.create(**checkout_params)
     except Exception as error:
         app.logger.warning("Stripe CeCoins checkout failed: %s", error)
+        detail = str(error).strip()
+        message = "Cumpărarea de CeCoins nu a putut fi pornită momentan."
+
+        if detail:
+            message = f"{message} Detalii Stripe: {detail[:280]}"
+
         return jsonify({
-            "error": "Cumpărarea de CeCoins nu a putut fi pornită momentan.",
+            "error": message,
             "code": "cecoins_checkout_failed",
         }), 502
 
@@ -6637,6 +6759,19 @@ def add_to_cart():
         if profile_id and existing_item.family_profile_id is None:
             existing_item.family_profile_id = profile_id
         existing_item.quantity += 1
+        db.session.add(
+            UsageEvent(
+                user_id=user.id,
+                event_type="cart_add",
+                source="cart",
+                metadata_json=json.dumps({
+                    "productName": product_name,
+                    "store": store,
+                    "quantity": 1,
+                    "familyProfileId": profile_id,
+                }),
+            )
+        )
         db.session.commit()
 
         return jsonify({
@@ -6658,6 +6793,19 @@ def add_to_cart():
     )
 
     db.session.add(new_item)
+    db.session.add(
+        UsageEvent(
+            user_id=user.id,
+            event_type="cart_add",
+            source="cart",
+            metadata_json=json.dumps({
+                "productName": product_name,
+                "store": store,
+                "quantity": int(data.get("quantity", 1) or 1),
+                "familyProfileId": profile_id,
+            }),
+        )
+    )
     db.session.commit()
 
     return jsonify({

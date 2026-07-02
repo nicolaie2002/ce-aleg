@@ -421,7 +421,7 @@ export default function DashboardPage() {
       current: Math.min(counts.history, 1),
       target: 1,
       progress: counts.history >= 1 ? 100 : 0,
-      reward: { coins: 20, bonusScans: 1, bonusDays: 0 },
+      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
     },
     {
       id: "ten_scans",
@@ -435,7 +435,7 @@ export default function DashboardPage() {
       current: Math.min(counts.history, 10),
       target: 10,
       progress: Math.min(100, Math.round((counts.history / 10) * 100)),
-      reward: { coins: 35, bonusScans: 1, bonusDays: 0 },
+      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
     },
     {
       id: "favorites_keeper",
@@ -449,7 +449,7 @@ export default function DashboardPage() {
       current: Math.min(counts.favorites, 3),
       target: 3,
       progress: Math.min(100, Math.round((counts.favorites / 3) * 100)),
-      reward: { coins: 35, bonusScans: 1, bonusDays: 0 },
+      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
     },
     {
       id: "smart_cart",
@@ -463,7 +463,7 @@ export default function DashboardPage() {
       current: Math.min(counts.cart, 3),
       target: 3,
       progress: Math.min(100, Math.round((counts.cart / 3) * 100)),
-      reward: { coins: 35, bonusScans: 1, bonusDays: 0 },
+      reward: { coins: 10, bonusScans: 0, bonusDays: 0 },
     },
     {
       id: "invite_starter",
@@ -477,12 +477,12 @@ export default function DashboardPage() {
       current: Boolean(bonusUntil) || bonusCredits > 0 ? 1 : 0,
       target: 1,
       progress: Boolean(bonusUntil) || bonusCredits > 0 ? 100 : 0,
-      reward: { coins: 120, bonusScans: 0, bonusDays: 1 },
+      reward: { coins: 100, bonusScans: 0, bonusDays: 0 },
     },
   ];
   const missions = gamification?.missions || fallbackMissions;
   const completedRewards = gamification?.completedMissions ?? missions.filter((mission) => mission.completed).length;
-  const claimedRewards = gamification?.claimedMissions ?? missions.filter((mission) => mission.claimed).length;
+  const claimedRewards = gamification?.claimedMissions ?? missions.filter((mission) => mission.claimed || mission.claimedToday).length;
   const rewardLevel = gamification?.level || (
     completedRewards >= 4
       ? pick("Avansat", "Advanced")
@@ -495,6 +495,8 @@ export default function DashboardPage() {
   const coinBalance = gamification?.coins ?? (
     counts.history * 3 + counts.favorites * 5 + Math.min(counts.cart * 2, 50)
   );
+  const dailyClaimedCoins = gamification?.dailyClaimedCoins ?? 0;
+  const dailyCoinLimit = gamification?.dailyCoinLimit ?? 40;
   const leaderboardData = gamification?.leaderboard || {};
   const selectedLeaderboard = leaderboardMode === "weekly"
     ? leaderboardData.weekly
@@ -610,7 +612,7 @@ export default function DashboardPage() {
     {
       label: "CeCoins",
       value: coinBalance,
-      detail: pick("soldul tău", "your balance"),
+      detail: pick(`${dailyClaimedCoins}/${dailyCoinLimit} azi`, `${dailyClaimedCoins}/${dailyCoinLimit} today`),
       icon: Coins,
       image: "/brand/CeCoin.png",
       tone: "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100",
@@ -809,6 +811,8 @@ export default function DashboardPage() {
                         className={`rounded-xl border p-4 transition ${
                           mission.completed
                             ? "border-cyan-300/35 bg-cyan-300/10"
+                            : mission.claimedToday
+                              ? "border-violet-300/20 bg-violet-300/[0.055]"
                             : "border-white/10 bg-white/[0.035]"
                         } ${isJustClaimed ? "scale-[1.01] animate-pulse shadow-[0_0_35px_rgba(103,232,249,.18)]" : ""}`}
                       >
@@ -817,9 +821,9 @@ export default function DashboardPage() {
                             <MissionIcon size={16} />
                             {copy.title || mission.title || mission.label}
                           </p>
-                          {mission.claimed && (
-                            <span className="rounded-full bg-cyan-300 px-2 py-1 text-[11px] font-black text-black">
-                              {pick("Activat", "Active")}
+                          {(mission.claimed || mission.claimedToday) && (
+                            <span className="rounded-full bg-violet-200 px-2 py-1 text-[11px] font-black text-black">
+                              {mission.claimedToday ? pick("Revendicat azi", "Claimed today") : pick("Activat", "Active")}
                             </span>
                           )}
                         </div>
@@ -849,7 +853,9 @@ export default function DashboardPage() {
                                 : "cursor-not-allowed border border-white/10 text-gray-500"
                             }`}
                           >
-                            {mission.claimed
+                            {mission.claimedToday
+                              ? pick("Mâine", "Tomorrow")
+                              : mission.claimed
                               ? pick("Revendicat", "Claimed")
                               : claimingMissionId === mission.id
                                 ? pick("Se activează...", "Activating...")
