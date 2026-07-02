@@ -172,6 +172,27 @@ export default function DashboardPage() {
     }
   }, [pick]);
 
+  const syncCecoinCheckout = useCallback(async (sessionId) => {
+    if (!sessionId) return false;
+
+    setShopMessage(pick("Se confirmă pachetul CeCoins...", "Confirming your CeCoins pack..."));
+
+    const response = await fetch(`${API_URL}/gamification/coin-checkout/sync`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+    const data = await readApiJson(response);
+
+    if (!response.ok) {
+      throw new Error(data.error || pick("CeCoins nu au putut fi actualizate.", "CeCoins could not be updated."));
+    }
+
+    setGamification(data.summary);
+    setShopMessage(data.message || pick("CeCoins au fost actualizate.", "CeCoins have been updated."));
+    return true;
+  }, [pick]);
+
   useEffect(() => {
     let isMounted = true;
     let currentUserId = null;
@@ -225,6 +246,37 @@ export default function DashboardPage() {
       }
 
       await loadDashboardData(data.user.id, getActiveProfile());
+      const queryParams = new URLSearchParams(window.location.search);
+      const cecoinStatus = queryParams.get("cecoins");
+      const cecoinSessionId = queryParams.get("session_id");
+
+      if (cecoinStatus === "success") {
+        if (cecoinSessionId) {
+          try {
+            await syncCecoinCheckout(cecoinSessionId);
+          } catch (error) {
+            setShopMessage(
+              error.message || pick(
+                "Plata a fost confirmată, dar CeCoins nu au putut fi actualizate automat.",
+                "Payment was confirmed, but CeCoins could not be updated automatically."
+              )
+            );
+          }
+        } else {
+          setShopMessage(
+            pick(
+              "Plata a fost confirmată. Dacă CeCoins nu apar imediat, webhook-ul Stripe le va sincroniza în scurt timp.",
+              "Payment was confirmed. If CeCoins do not appear immediately, Stripe webhook will sync them shortly."
+            )
+          );
+        }
+
+        window.history.replaceState(null, "", "/dashboard");
+      } else if (cecoinStatus === "cancelled") {
+        setShopMessage(pick("Cumpărarea de CeCoins a fost anulată.", "CeCoins purchase was cancelled."));
+        window.history.replaceState(null, "", "/dashboard");
+      }
+
       loadGamificationData();
     });
 
@@ -232,7 +284,7 @@ export default function DashboardPage() {
       isMounted = false;
       window.removeEventListener("cealeg:profile-change", handleProfileChange);
     };
-  }, [loadCoinPacks, loadDashboardData, loadGamificationData, pick]);
+  }, [loadCoinPacks, loadDashboardData, loadGamificationData, pick, syncCecoinCheckout]);
 
   async function logout() {
     await fetch(`${API_URL}/logout`, { method: "POST" }).catch(() => null);

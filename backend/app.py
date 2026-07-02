@@ -2916,6 +2916,7 @@ AUTH_ENDPOINTS = {
     "claim_gamification_mission",
     "redeem_cecoin_reward",
     "start_cecoin_checkout",
+    "sync_cecoin_checkout_session",
     "start_checkout",
     "start_billing_portal",
     "get_family_profiles",
@@ -6195,7 +6196,7 @@ def start_cecoin_checkout():
     checkout_params = {
         "mode": "payment",
         "line_items": [{"price": price_id, "quantity": 1}],
-        "success_url": f"{FRONTEND_PUBLIC_URL}/dashboard?cecoins=success",
+        "success_url": f"{FRONTEND_PUBLIC_URL}/dashboard?cecoins=success&session_id={{CHECKOUT_SESSION_ID}}",
         "cancel_url": f"{FRONTEND_PUBLIC_URL}/dashboard?cecoins=cancelled",
         "client_reference_id": str(user.id),
         "metadata": metadata,
@@ -6227,6 +6228,59 @@ def start_cecoin_checkout():
         "pack": pack["id"],
         "checkoutUrl": checkout_session.url,
         "sessionId": checkout_session.id,
+    })
+
+
+@app.route("/gamification/coin-checkout/sync", methods=["POST"])
+def sync_cecoin_checkout_session():
+    data = request.get_json(silent=True) or {}
+    session_id = str(data.get("sessionId") or "").strip()
+
+    if not session_id.startswith("cs_"):
+        return jsonify({"error": "Sesiunea Stripe este invalidă."}), 400
+
+    if not configure_stripe():
+        return jsonify({
+            "error": "Stripe nu este configurat complet.",
+            "code": "stripe_not_configured",
+        }), 503
+
+    try:
+        checkout_session = stripe.checkout.Session.retrieve(session_id)
+    except Exception as error:
+        app.logger.warning("Stripe CeCoins session sync failed: %s", error)
+        return jsonify({
+            "error": "Plata nu a putut fi verificată momentan.",
+            "code": "stripe_session_sync_failed",
+        }), 502
+
+    metadata = checkout_session.get("metadata") or {}
+
+    if metadata.get("type") != "cecoins":
+        return jsonify({"error": "Sesiunea Stripe nu aparține unui pachet CeCoins."}), 400
+
+    if str(metadata.get("user_id") or "") != str(g.current_user.id):
+        return jsonify({"error": "Sesiunea Stripe aparține altui cont."}), 403
+
+    if checkout_session.get("payment_status") not in {"paid", "no_payment_required"}:
+        return jsonify({
+            "error": "Plata nu este confirmată încă.",
+            "code": "stripe_payment_not_confirmed",
+        }), 409
+
+    try:
+        handle_stripe_cecoin_checkout_completed(checkout_session)
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Stripe CeCoins session sync handler failed")
+        return jsonify({
+            "error": "CeCoins nu au putut fi actualizate momentan.",
+            "code": "cecoins_session_sync_failed",
+        }), 500
+
+    return jsonify({
+        "message": "CeCoins au fost actualizate.",
+        "summary": get_gamification_summary_for_user(g.current_user),
     })
 
 
