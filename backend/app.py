@@ -1762,6 +1762,60 @@ def configure_stripe():
     return True
 
 
+def stripe_customer_is_usable(customer_id):
+    customer_id = str(customer_id or "").strip()
+
+    if not customer_id or not configure_stripe():
+        return False
+
+    try:
+        customer = stripe.Customer.retrieve(customer_id)
+    except Exception as error:
+        app.logger.warning("Stripe customer %s could not be verified: %s", customer_id, error)
+        return False
+
+    return not bool(customer.get("deleted"))
+
+
+def clear_stale_stripe_customer(subscription):
+    if not subscription or not subscription.provider_customer_id:
+        return
+
+    app.logger.warning(
+        "Clearing stale Stripe customer %s for subscription %s.",
+        subscription.provider_customer_id,
+        subscription.id,
+    )
+    subscription.provider_customer_id = None
+    subscription.updated_at = datetime.utcnow()
+    db.session.commit()
+
+
+def apply_stripe_customer_to_checkout(checkout_params, subscription, user, allow_customer_update=False):
+    customer_id = (
+        subscription.provider_customer_id
+        if subscription and subscription.provider == "stripe"
+        else ""
+    )
+
+    if customer_id and stripe_customer_is_usable(customer_id):
+        checkout_params["customer"] = customer_id
+
+        if allow_customer_update:
+            checkout_params["customer_update"] = {
+                "address": "auto",
+                "name": "auto",
+            }
+
+        return customer_id
+
+    if customer_id:
+        clear_stale_stripe_customer(subscription)
+
+    checkout_params["customer_email"] = user.email
+    return None
+
+
 def datetime_from_unix(timestamp):
     if not timestamp:
         return None
@@ -5773,17 +5827,12 @@ def start_checkout():
             },
         }
 
-        if (
-            subscription.provider == "stripe"
-            and subscription.provider_customer_id
-        ):
-            checkout_params["customer"] = subscription.provider_customer_id
-            checkout_params["customer_update"] = {
-                "address": "auto",
-                "name": "auto",
-            }
-        else:
-            checkout_params["customer_email"] = user.email
+        apply_stripe_customer_to_checkout(
+            checkout_params,
+            subscription,
+            user,
+            allow_customer_update=True,
+        )
 
         try:
             checkout_session = stripe.checkout.Session.create(**checkout_params)
@@ -5833,6 +5882,13 @@ def start_billing_portal():
             "error": "Nu exista inca un abonament Stripe pentru contul tau.",
             "code": "stripe_customer_missing",
         }), 404
+
+    if not stripe_customer_is_usable(subscription.provider_customer_id):
+        clear_stale_stripe_customer(subscription)
+        return jsonify({
+            "error": "Customer-ul Stripe salvat pentru cont nu mai există. Pornește o plată nouă ca să fie creat automat unul valid.",
+            "code": "stripe_customer_stale",
+        }), 409
 
     try:
         portal_session = stripe.billing_portal.Session.create(
@@ -6094,13 +6150,7 @@ def start_cecoin_checkout():
         "automatic_tax": {"enabled": env_flag("STRIPE_AUTOMATIC_TAX", False)},
     }
 
-    if (
-        subscription.provider == "stripe"
-        and subscription.provider_customer_id
-    ):
-        checkout_params["customer"] = subscription.provider_customer_id
-    else:
-        checkout_params["customer_email"] = user.email
+    apply_stripe_customer_to_checkout(checkout_params, subscription, user)
 
     try:
         checkout_session = stripe.checkout.Session.create(**checkout_params)
