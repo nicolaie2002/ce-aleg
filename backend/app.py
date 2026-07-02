@@ -2148,6 +2148,7 @@ def handle_stripe_cecoin_checkout_completed(session):
         )
     )
     db.session.commit()
+    clear_leaderboard_cache()
     return user
 
 
@@ -2586,6 +2587,33 @@ def calculate_user_coins(user_id, metrics=None):
     return max(0, earned - spent)
 
 
+def clear_leaderboard_cache():
+    LEADERBOARD_CACHE.clear()
+
+
+def empty_leaderboard(current_user_id=None, metrics=None, coins=0):
+    metrics = metrics or {}
+    return {
+        "top": [],
+        "currentUser": {
+            "userId": current_user_id,
+            "rank": None,
+            "name": "Tu",
+            "coins": coins,
+            "score": calculate_activity_score({
+                "scanCount": metrics.get("scanCount", 0),
+                "favoritesCount": metrics.get("favoritesCount", 0),
+                "cartCount": metrics.get("cartCount", 0),
+                "approvedSubmissions": metrics.get("approvedSubmissions", 0),
+                "confirmedInvites": metrics.get("confirmedInvites", 0),
+            }),
+            "scanCount": metrics.get("scanCount", 0),
+            "approvedSubmissions": metrics.get("approvedSubmissions", 0),
+            "isCurrentUser": True,
+        },
+    }
+
+
 def build_mission_title(series_id, target):
     target = int(target or 0)
 
@@ -2780,8 +2808,15 @@ def get_gamification_summary_for_user(user):
     )
     coins = calculate_user_coins(user.id, metrics)
     week_start = get_week_start()
-    all_time_leaderboard = build_user_leaderboard(user.id)
-    weekly_leaderboard = build_user_leaderboard(user.id, since=week_start)
+
+    try:
+        all_time_leaderboard = build_user_leaderboard(user.id)
+        weekly_leaderboard = build_user_leaderboard(user.id, since=week_start)
+    except Exception:
+        app.logger.exception("Gamification leaderboard failed")
+        all_time_leaderboard = empty_leaderboard(user.id, metrics, coins)
+        weekly_leaderboard = empty_leaderboard(user.id, metrics, coins)
+
     daily_claimed_coins = sum(
         int((mission.get("reward") or {}).get("coins") or 0)
         for mission in missions
@@ -5932,24 +5967,35 @@ def stripe_webhook():
     event_type = event.get("type")
     event_object = (event.get("data") or {}).get("object") or {}
 
-    if event_type == "checkout.session.completed":
-        handle_stripe_checkout_completed(event_object)
-    elif event_type in {
-        "customer.subscription.created",
-        "customer.subscription.updated",
-        "customer.subscription.paused",
-        "customer.subscription.resumed",
-    }:
-        sync_stripe_subscription_by_id(event_object.get("id"))
-    elif event_type == "customer.subscription.deleted":
-        sync_stripe_subscription(event_object, deleted=True)
-    elif event_type in {
-        "invoice.paid",
-        "invoice.payment_succeeded",
-        "invoice.payment_failed",
-        "invoice.payment_action_required",
-    }:
-        sync_stripe_subscription_by_id(get_invoice_subscription_id(event_object))
+    try:
+        if event_type == "checkout.session.completed":
+            handle_stripe_checkout_completed(event_object)
+        elif event_type in {
+            "customer.subscription.created",
+            "customer.subscription.updated",
+            "customer.subscription.paused",
+            "customer.subscription.resumed",
+        }:
+            sync_stripe_subscription_by_id(event_object.get("id"))
+        elif event_type == "customer.subscription.deleted":
+            sync_stripe_subscription(event_object, deleted=True)
+        elif event_type in {
+            "invoice.paid",
+            "invoice.payment_succeeded",
+            "invoice.payment_failed",
+            "invoice.payment_action_required",
+        }:
+            sync_stripe_subscription_by_id(get_invoice_subscription_id(event_object))
+    except Exception:
+        db.session.rollback()
+        app.logger.exception(
+            "Stripe webhook handler failed for event %s",
+            event_type,
+        )
+        return jsonify({
+            "code": "stripe_webhook_handler_failed",
+            "error": "Evenimentul Stripe nu a putut fi procesat momentan.",
+        }), 500
 
     return jsonify({"received": True})
 
@@ -6039,6 +6085,7 @@ def claim_gamification_mission():
         )
     )
     db.session.commit()
+    clear_leaderboard_cache()
 
     return jsonify({
         "message": "Recompensă revendicată.",
@@ -6100,6 +6147,7 @@ def redeem_cecoin_reward():
         )
     )
     db.session.commit()
+    clear_leaderboard_cache()
 
     return jsonify({
         "message": "Recompensa a fost activată.",
