@@ -806,12 +806,18 @@ export default function DashboardPage() {
                     ].filter(Boolean);
                     const isJustClaimed = claimedMissionId === mission.id;
                     const copy = missionCopy[mission.id] || {};
+                    const missionProgress = Math.round(Number(mission.progress || 0));
+                    const missionIsClaimed = Boolean(mission.claimed || mission.claimedToday);
+                    const missionIsComplete = Boolean(mission.completed || missionProgress >= 100);
+                    const missionIsClaimable = Boolean(
+                      !missionIsClaimed && (mission.claimable || missionIsComplete)
+                    );
 
                     return (
                       <div
                         key={mission.id}
                         className={`rounded-xl border p-4 transition ${
-                          mission.completed
+                          missionIsClaimable
                             ? "border-cyan-300/35 bg-cyan-300/10"
                             : mission.claimedToday
                               ? "border-violet-300/20 bg-violet-300/[0.055]"
@@ -819,7 +825,7 @@ export default function DashboardPage() {
                         } ${isJustClaimed ? "scale-[1.01] animate-pulse shadow-[0_0_35px_rgba(103,232,249,.18)]" : ""}`}
                       >
                         <div className="flex items-start justify-between gap-3">
-                          <p className={`flex items-center gap-2 text-sm font-black ${mission.completed ? "text-cyan-100" : "text-gray-300"}`}>
+                          <p className={`flex items-center gap-2 text-sm font-black ${missionIsClaimable ? "text-cyan-100" : "text-gray-300"}`}>
                             <MissionIcon size={16} />
                             {copy.title || mission.title || mission.label}
                           </p>
@@ -835,10 +841,10 @@ export default function DashboardPage() {
                         <div className="mt-4">
                           <div className="flex items-center justify-between text-xs font-bold text-gray-400">
                             <span>{mission.current}/{mission.target}</span>
-                            <span>{Math.round(mission.progress || 0)}%</span>
+                            <span>{missionProgress}%</span>
                           </div>
                           <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full rounded-full bg-violet-200 transition-all" style={{ width: `${mission.progress || 0}%` }} />
+                            <div className="h-full rounded-full bg-violet-200 transition-all" style={{ width: `${Math.min(100, Math.max(0, missionProgress))}%` }} />
                           </div>
                         </div>
                         <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -848,9 +854,9 @@ export default function DashboardPage() {
                           <button
                             type="button"
                             onClick={() => claimMission(mission.id)}
-                            disabled={!mission.claimable || claimingMissionId === mission.id}
+                            disabled={!missionIsClaimable || claimingMissionId === mission.id}
                             className={`rounded-lg px-3 py-2 text-xs font-black transition ${
-                              mission.claimable
+                              missionIsClaimable
                                 ? "bg-white text-black hover:bg-cyan-100"
                                 : "cursor-not-allowed border border-white/10 text-gray-500"
                             }`}
@@ -861,7 +867,7 @@ export default function DashboardPage() {
                               ? pick("Revendicat", "Claimed")
                               : claimingMissionId === mission.id
                                 ? pick("Se activează...", "Activating...")
-                                : mission.claimable
+                                : missionIsClaimable
                                   ? pick("Revendică", "Claim")
                                   : pick("În progres", "In progress")}
                           </button>

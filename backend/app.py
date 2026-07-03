@@ -1791,6 +1791,13 @@ def clear_stale_stripe_customer(subscription):
     db.session.commit()
 
 
+def stripe_error_mentions_missing_customer(error):
+    text = str(error or "").lower()
+    return "no such customer" in text or (
+        "customer" in text and "does not exist" in text
+    )
+
+
 def apply_stripe_customer_to_checkout(checkout_params, subscription, user, allow_customer_update=False):
     customer_id = (
         subscription.provider_customer_id
@@ -1814,6 +1821,31 @@ def apply_stripe_customer_to_checkout(checkout_params, subscription, user, allow
 
     checkout_params["customer_email"] = user.email
     return None
+
+
+def create_checkout_session_with_stale_customer_retry(checkout_params, subscription, user):
+    try:
+        return stripe.checkout.Session.create(**checkout_params)
+    except Exception as error:
+        if (
+            subscription
+            and subscription.provider_customer_id
+            and checkout_params.get("customer") == subscription.provider_customer_id
+            and stripe_error_mentions_missing_customer(error)
+        ):
+            app.logger.warning(
+                "Retrying Stripe checkout without stale customer %s.",
+                subscription.provider_customer_id,
+            )
+            db.session.rollback()
+            clear_stale_stripe_customer(subscription)
+            retry_params = dict(checkout_params)
+            retry_params.pop("customer", None)
+            retry_params.pop("customer_update", None)
+            retry_params["customer_email"] = user.email
+            return stripe.checkout.Session.create(**retry_params)
+
+        raise
 
 
 def datetime_from_unix(timestamp):
@@ -2125,22 +2157,36 @@ def handle_stripe_cecoin_checkout_completed(session):
         app.logger.warning("Stripe CeCoins checkout ignored: user %s not found.", user_id)
         return None
 
-    existing_events = UsageEvent.query.filter_by(
-        user_id=user.id,
-        event_type="cecoin_purchase",
-        source=pack["id"],
+    existing_events = UsageEvent.query.filter(
+        UsageEvent.user_id == user.id,
+        UsageEvent.event_type == "cecoin_purchase",
+        or_(UsageEvent.source == pack["id"], UsageEvent.source == session_id),
     ).all()
 
     if any(parse_usage_metadata(event).get("sessionId") == session_id for event in existing_events):
         return None
 
+    customer_id = str(session.get("customer") or "").strip()
+
+    if customer_id:
+        subscription = get_or_create_subscription(user)
+
+        if (
+            subscription.provider != "stripe"
+            or subscription.provider_customer_id != customer_id
+        ):
+            subscription.provider = "stripe"
+            subscription.provider_customer_id = customer_id
+            subscription.updated_at = datetime.utcnow()
+
     db.session.add(
         UsageEvent(
             user_id=user.id,
             event_type="cecoin_purchase",
-            source=pack["id"],
+            source=session_id or pack["id"],
             metadata_json=json.dumps({
                 "coins": int(pack["coins"]),
+                "packId": pack["id"],
                 "sessionId": session_id,
                 "paymentStatus": payment_status,
                 "priceEnv": pack["priceEnv"],
@@ -5871,7 +5917,11 @@ def start_checkout():
         )
 
         try:
-            checkout_session = stripe.checkout.Session.create(**checkout_params)
+            checkout_session = create_checkout_session_with_stale_customer_retry(
+                checkout_params,
+                subscription,
+                user,
+            )
         except Exception as error:
             app.logger.warning("Stripe checkout session failed: %s", error)
             return jsonify({
@@ -6209,7 +6259,11 @@ def start_cecoin_checkout():
     apply_stripe_customer_to_checkout(checkout_params, subscription, user)
 
     try:
-        checkout_session = stripe.checkout.Session.create(**checkout_params)
+        checkout_session = create_checkout_session_with_stale_customer_retry(
+            checkout_params,
+            subscription,
+            user,
+        )
     except Exception as error:
         app.logger.warning("Stripe CeCoins checkout failed: %s", error)
         detail = str(error).strip()
