@@ -104,28 +104,25 @@ export default function DashboardPage() {
 
   const loadDashboardData = useCallback(async (userId, profile = null) => {
     try {
+      if (!userId) return;
+      setLoadError("");
       const profileQuery = profile?.id ? `?profile_id=${encodeURIComponent(profile.id)}` : "";
-      const responses = await Promise.all([
-        fetch(`${API_URL}/cart/${userId}${profileQuery}`),
-        fetch(`${API_URL}/history/${userId}`),
-        fetch(`${API_URL}/favorites/${userId}`),
-        fetch(`${API_URL}/billing/status`),
-      ]);
-      const [cart, history, favorites, billingData] = await Promise.all(
-        responses.map((response) => readApiJson(response))
-      );
+      const response = await fetch(`${API_URL}/dashboard/summary${profileQuery}`, {
+        cache: "no-store",
+      });
+      const data = await readApiJson(response);
 
-      if (responses.slice(0, 3).some((response) => !response.ok)) {
-        throw new Error(pick("Datele nu au putut fi încărcate. Reîncearcă în câteva clipe.", "Your data could not be loaded. Try again in a few moments."));
+      if (!response.ok) {
+        throw new Error(data.error || pick("Datele nu au putut fi încărcate. Reîncearcă în câteva clipe.", "Your data could not be loaded. Try again in a few moments."));
       }
 
       setCounts({
-        cart: cart.reduce((total, item) => total + (item.quantity || 1), 0),
-        history: history.length,
-        favorites: favorites.length,
+        cart: data.counts?.cart || 0,
+        history: data.counts?.history || 0,
+        favorites: data.counts?.favorites || 0,
       });
-      setLastScannedProduct(history[0]?.name || "-");
-      if (responses[3].ok) setBilling(billingData);
+      setLastScannedProduct(data.lastScannedProduct || "-");
+      if (data.billing) setBilling(data.billing);
     } catch (error) {
       setLoadError(error.message);
     } finally {

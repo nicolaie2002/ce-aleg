@@ -2157,10 +2157,10 @@ def handle_stripe_cecoin_checkout_completed(session):
         app.logger.warning("Stripe CeCoins checkout ignored: user %s not found.", user_id)
         return None
 
-    existing_events = UsageEvent.query.filter(
-        UsageEvent.user_id == user.id,
-        UsageEvent.event_type == "cecoin_purchase",
-        or_(UsageEvent.source == pack["id"], UsageEvent.source == session_id),
+    existing_events = UsageEvent.query.filter_by(
+        user_id=user.id,
+        event_type="cecoin_purchase",
+        source=pack["id"],
     ).all()
 
     if any(parse_usage_metadata(event).get("sessionId") == session_id for event in existing_events):
@@ -2183,7 +2183,7 @@ def handle_stripe_cecoin_checkout_completed(session):
         UsageEvent(
             user_id=user.id,
             event_type="cecoin_purchase",
-            source=session_id or pack["id"],
+            source=pack["id"],
             metadata_json=json.dumps({
                 "coins": int(pack["coins"]),
                 "packId": pack["id"],
@@ -2843,23 +2843,31 @@ def get_public_cecoin_packs():
     ]
 
 
-def get_gamification_summary_for_user(user):
+def get_gamification_summary_for_user(user, include_leaderboard=False):
     metrics = get_user_gamification_metrics(user.id)
     missions = build_mission_statuses(user.id, metrics)
-    completed_count = count_completed_catalog_missions(user.id, metrics)
+    completed_count = sum(
+        1
+        for mission in missions
+        if mission.get("completed") or mission.get("claimedToday")
+    )
     claimed_count = sum(
         1
         for mission in missions
         if mission.get("claimedToday") or mission.get("claimed")
     )
     coins = calculate_user_coins(user.id, metrics)
-    week_start = get_week_start()
 
-    try:
-        all_time_leaderboard = build_user_leaderboard(user.id)
-        weekly_leaderboard = build_user_leaderboard(user.id, since=week_start)
-    except Exception:
-        app.logger.exception("Gamification leaderboard failed")
+    if include_leaderboard:
+        try:
+            week_start = get_week_start()
+            all_time_leaderboard = build_user_leaderboard(user.id)
+            weekly_leaderboard = build_user_leaderboard(user.id, since=week_start)
+        except Exception:
+            app.logger.exception("Gamification leaderboard failed")
+            all_time_leaderboard = empty_leaderboard(user.id, metrics, coins)
+            weekly_leaderboard = empty_leaderboard(user.id, metrics, coins)
+    else:
         all_time_leaderboard = empty_leaderboard(user.id, metrics, coins)
         weekly_leaderboard = empty_leaderboard(user.id, metrics, coins)
 
@@ -2958,6 +2966,7 @@ AUTH_ENDPOINTS = {
     "logout",
     "get_open_food_facts_alternatives",
     "get_billing_status",
+    "get_dashboard_summary",
     "get_gamification_summary",
     "claim_gamification_mission",
     "redeem_cecoin_reward",
@@ -3004,6 +3013,9 @@ def enforce_access_controls():
     endpoint = request.endpoint
 
     if not endpoint or endpoint == "static":
+        return None
+
+    if endpoint == "health":
         return None
 
     if not rate_limit("global", GLOBAL_RATE_LIMIT, GLOBAL_RATE_LIMIT_WINDOW):
@@ -5717,6 +5729,37 @@ def get_billing_status():
     })
 
 
+@app.route("/dashboard/summary", methods=["GET"])
+def get_dashboard_summary():
+    user = g.current_user
+    requested_profile_id = get_requested_family_profile_id()
+    profile = resolve_cart_profile(user, requested_profile_id)
+    cart_count = cart_query_for_profile(user, profile).with_entities(
+        func.coalesce(func.sum(CartItem.quantity), 0)
+    ).scalar() or 0
+    history_count = ScanHistory.query.filter_by(user_id=user.id).count()
+    favorites_count = Favorite.query.filter_by(user_id=user.id).count()
+    last_history_item = ScanHistory.query.filter_by(user_id=user.id).order_by(
+        ScanHistory.scanned_at.desc()
+    ).first()
+    subscription = get_or_create_subscription(user)
+
+    return jsonify({
+        "counts": {
+            "cart": int(cart_count or 0),
+            "history": int(history_count or 0),
+            "favorites": int(favorites_count or 0),
+        },
+        "lastScannedProduct": last_history_item.product_name if last_history_item else "-",
+        "billing": {
+            "user": user_to_dict(user),
+            "usage": get_usage_summary(user),
+            "subscription": subscription_to_billing_dict(subscription),
+            "plans": PLAN_CATALOG,
+        },
+    })
+
+
 @app.route("/family/profiles", methods=["GET"])
 def get_family_profiles():
     user = g.current_user
@@ -6063,7 +6106,11 @@ def get_cecoin_packs():
 @app.route("/gamification/summary", methods=["GET"])
 def get_gamification_summary():
     try:
-        return jsonify(get_gamification_summary_for_user(g.current_user))
+        include_leaderboard = request.args.get("leaderboard") == "1"
+        return jsonify(get_gamification_summary_for_user(
+            g.current_user,
+            include_leaderboard=include_leaderboard,
+        ))
     except Exception:
         app.logger.exception("Gamification summary failed")
         return jsonify({
