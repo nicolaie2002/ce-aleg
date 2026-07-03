@@ -2620,6 +2620,16 @@ def calculate_claimed_mission_coins(user_id):
     return total
 
 
+def calculate_claimed_invite_mission_coins(user_id):
+    total = 0
+
+    for event in get_mission_claim_events(user_id, series_id="invite"):
+        reward = parse_usage_metadata(event).get("reward") or {}
+        total += int(reward.get("coins") or 0)
+
+    return total
+
+
 def calculate_event_coin_total(user_id, event_type):
     total = 0
     events = UsageEvent.query.filter_by(
@@ -2632,6 +2642,14 @@ def calculate_event_coin_total(user_id, event_type):
         total += int(data.get("coins") or data.get("cost") or 0)
 
     return total
+
+
+def calculate_referral_cecoin_bonus(user_id, metrics=None):
+    metrics = metrics or get_user_gamification_metrics(user_id)
+    expected_total = int(metrics.get("confirmedInvites", 0) or 0) * 100
+    claimed_invite_total = calculate_claimed_invite_mission_coins(user_id)
+    recorded_total = calculate_event_coin_total(user_id, "referral_cecoin_bonus")
+    return max(recorded_total, max(0, expected_total - claimed_invite_total))
 
 
 def calculate_activity_score(metrics):
@@ -2648,7 +2666,7 @@ def calculate_user_coins(user_id, metrics=None):
     earned = (
         calculate_claimed_mission_coins(user_id)
         + calculate_event_coin_total(user_id, "cecoin_purchase")
-        + calculate_event_coin_total(user_id, "referral_cecoin_bonus")
+        + calculate_referral_cecoin_bonus(user_id, metrics)
     )
     spent = calculate_event_coin_total(user_id, "cecoin_spend")
     return max(0, earned - spent)
