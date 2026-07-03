@@ -50,12 +50,14 @@ const stores = [
     name: "Market local",
     tagline: "Magazine independente",
     logo: "/stores/market-local.png",
+    imageStyle: "cover",
   },
   {
     id: "any",
     name: "Orice magazin",
     tagline: "Recomandări generale",
     logo: "/stores/any-store.png",
+    imageStyle: "cover",
   },
 ];
 
@@ -104,7 +106,11 @@ export default function StorePage() {
                     <Check className="h-4 w-4" />
                   </span>
                 )}
-                <span className="ce-store-logo-frame">
+                <span
+                  className={`ce-store-logo-frame ${
+                    store.imageStyle === "cover" ? "ce-store-logo-frame-cover" : ""
+                  }`}
+                >
                   <Image
                     src={store.logo}
                     alt={`${store.name} logo`}
