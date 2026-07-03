@@ -360,6 +360,9 @@ export default function DashboardPage() {
       }
 
       setGamification(data.summary);
+      if (user?.id) {
+        await loadDashboardData(user.id, getActiveProfile());
+      }
       setClaimedMissionId(missionId);
       setClaimMessage(data.message || "Recompensă revendicată.");
       setTimeout(() => setClaimedMissionId(""), 2200);
@@ -390,6 +393,9 @@ export default function DashboardPage() {
 
       setGamification(data.summary);
       setShopMessage(data.message || "Recompensa a fost activată.");
+      if (user?.id) {
+        await loadDashboardData(user.id, getActiveProfile());
+      }
     } catch (error) {
       setShopMessage(error.message);
     } finally {
@@ -504,8 +510,14 @@ export default function DashboardPage() {
     {
       id: "unlimited_day_1",
       title: pick("1 zi de scanări nelimitate", "1 day of unlimited scans"),
-      description: pick("Activează scanări nelimitate pentru o zi.", "Activate unlimited scans for one day."),
-      cost: 700,
+      description: pick("Activează acces nelimitat pentru toate scanările din următoarele 24 de ore.", "Activate unlimited access for every scan in the next 24 hours."),
+      cost: 400,
+    },
+    {
+      id: "unlimited_month_1",
+      title: pick("1 lună de scanări nelimitate", "1 month of unlimited scans"),
+      description: pick("Activează scanări nelimitate pentru 30 de zile.", "Activate unlimited scans for 30 days."),
+      cost: 1050,
     },
   ];
   const shopItems = gamification?.shopItems?.length ? gamification.shopItems : fallbackShopItems;

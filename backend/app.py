@@ -486,9 +486,16 @@ CECOIN_SHOP_ITEMS = [
     {
         "id": "unlimited_day_1",
         "title": "1 zi de scanări nelimitate",
-        "description": "Activează scanări nelimitate pentru o zi.",
-        "cost": 700,
+        "description": "Activează acces nelimitat pentru toate scanările din următoarele 24 de ore.",
+        "cost": 400,
         "bonusDays": 1,
+    },
+    {
+        "id": "unlimited_month_1",
+        "title": "1 lună de scanări nelimitate",
+        "description": "Activează scanări nelimitate pentru 30 de zile.",
+        "cost": 1050,
+        "bonusDays": 30,
     },
 ]
 
