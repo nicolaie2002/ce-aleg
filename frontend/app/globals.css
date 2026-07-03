@@ -1280,9 +1280,8 @@ textarea:focus {
   overflow: hidden;
   border-radius: 1.05rem;
   border: 1px solid oklch(1 0 0 / 14%);
-  background:
-    linear-gradient(145deg, oklch(1 0 0), oklch(0.94 0.02 230));
-  padding: 1.1rem;
+  background: oklch(0.1 0.025 245);
+  padding: 0;
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 78%),
     0 22px 44px -34px oklch(0 0 0 / 80%);
@@ -1295,10 +1294,12 @@ textarea:focus {
 
 .ce-store-logo {
   display: block;
-  max-height: 7.2rem;
+  height: 9.5rem;
   width: 100%;
+  max-height: none;
   max-width: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  object-position: center;
   transition: transform 420ms ease, filter 420ms ease;
 }
 

@@ -36,13 +36,13 @@ const stores = [
   {
     id: "profi",
     name: "Profi",
-    tagline: "Optiuni aproape de tine",
+    tagline: "Opțiuni aproape de tine",
     logo: "/stores/profi.png",
   },
   {
     id: "penny",
     name: "Penny",
-    tagline: "Preturi mici, comparatii clare",
+    tagline: "Prețuri mici, comparații clare",
     logo: "/stores/penny.png",
   },
   {
@@ -50,12 +50,11 @@ const stores = [
     name: "Market local",
     tagline: "Magazine independente",
     logo: "/stores/market-local.png",
-    imageStyle: "cover",
   },
   {
     id: "any",
     name: "Orice magazin",
-    tagline: "Recomandari generale",
+    tagline: "Recomandări generale",
     logo: "/stores/any-store.png",
   },
 ];
@@ -105,11 +104,7 @@ export default function StorePage() {
                     <Check className="h-4 w-4" />
                   </span>
                 )}
-                <span
-                  className={`ce-store-logo-frame ${
-                    store.imageStyle === "cover" ? "ce-store-logo-frame-cover" : ""
-                  }`}
-                >
+                <span className="ce-store-logo-frame">
                   <Image
                     src={store.logo}
                     alt={`${store.name} logo`}
@@ -144,7 +139,7 @@ export default function StorePage() {
                   : "cursor-not-allowed bg-white/10 text-gray-500"
               }`}
             >
-              <Store className="h-5 w-5" /> {pick("Continua", "Continue")}
+              <Store className="h-5 w-5" /> {pick("Continuă", "Continue")}
             </Link>
 
             <Link
