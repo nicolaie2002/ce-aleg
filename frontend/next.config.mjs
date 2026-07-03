@@ -72,6 +72,22 @@ const nextConfig = {
     "cealeg-frontend-niko.loca.lt",
     "*.loca.lt",
   ],
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "cealeg.shop" }],
+        destination: "https://www.cealeg.shop/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "ce-aleg.vercel.app" }],
+        destination: "https://www.cealeg.shop/:path*",
+        permanent: true,
+      },
+    ];
+  },
   async rewrites() {
     return [
       {
