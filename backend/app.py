@@ -422,7 +422,7 @@ MISSION_SERIES = [
         "icon": "scan",
         "titleTemplate": "Scanează {target} produs(e)",
         "description": "Scanează produse noi și construiește un istoric util.",
-        "targets": [1, 5, 10, 20, 50, 100, 250, 500, 1000],
+        "targets": [3],
         "coins": 10,
         "daily": True,
     },
@@ -432,7 +432,7 @@ MISSION_SERIES = [
         "icon": "cart",
         "titleTemplate": "Pune {target} produs(e) în coș",
         "description": "Construiește liste utile pentru cumpărăturile următoare.",
-        "targets": [1, 3, 5, 10, 20, 50, 100],
+        "targets": [2],
         "coins": 10,
         "daily": True,
     },
@@ -442,7 +442,7 @@ MISSION_SERIES = [
         "icon": "favorite",
         "titleTemplate": "Salvează {target} favorite",
         "description": "Păstrează produsele și alternativele la care vrei să revii.",
-        "targets": [1, 3, 5, 10, 20, 50, 100],
+        "targets": [1],
         "coins": 10,
         "daily": True,
     },
@@ -452,7 +452,7 @@ MISSION_SERIES = [
         "icon": "catalog",
         "titleTemplate": "Adaugă {target} produs(e) aprobate",
         "description": "Produsele aprobate ajută catalogul și îți cresc recompensa.",
-        "targets": [1, 3, 10, 25, 50],
+        "targets": [1],
         "coins": 10,
         "daily": True,
     },
@@ -460,9 +460,9 @@ MISSION_SERIES = [
         "seriesId": "invite",
         "metric": "confirmedInvites",
         "icon": "invite",
-        "titleTemplate": "Invită încă {target} prieten(i)",
-        "description": "Primești recompensa când prietenii confirmă emailul cu codul tău.",
-        "targets": list(range(1, 1001)),
+        "titleTemplate": "Invită prieteni",
+        "description": "Primești automat 100 CeCoins pentru fiecare prieten care confirmă emailul cu codul tău.",
+        "targets": [1],
         "coins": 100,
         "daily": False,
     },
@@ -1333,7 +1333,20 @@ def apply_referral_bonus_after_verification(user):
         "referral_inviter",
         {"invitedUserId": user.id},
     )
+    db.session.add(
+        UsageEvent(
+            user_id=inviter.id,
+            event_type="referral_cecoin_bonus",
+            source="referral_inviter",
+            metadata_json=json.dumps({
+                "coins": 100,
+                "invitedUserId": user.id,
+                "awardedAt": datetime.utcnow().isoformat() + "Z",
+            }),
+        )
+    )
     db.session.commit()
+    clear_leaderboard_cache()
     return True
 
 
@@ -2635,6 +2648,7 @@ def calculate_user_coins(user_id, metrics=None):
     earned = (
         calculate_claimed_mission_coins(user_id)
         + calculate_event_coin_total(user_id, "cecoin_purchase")
+        + calculate_event_coin_total(user_id, "referral_cecoin_bonus")
     )
     spent = calculate_event_coin_total(user_id, "cecoin_spend")
     return max(0, earned - spent)
@@ -2683,7 +2697,7 @@ def build_mission_title(series_id, target):
         return "Adaugă 1 produs aprobat" if target == 1 else f"Adaugă {target} produse aprobate"
 
     if series_id == "invite":
-        return "Invită încă un prieten" if target == 1 else f"Invită încă {target} prieteni"
+        return "Invită prieteni"
 
     return f"Misiune {target}"
 
@@ -2711,6 +2725,38 @@ def build_mission_statuses(user_id, metrics=None):
                 series_id=series_id,
                 since=day_start,
             ))
+
+        if series_id == "invite":
+            confirmed_invites = int(all_time_metrics.get(series["metric"], 0) or 0)
+            display_target = max(1, confirmed_invites)
+            display_current = confirmed_invites
+            progress = 100 if confirmed_invites > 0 else 0
+            reward = {
+                "coins": series.get("coins", 100),
+                "bonusScans": 0,
+                "bonusDays": 0,
+            }
+
+            missions.append({
+                "id": series_missions[0]["id"],
+                "seriesId": series_id,
+                "tier": 1,
+                "icon": series.get("icon"),
+                "title": build_mission_title(series_id, display_target),
+                "description": series["description"],
+                "current": display_current,
+                "target": display_target,
+                "progress": progress,
+                "completed": False,
+                "claimed": False,
+                "claimedToday": False,
+                "claimable": False,
+                "automatic": True,
+                "daily": False,
+                "availableAt": None,
+                "reward": reward,
+            })
+            continue
 
         mission = next(
             (

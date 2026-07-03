@@ -17,6 +17,7 @@ import {
   Heart,
   ListPlus,
   LogOut,
+  Plus,
   ScanLine,
   ShieldCheck,
   ShoppingCart,
@@ -591,6 +592,8 @@ export default function DashboardPage() {
       detail: hasUnlimitedScans ? pick("scanări nelimitate", "unlimited scans") : pick("5 scanări gratuite lunar", "5 free scans monthly"),
       icon: Trophy,
       tone: "border-violet-300/25 bg-violet-300/[0.08] text-violet-100",
+      actionHref: "/pricing",
+      actionLabel: pick("Vezi planurile", "See plans"),
     },
     {
       label: pick("Scanări", "Scans"),
@@ -613,8 +616,132 @@ export default function DashboardPage() {
       icon: Coins,
       image: "/brand/CeCoin.png",
       tone: "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100",
+      actionHref: "#cumpara-cecoins",
+      actionLabel: pick("Cumpără CeCoins", "Buy CeCoins"),
     },
   ];
+  const rewardShopPanel = (
+    <div className="mt-5 rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
+            <Image src="/brand/CeCoin.png" alt="" width={28} height={28} className="rounded-full object-cover" />
+            {pick("Recompense cu CeCoins", "CeCoins rewards")}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-gray-400">
+            {pick(
+              "Folosește punctele strânse pentru scanări bonus sau acces nelimitat temporar.",
+              "Use earned points for bonus scans or temporary unlimited access."
+            )}
+          </p>
+        </div>
+        <span className="w-fit rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
+          {coinBalance} CC
+        </span>
+      </div>
+
+      {shopMessage && (
+        <p className="mt-4 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100">
+          {shopMessage}
+        </p>
+      )}
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+        {shopItems.map((item) => {
+          const canAfford = coinBalance >= item.cost;
+
+          return (
+            <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-white">{item.title}</p>
+                  <p className="mt-1 text-xs leading-5 text-gray-400">{item.description}</p>
+                </div>
+                <span className="shrink-0 rounded-full bg-yellow-200 px-2 py-1 text-xs font-black text-black">
+                  {item.cost} CC
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => redeemShopItem(item.id)}
+                disabled={!canAfford || redeemingItemId === item.id}
+                className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black transition ${
+                  canAfford
+                    ? "bg-white text-black hover:bg-yellow-100"
+                    : "cursor-not-allowed border border-white/10 text-gray-500"
+                }`}
+              >
+                {redeemingItemId === item.id
+                  ? pick("Se activează...", "Activating...")
+                  : canAfford
+                    ? pick("Activează", "Redeem")
+                    : pick("Strânge mai multe", "Earn more")}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+  const coinPackPurchasePanel = coinPacks.length > 0 ? (
+    <div id="cumpara-cecoins" className="rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5 scroll-mt-24">
+      <div className="flex items-center justify-between gap-3">
+        <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
+          <Image src="/brand/CeCoin.png" alt="" width={28} height={28} className="rounded-full object-cover" />
+          {pick("Cumpără CeCoins", "Buy CeCoins")}
+        </p>
+        <span className="rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
+          {coinBalance} CC
+        </span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-gray-400">
+        {pick(
+          "Completează rapid soldul când vrei să activezi recompense fără să aștepți misiunile.",
+          "Top up your balance when you want to unlock rewards without waiting for missions."
+        )}
+      </p>
+      <div className="mt-4 space-y-2">
+        {coinPacks.map((pack) => {
+          const packVisual = CECOIN_PACK_VISUALS[pack.id] || {};
+          const packImage = pack.image || packVisual.image || "/brand/CeCoin.png";
+
+          return (
+            <button
+              key={pack.id}
+              type="button"
+              onClick={() => buyCoinPack(pack.id)}
+              disabled={!pack.configured || buyingPackId === pack.id}
+              className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-yellow-300/35 disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5">
+                  <Image
+                    src={packImage}
+                    alt=""
+                    width={96}
+                    height={96}
+                    className="h-full w-full object-cover"
+                    sizes="48px"
+                  />
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-black text-white">{pack.title}</span>
+                  <span className="block text-xs text-gray-400">{pack.coins} CeCoins</span>
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-black text-yellow-100">
+                {buyingPackId === pack.id
+                  ? pick("Se deschide...", "Opening...")
+                  : pack.configured
+                    ? pack.priceText
+                    : pick("În curând", "Soon")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
@@ -639,19 +766,29 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-[560px]">
-              {walletCards.map(({ label, value, detail, icon: Icon, image, tone }) => (
-                <div key={label} className={`rounded-xl border p-4 ${tone}`}>
+            <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-[480px]">
+              {walletCards.map(({ label, value, detail, icon: Icon, image, tone, actionHref, actionLabel }) => (
+                <div key={label} className={`relative rounded-lg border p-3 pr-9 ${tone}`}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-black uppercase tracking-wide opacity-80">{label}</p>
                     {image ? (
-                      <Image src={image} alt="" width={24} height={24} className="rounded-full object-cover" />
+                      <Image src={image} alt="" width={20} height={20} className="rounded-full object-cover" />
                     ) : (
-                      <Icon size={17} />
+                      <Icon size={15} />
                     )}
                   </div>
-                  <p className="mt-2 truncate text-2xl font-black">{value}</p>
+                  <p className="mt-1 truncate text-xl font-black">{value}</p>
                   <p className="mt-1 text-xs font-bold opacity-75">{detail}</p>
+                  {actionHref && (
+                    <Link
+                      href={actionHref}
+                      className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white hover:text-black"
+                      aria-label={actionLabel}
+                      title={actionLabel}
+                    >
+                      <Plus size={14} strokeWidth={3} />
+                    </Link>
+                  )}
                 </div>
               ))}
             </div>
@@ -808,18 +945,25 @@ export default function DashboardPage() {
                   <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
                     {missions.map((mission) => {
                     const MissionIcon = missionIcons[mission.icon] || Award;
-                    const rewardParts = [
-                      mission.reward?.coins ? `${mission.reward.coins} CeCoins` : "",
-                      mission.reward?.bonusScans ? `+${mission.reward.bonusScans} ${pick("scanări bonus", "bonus scans")}` : "",
-                      mission.reward?.bonusDays ? `+${mission.reward.bonusDays} ${pick("zi nelimitată", "unlimited day")}` : "",
-                    ].filter(Boolean);
+                    const isAutomaticInvite = mission.seriesId === "invite" || mission.automatic;
+                    const rewardParts = isAutomaticInvite
+                      ? [
+                          mission.reward?.coins
+                            ? `${mission.reward.coins} CeCoins / ${pick("prieten confirmat", "verified friend")}`
+                            : "",
+                        ].filter(Boolean)
+                      : [
+                          mission.reward?.coins ? `${mission.reward.coins} CeCoins` : "",
+                          mission.reward?.bonusScans ? `+${mission.reward.bonusScans} ${pick("scanări bonus", "bonus scans")}` : "",
+                          mission.reward?.bonusDays ? `+${mission.reward.bonusDays} ${pick("zi nelimitată", "unlimited day")}` : "",
+                        ].filter(Boolean);
                     const isJustClaimed = claimedMissionId === mission.id;
                     const copy = missionCopy[mission.id] || {};
                     const missionProgress = Math.round(Number(mission.progress || 0));
                     const missionIsClaimed = Boolean(mission.claimed || mission.claimedToday);
                     const missionIsComplete = Boolean(mission.completed || missionProgress >= 100);
                     const missionIsClaimable = Boolean(
-                      !missionIsClaimed && (mission.claimable || missionIsComplete)
+                      !isAutomaticInvite && !missionIsClaimed && (mission.claimable || missionIsComplete)
                     );
 
                     return (
@@ -863,14 +1007,16 @@ export default function DashboardPage() {
                           <button
                             type="button"
                             onClick={() => claimMission(mission.id)}
-                            disabled={!missionIsClaimable || claimingMissionId === mission.id}
+                            disabled={isAutomaticInvite || !missionIsClaimable || claimingMissionId === mission.id}
                             className={`rounded-lg px-3 py-2 text-xs font-black transition ${
                               missionIsClaimable
                                 ? "bg-white text-black hover:bg-cyan-100"
                                 : "cursor-not-allowed border border-white/10 text-gray-500"
                             }`}
                           >
-                            {mission.claimedToday
+                            {isAutomaticInvite
+                              ? pick("Automat", "Automatic")
+                              : mission.claimedToday
                               ? pick("Mâine", "Tomorrow")
                               : mission.claimed
                               ? pick("Revendicat", "Claimed")
@@ -898,6 +1044,8 @@ export default function DashboardPage() {
                     )}
                   </div>
                 ) : null}
+
+                {rewardShopPanel}
               </div>
 
               <div className="space-y-4">
@@ -955,107 +1103,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
-                      <Image src="/brand/CeCoin.png" alt="" width={28} height={28} className="rounded-full object-cover" />
-                      {pick("Magazin CeCoins", "CeCoins shop")}
-                    </p>
-                    <span className="rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
-                      {coinBalance} CC
-                    </span>
-                  </div>
-
-                  {shopMessage && (
-                    <p className="mt-4 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100">
-                      {shopMessage}
-                    </p>
-                  )}
-
-                  <div className="mt-4 space-y-3">
-                    {shopItems.map((item) => {
-                      const canAfford = coinBalance >= item.cost;
-
-                      return (
-                        <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-sm font-black text-white">{item.title}</p>
-                              <p className="mt-1 text-xs leading-5 text-gray-400">{item.description}</p>
-                            </div>
-                            <span className="shrink-0 rounded-full bg-yellow-200 px-2 py-1 text-xs font-black text-black">
-                              {item.cost} CC
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => redeemShopItem(item.id)}
-                            disabled={!canAfford || redeemingItemId === item.id}
-                            className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black transition ${
-                              canAfford
-                                ? "bg-white text-black hover:bg-yellow-100"
-                                : "cursor-not-allowed border border-white/10 text-gray-500"
-                            }`}
-                          >
-                            {redeemingItemId === item.id
-                              ? pick("Se activează...", "Activating...")
-                              : canAfford
-                                ? pick("Activează", "Redeem")
-                                : pick("Strânge mai multe", "Earn more")}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  {coinPacks.length > 0 && (
-                    <div className="mt-5 border-t border-white/10 pt-4">
-                      <p className="text-xs font-black uppercase tracking-wide text-gray-400">
-                        {pick("Cumpără CeCoins", "Buy CeCoins")}
-                      </p>
-                      <div className="mt-3 space-y-2">
-                        {coinPacks.map((pack) => {
-                          const packVisual = CECOIN_PACK_VISUALS[pack.id] || {};
-                          const packImage = pack.image || packVisual.image || "/brand/CeCoin.png";
-
-                          return (
-                            <button
-                              key={pack.id}
-                              type="button"
-                              onClick={() => buyCoinPack(pack.id)}
-                              disabled={!pack.configured || buyingPackId === pack.id}
-                              className="flex w-full items-center justify-between gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-left transition hover:border-yellow-300/35 disabled:cursor-not-allowed disabled:opacity-55"
-                            >
-                              <span className="flex min-w-0 items-center gap-3">
-                                <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-white/10 bg-white/5">
-                                  <Image
-                                    src={packImage}
-                                    alt=""
-                                    width={96}
-                                    height={96}
-                                    className="h-full w-full object-cover"
-                                    sizes="48px"
-                                  />
-                                </span>
-                                <span className="min-w-0">
-                                  <span className="block truncate text-sm font-black text-white">{pack.title}</span>
-                                  <span className="block text-xs text-gray-400">{pack.coins} CeCoins</span>
-                                </span>
-                              </span>
-                              <span className="shrink-0 text-sm font-black text-yellow-100">
-                                {buyingPackId === pack.id
-                                  ? pick("Se deschide...", "Opening...")
-                                  : pack.configured
-                                    ? pack.priceText
-                                    : pick("În curând", "Soon")}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {coinPackPurchasePanel}
               </div>
             </div>
           </div>
