@@ -5009,20 +5009,84 @@ def normalize_product_name_for_duplicate(text):
         return ""
 
     text = normalize_search_text(text)
+    replacements = {
+        "filetto": "file",
+        "filet": "file",
+        "muschiulet": "muschi",
+        "mușchi": "muschi",
+        "sunca": "ham",
+        "șuncă": "ham",
+        "jambon": "ham",
+        "prosciutto": "ham",
+        "carne porc": "porc",
+        "pork": "porc",
+        "chicken": "pui",
+        "turkey": "curcan",
+        "yoghurt": "yogurt",
+        "yaourt": "yogurt",
+        "fromage": "branza",
+        "cheese": "branza",
+    }
+
+    for source, target in replacements.items():
+        text = text.replace(source, target)
 
     generic_words = {
+        "aliment",
+        "alimento",
+        "aliments",
+        "articol",
         "energy",
         "energizant",
         "energizanta",
         "bautura",
         "băutură",
+        "boisson",
         "drink",
         "doza",
         "can",
+        "conserva",
+        "ambalaj",
+        "pack",
+        "package",
         "produs",
+        "product",
+        "produit",
+        "producto",
         "cu",
+        "de",
+        "din",
+        "si",
+        "și",
+        "la",
+        "le",
+        "les",
+        "el",
+        "the",
+        "with",
+        "and",
         "fara",
         "fără",
+        "zero",
+        "original",
+        "clasic",
+        "classic",
+        "natural",
+        "naturale",
+        "naturelle",
+        "felii",
+        "feliat",
+        "sliced",
+        "bucati",
+        "bucăți",
+        "piece",
+        "pieces",
+        "gram",
+        "grams",
+        "g",
+        "kg",
+        "ml",
+        "l",
     }
 
     words = text.split()
@@ -6755,8 +6819,13 @@ def get_open_food_facts_alternatives():
     off_products = []
     lookup_errors = []
     seen_off_codes = set()
+    local_seed_alternatives = [
+        *get_local_catalog_alternatives(scanned_product, criteria),
+        *get_known_catalog_alternatives(scanned_product, criteria),
+    ]
+    prefer_local_catalog = len(local_seed_alternatives) >= 10 and scanned_family != "general"
 
-    if category_tag:
+    if not prefer_local_catalog and category_tag:
         try:
             category_products = fetch_off_category_products(category_tag)
             off_products.extend(category_products)
@@ -6772,7 +6841,7 @@ def get_open_food_facts_alternatives():
                 error,
             )
 
-    if "caffeine" in criteria and scanned_family in {"coffee_drink", "energy_drink", "caffeinated_beverage", "cola"}:
+    if not prefer_local_catalog and "caffeine" in criteria and scanned_family in {"coffee_drink", "energy_drink", "caffeinated_beverage", "cola"}:
         for extra_category_tag in ["en:energy-drinks", "en:iced-coffees"]:
             if extra_category_tag == category_tag:
                 continue
@@ -6792,7 +6861,7 @@ def get_open_food_facts_alternatives():
                     error,
                 )
 
-    if len(off_products) < 8:
+    if not prefer_local_catalog and len(off_products) < 8:
         try:
             existing_codes = {
                 str(product.get("code") or "").strip()
@@ -6811,7 +6880,7 @@ def get_open_food_facts_alternatives():
                 error,
             )
 
-    if not off_products and category_tag:
+    if not prefer_local_catalog and not off_products and category_tag:
         try:
             search_products = fetch_off_search_products(scanned_product, None)
             off_products.extend(search_products)
@@ -6822,7 +6891,7 @@ def get_open_food_facts_alternatives():
                 error,
             )
 
-    if len(off_products) < 6:
+    if not prefer_local_catalog and len(off_products) < 6:
         existing_codes = {
             str(product.get("code") or "").strip()
             for product in off_products
@@ -6870,10 +6939,7 @@ def get_open_food_facts_alternatives():
         for item in alternatives
     }
 
-    for candidate in [
-        *get_local_catalog_alternatives(scanned_product, criteria),
-        *get_known_catalog_alternatives(scanned_product, criteria),
-    ]:
+    for candidate in local_seed_alternatives:
         candidate_key = normalize_search_text(
             f"{candidate.get('barcode') or ''} {candidate.get('name') or ''}"
         )
@@ -6912,13 +6978,29 @@ def get_open_food_facts_alternatives():
     alternatives_without_photos = [
         product for product in alternatives if not product.get("image")
     ]
+    products = (photographed_alternatives + alternatives_without_photos)[:6]
+
+    if len(products) < 2:
+        current_user = getattr(g, "current_user", None)
+        record_search_event(
+            scanned_product.get("name") or barcode or category_tag or "alternative_missing",
+            store=scanned_product.get("store"),
+            result_count=len(products),
+            source="alternatives_low",
+            user_id=getattr(current_user, "id", None),
+        )
+        db.session.commit()
 
     return jsonify({
-        "source": "openfoodfacts",
+        "source": "catalog" if prefer_local_catalog else "openfoodfacts",
         "category": category_tag,
-        "products": (photographed_alternatives + alternatives_without_photos)[:6],
+        "products": products,
         "message": (
-            "Alternative calculate din catalogul Open Food Facts."
+            (
+                "Alternative calculate rapid din catalogul intern."
+                if prefer_local_catalog
+                else "Alternative calculate din catalogul Open Food Facts."
+            )
             if alternatives
             else "Nu am gasit suficiente alternative externe pentru produsul scanat."
         ),
@@ -8237,7 +8319,7 @@ def get_open_prices_summary(barcode):
                 "order_by": "-date",
             },
             headers={
-                "User-Agent": "CeAlegApp/1.0 (contact: local-dev)",
+                "User-Agent": "CeAlegApp/1.0 (contact: contact@cealeg.shop)",
                 "Accept": "application/json",
             },
             timeout=6,
@@ -8525,7 +8607,32 @@ def get_product_recommendation_family(product_data):
     cereal_words = ["cereale", "cereal", "muesli", "granola", "oatmeal"]
     sauce_words = ["sos", "sauce", "mustar", "ketchup", "maioneza", "mayonnaise", "salsa", "condiment"]
     bread_words = ["paine", "bread", "toast", "bagheta", "chifla", "bakery"]
-    meat_words = ["carne", "meat", "salam", "sausage", "carnati", "ham", "prosciutto"]
+    meat_words = [
+        "carne",
+        "meat",
+        "salam",
+        "sausage",
+        "carnati",
+        "ham",
+        "prosciutto",
+        "jambon",
+        "sunca",
+        "șuncă",
+        "muschi",
+        "mușchi",
+        "file",
+        "filet",
+        "filetto",
+        "porc",
+        "pork",
+        "pui",
+        "chicken",
+        "curcan",
+        "turkey",
+        "pastrama",
+        "pastramă",
+        "bacon",
+    ]
     fish_words = ["peste", "fish", "ton", "tuna", "somon", "salmon", "seafood"]
     spread_words = ["spread", "crema tartinabila", "nutella", "peanut butter", "gem", "jam", "miere", "honey"]
     nuts_words = ["nuts", "nuci", "alune", "seeds", "seminte"]
@@ -9015,10 +9122,10 @@ def fetch_off_products(params, cache_key):
         "https://world.openfoodfacts.org/api/v2/search",
         params=request_params,
         headers={
-            "User-Agent": "CeAlegApp/1.0 (contact: local-dev)",
+            "User-Agent": "CeAlegApp/1.0 (contact: contact@cealeg.shop)",
             "Accept": "application/json",
         },
-        timeout=15,
+        timeout=8,
     )
     response.raise_for_status()
     products = response.json().get("products", [])
@@ -9045,7 +9152,7 @@ def fetch_off_product_by_barcode(barcode):
     response = requests.get(
         f"https://world.openfoodfacts.org/api/v2/product/{barcode}",
         headers={
-            "User-Agent": "CeAlegApp/1.0 (contact: local-dev)",
+            "User-Agent": "CeAlegApp/1.0 (contact: contact@cealeg.shop)",
             "Accept": "application/json",
         },
         timeout=15,
@@ -9504,7 +9611,19 @@ def is_same_catalog_product(scanned_product, candidate):
     if scanned_name == candidate_name:
         return True
 
-    return SequenceMatcher(None, scanned_name, candidate_name).ratio() >= 0.88
+    scanned_family = get_product_recommendation_family(scanned_product)
+    candidate_family = get_product_recommendation_family(candidate)
+    scanned_brand = normalize_search_text(scanned_product.get("brand") or "")
+    candidate_brand = normalize_search_text(candidate.get("brand") or "")
+    name_similarity = SequenceMatcher(None, scanned_name, candidate_name).ratio()
+
+    if scanned_family == candidate_family and scanned_family != "general":
+        if scanned_brand and candidate_brand and scanned_brand != candidate_brand and name_similarity < 0.92:
+            return False
+
+        return name_similarity >= 0.82
+
+    return name_similarity >= 0.88
 
 
 def get_alternative_identity_key(product_data):
@@ -9581,6 +9700,9 @@ def get_local_catalog_alternatives(scanned_product, criteria):
     query = Product.query
     used_category_filter = False
 
+    if scanned_family == "general":
+        return []
+
     if (
         category
         and normalize_search_text(category) not in {"altele", "other"}
@@ -9605,6 +9727,14 @@ def get_local_catalog_alternatives(scanned_product, criteria):
             "cereal": ["cereale", "cereal", "granola", "muesli"],
             "water": ["apa", "water", "mineral"],
             "cola": ["cola", "pepsi", "coca"],
+            "meat": ["muschi", "file", "filet", "sunca", "ham", "salam", "carne", "porc", "pui", "curcan", "prosciutto"],
+            "fish": ["peste", "fish", "ton", "tuna", "somon", "salmon"],
+            "spread": ["spread", "crema", "tartinabila", "nutella", "unt arahide", "peanut butter", "gem"],
+            "nuts": ["nuci", "alune", "nuts", "seeds", "seminte"],
+            "bread": ["paine", "bread", "toast", "bagheta", "chifla"],
+            "ready_meal": ["ready meal", "sandwich", "salata", "supa"],
+            "frozen": ["frozen", "congelat", "congelata"],
+            "pizza": ["pizza"],
         }.get(scanned_family, [])
 
         if family_keywords:

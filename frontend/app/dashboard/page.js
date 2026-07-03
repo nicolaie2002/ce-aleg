@@ -81,7 +81,6 @@ export default function DashboardPage() {
   const [isInviteVisible, setIsInviteVisible] = useState(false);
   const [inviteCopyNotice, setInviteCopyNotice] = useState("");
   const [gamification, setGamification] = useState(null);
-  const [coinPackCatalog, setCoinPackCatalog] = useState([]);
   const [isGamificationLoading, setIsGamificationLoading] = useState(false);
   const [gamificationError, setGamificationError] = useState("");
   const [claimMessage, setClaimMessage] = useState("");
@@ -130,19 +129,6 @@ export default function DashboardPage() {
       setIsLoading(false);
     }
   }, [pick]);
-
-  const loadCoinPacks = useCallback(async () => {
-    try {
-      const response = await fetch(`${API_URL}/gamification/coin-packs`);
-      const data = await readApiJson(response);
-
-      if (response.ok && data.coinPacks?.length) {
-        setCoinPackCatalog(data.coinPacks);
-      }
-    } catch {
-      setCoinPackCatalog([]);
-    }
-  }, []);
 
   const loadGamificationData = useCallback(async () => {
     setIsGamificationLoading(true);
@@ -214,7 +200,6 @@ export default function DashboardPage() {
       localStorage.setItem("cealeg_user", JSON.stringify(data.user));
       currentUserId = data.user.id;
       setUser(data.user);
-      loadCoinPacks();
 
       const savedEmailStatus = localStorage.getItem("cealeg_email_status");
 
@@ -282,7 +267,7 @@ export default function DashboardPage() {
       isMounted = false;
       window.removeEventListener("cealeg:profile-change", handleProfileChange);
     };
-  }, [loadCoinPacks, loadDashboardData, loadGamificationData, pick, syncCecoinCheckout]);
+  }, [loadDashboardData, loadGamificationData, pick, syncCecoinCheckout]);
 
   async function logout() {
     await fetch(`${API_URL}/logout`, { method: "POST" }).catch(() => null);
@@ -551,11 +536,7 @@ export default function DashboardPage() {
       icon: CECOIN_PACK_VISUALS.diamond.icon,
     },
   ];
-  const coinPacks = coinPackCatalog.length
-    ? coinPackCatalog
-    : gamification?.coinPacks?.length
-      ? gamification.coinPacks
-      : fallbackCoinPacks;
+  const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;
   const missionCopy = {
     first_scan: {
       title: pick("Prima scanare", "First scan"),
