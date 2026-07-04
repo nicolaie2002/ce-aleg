@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -11,6 +11,7 @@ import {
   Database,
   Mail,
   RefreshCw,
+  Search,
   SearchX,
   Server,
   ShieldCheck,
@@ -106,6 +107,7 @@ export default function AdminPage() {
   const [misses, setMisses] = useState([]);
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
@@ -229,6 +231,12 @@ export default function AdminPage() {
   const payments = monitoring?.payments || {};
   const email = monitoring?.email || {};
   const catalog = monitoring?.catalog || {};
+  const filteredUsers = useMemo(() => {
+    const term = userSearch.trim().toLowerCase();
+    if (!term) return users;
+
+    return users.filter((item) => item.email?.toLowerCase().includes(term));
+  }, [users, userSearch]);
 
   return (
     <main className="min-h-screen bg-[#080c10] text-white">
@@ -518,7 +526,36 @@ export default function AdminPage() {
         </section>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
+            <div className="order-2 w-full lg:max-w-sm">
+              <label className="text-xs font-black uppercase text-gray-400" htmlFor="admin-user-search">
+                Caută utilizator după email
+              </label>
+              <div className="mt-2 flex items-center gap-2 rounded-xl border border-white/10 bg-black/25 px-3 py-2 focus-within:border-cyan-300/50">
+                <Search size={17} className="text-cyan-200" />
+                <input
+                  id="admin-user-search"
+                  value={userSearch}
+                  onChange={(event) => setUserSearch(event.target.value)}
+                  type="search"
+                  placeholder="ex: contact@cealeg.shop"
+                  className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none placeholder:text-gray-500"
+                />
+                {userSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setUserSearch("")}
+                    className="rounded-lg p-1 text-gray-400 hover:bg-white/10 hover:text-white"
+                    aria-label="Șterge căutarea"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                {filteredUsers.length} din {users.length} conturi afișate
+              </p>
+            </div>
             <div>
               <h2 className="text-2xl font-black">Planuri utilizatori</h2>
               <p className="mt-2 text-sm text-gray-400">
@@ -537,7 +574,7 @@ export default function AdminPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((item) => (
+                {filteredUsers.map((item) => (
                   <tr key={item.id}>
                     <td className="border-b border-white/5 py-3">{item.email}</td>
                     <td className="border-b border-white/5 py-3">{item.is_admin ? "da" : "nu"}</td>
@@ -559,6 +596,11 @@ export default function AdminPage() {
                 ))}
               </tbody>
             </table>
+            {!filteredUsers.length && (
+              <EmptyState>
+                Nu am găsit niciun utilizator pentru emailul introdus.
+              </EmptyState>
+            )}
           </div>
         </section>
 
