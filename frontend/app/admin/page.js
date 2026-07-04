@@ -2,10 +2,27 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Mail, RefreshCw, SearchX, ShieldCheck, Trash2 } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  Bell,
+  CheckCircle2,
+  CreditCard,
+  Database,
+  Mail,
+  RefreshCw,
+  SearchX,
+  Server,
+  ShieldCheck,
+  Trash2,
+  Users,
+  XCircle,
+} from "lucide-react";
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { readApiJson } from "../utils/apiResponse";
+
+const CONTACT_EMAIL = "contact@cealeg.shop";
 
 const statLabels = {
   users: "Conturi",
@@ -14,42 +31,124 @@ const statLabels = {
   searches: "Căutări salvate",
   missingProducts: "Produse negăsite",
   priceObservations: "Prețuri raportate",
-  proUsers: "Utilizatori Pro",
+  proUsers: "Utilizatori plătitori",
 };
 
-const CONTACT_EMAIL = "contact@cealeg.shop";
+function formatDate(value) {
+  if (!value) return "-";
+
+  try {
+    return new Date(value).toLocaleString("ro-RO", {
+      dateStyle: "short",
+      timeStyle: "short",
+    });
+  } catch {
+    return "-";
+  }
+}
+
+function compactNumber(value) {
+  return new Intl.NumberFormat("ro-RO").format(Number(value || 0));
+}
+
+function monitorTone(status) {
+  if (status === "danger") return "border-red-400/35 bg-red-400/10 text-red-100";
+  if (status === "warning") return "border-yellow-300/35 bg-yellow-300/10 text-yellow-100";
+  return "border-cyan-300/25 bg-cyan-300/10 text-cyan-100";
+}
+
+function StatCard({ label, value, icon: Icon, tone = "default", detail }) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-400/25 bg-red-400/8"
+      : tone === "warning"
+        ? "border-yellow-300/25 bg-yellow-300/8"
+        : "border-white/10 bg-white/[0.045]";
+
+  return (
+    <article className={`rounded-xl border p-4 ${toneClass}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-wide text-gray-400">{label}</p>
+          <p className="mt-2 text-3xl font-black text-white">{value}</p>
+        </div>
+        {Icon && (
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/8 text-cyan-200">
+            <Icon size={19} />
+          </span>
+        )}
+      </div>
+      {detail && <p className="mt-2 text-sm leading-6 text-gray-400">{detail}</p>}
+    </article>
+  );
+}
+
+function EmptyState({ children }) {
+  return (
+    <p className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-gray-400">
+      {children}
+    </p>
+  );
+}
+
+function EventPill({ children, tone = "default" }) {
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${monitorTone(tone)}`}>
+      {children}
+    </span>
+  );
+}
 
 export default function AdminPage() {
   const [overview, setOverview] = useState({});
+  const [monitoring, setMonitoring] = useState(null);
   const [submissions, setSubmissions] = useState([]);
   const [misses, setMisses] = useState([]);
   const [users, setUsers] = useState([]);
   const [message, setMessage] = useState("");
   const [emailBusy, setEmailBusy] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
 
   async function loadAdmin() {
-    const [overviewResponse, submissionsResponse, missesResponse, usersResponse] = await Promise.all([
-      fetch(`${API_URL}/admin/overview`),
-      fetch(`${API_URL}/admin/submissions`),
-      fetch(`${API_URL}/admin/search-misses?days=30&limit=40`),
-      fetch(`${API_URL}/users`),
-    ]);
+    setIsLoading(true);
+    setMessage("");
 
-    if (overviewResponse.status === 401) {
-      window.location.assign("/login");
-      return;
+    try {
+      const [
+        overviewResponse,
+        monitoringResponse,
+        submissionsResponse,
+        missesResponse,
+        usersResponse,
+      ] = await Promise.all([
+        fetch(`${API_URL}/admin/overview`),
+        fetch(`${API_URL}/admin/monitoring?days=7&limit=16`),
+        fetch(`${API_URL}/admin/submissions`),
+        fetch(`${API_URL}/admin/search-misses?days=30&limit=40`),
+        fetch(`${API_URL}/users`),
+      ]);
+
+      if (overviewResponse.status === 401) {
+        window.location.assign("/login?next=/admin");
+        return;
+      }
+
+      if (!overviewResponse.ok || !submissionsResponse.ok || !usersResponse.ok) {
+        setMessage("Acest spațiu este disponibil doar administratorului.");
+        return;
+      }
+
+      setOverview(await readApiJson(overviewResponse));
+      setMonitoring(monitoringResponse.ok ? await readApiJson(monitoringResponse) : null);
+      setSubmissions(await readApiJson(submissionsResponse));
+      setMisses(missesResponse.ok ? await readApiJson(missesResponse) : []);
+      setUsers(await readApiJson(usersResponse));
+    } catch {
+      setMessage("Datele de administrare nu au putut fi încărcate.");
+    } finally {
+      setIsLoading(false);
     }
-
-    if (!overviewResponse.ok || !submissionsResponse.ok || !usersResponse.ok) {
-      setMessage("Acest spațiu este disponibil doar administratorului.");
-      return;
-    }
-
-    setOverview(await overviewResponse.json());
-    setSubmissions(await submissionsResponse.json());
-    setMisses(missesResponse.ok ? await missesResponse.json() : []);
-    setUsers(await usersResponse.json());
   }
 
   useEffect(() => {
@@ -61,7 +160,7 @@ export default function AdminPage() {
     const response = await fetch(`${API_URL}/submissions/ai-review/${submissionId}`, {
       method: "POST",
     });
-    const data = await response.json();
+    const data = await readApiJson(response);
     setMessage(data.message || data.error);
     await loadAdmin();
   }
@@ -70,7 +169,7 @@ export default function AdminPage() {
     const response = await fetch(`${API_URL}/submissions/approve/${submissionId}`, {
       method: "POST",
     });
-    const data = await response.json();
+    const data = await readApiJson(response);
     setMessage(data.message || data.error);
     await loadAdmin();
   }
@@ -80,7 +179,7 @@ export default function AdminPage() {
     const response = await fetch(`${API_URL}/submissions/item/${submissionId}`, {
       method: "DELETE",
     });
-    const data = await response.json();
+    const data = await readApiJson(response);
     setMessage(data.message || data.error);
     await loadAdmin();
   }
@@ -91,7 +190,7 @@ export default function AdminPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ plan, status: "active" }),
     });
-    const data = await response.json();
+    const data = await readApiJson(response);
     setMessage(data.message || data.error);
     await loadAdmin();
   }
@@ -110,10 +209,9 @@ export default function AdminPage() {
       setMessage(
         data.message ||
           data.error ||
-          (response.ok
-            ? "Test email finalizat."
-            : "Emailul de test nu a putut fi trimis.")
+          (response.ok ? "Test email finalizat." : "Emailul de test nu a putut fi trimis.")
       );
+      await loadAdmin();
     } catch {
       setMessage("Emailul de test nu a putut fi trimis.");
     } finally {
@@ -121,38 +219,240 @@ export default function AdminPage() {
     }
   }
 
+  const readiness = monitoring?.backend;
+  const readinessTone = readiness?.ready
+    ? "default"
+    : readiness?.blockers?.length
+      ? "danger"
+      : "warning";
+  const scanIssues = monitoring?.scanIssues || {};
+  const payments = monitoring?.payments || {};
+  const email = monitoring?.email || {};
+  const catalog = monitoring?.catalog || {};
+
   return (
     <main className="min-h-screen bg-[#080c10] text-white">
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
       <section className="ce-shell ce-page">
-        <p className="flex items-center gap-2 text-sm font-bold text-emerald-300">
-          <ShieldCheck size={16} /> Administrare platformă
-        </p>
-        <h1 className="mt-3 text-4xl font-black">Moderare, planuri și sănătatea platformei</h1>
-        <p className="mt-3 max-w-2xl text-gray-300">
-          Verifică propunerile comunității, planurile utilizatorilor și serviciile esențiale ale platformei.
-        </p>
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="flex items-center gap-2 text-sm font-bold text-cyan-200">
+              <ShieldCheck size={16} /> Administrare platformă
+            </p>
+            <h1 className="mt-3 text-4xl font-black md:text-5xl">
+              Monitorizare după lansare.
+            </h1>
+            <p className="mt-3 max-w-3xl text-gray-300">
+              Urmărește produsele negăsite, scanările eșuate, alternativele slabe,
+              plățile, emailurile și starea backend-ului.
+            </p>
+          </div>
+          <button
+            onClick={loadAdmin}
+            disabled={isLoading}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.045] px-4 py-3 font-black text-white hover:bg-white/10 disabled:opacity-60"
+          >
+            <RefreshCw size={17} className={isLoading ? "animate-spin" : ""} />
+            Reîncarcă datele
+          </button>
+        </div>
+
+        {message && (
+          <p className="mt-5 rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm text-cyan-100">
+            {message}
+          </p>
+        )}
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
           {Object.entries(statLabels).map(([key, label]) => (
-            <div key={key} className="rounded-lg border border-white/10 bg-[#11171d] p-4">
-              <p className="text-sm text-gray-400">{label}</p>
-              <p className="mt-2 text-3xl font-black text-emerald-300">{overview[key] ?? "-"}</p>
-            </div>
+            <StatCard key={key} label={label} value={overview[key] ?? "-"} />
           ))}
         </div>
 
-        {message && <p className="mt-5 rounded-lg border border-emerald-300/25 bg-emerald-400/10 p-4 text-sm text-emerald-100">{message}</p>}
+        <section className="mt-8 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                  <Activity size={16} /> Ultimele 7 zile
+                </p>
+                <h2 className="mt-2 text-2xl font-black">Semnale importante</h2>
+              </div>
+              <EventPill tone={readinessTone}>
+                {readiness?.ready ? "Backend pregătit" : "Necesită atenție"}
+              </EventPill>
+            </div>
 
-        <section className="mt-8 rounded-lg border border-white/10 bg-[#11171d] p-5">
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <StatCard
+                icon={SearchX}
+                label="Produse / scanări problemă"
+                value={compactNumber(scanIssues.total)}
+                tone={scanIssues.total ? "warning" : "default"}
+                detail={`${compactNumber(scanIssues.barcodeNotFound)} coduri negăsite, ${compactNumber(scanIssues.analysisNotFound)} analize fără rezultat`}
+              />
+              <StatCard
+                icon={AlertTriangle}
+                label="Alternative slabe"
+                value={compactNumber(scanIssues.alternativesLow)}
+                tone={scanIssues.alternativesLow ? "warning" : "default"}
+                detail="Cazuri cu prea puține alternative bune pentru produsul scanat."
+              />
+              <StatCard
+                icon={CreditCard}
+                label="Checkout-uri"
+                value={compactNumber(payments.checkoutStarted)}
+                tone={payments.checkoutErrors ? "danger" : "default"}
+                detail={`${compactNumber(payments.checkoutErrors)} erori checkout`}
+              />
+              <StatCard
+                icon={Database}
+                label="Catalog"
+                value={compactNumber(catalog.products)}
+                detail={`${compactNumber(catalog.pendingSubmissions)} propuneri de verificat`}
+              />
+              <StatCard
+                icon={Mail}
+                label="Email"
+                value={email.configured ? "Activ" : "Oprit"}
+                tone={email.configured ? "default" : "danger"}
+                detail={`${email.provider || "-"} · ${email.from || "-"}`}
+              />
+              <StatCard
+                icon={Users}
+                label="Abonamente active"
+                value={compactNumber(payments.activeSubscriptions)}
+                detail={`${compactNumber(payments.proUsers)} Pro, ${compactNumber(payments.familyUsers)} Family`}
+              />
+            </div>
+          </div>
+
+          <aside className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+            <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+              <Server size={16} /> Backend și Render
+            </p>
+            <h2 className="mt-2 text-2xl font-black">
+              {readiness?.ready ? "Totul arată bine" : "Verifică blocajele"}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-400">
+              Mediu: {readiness?.environment || "-"} · DB: {readiness?.database || "-"}
+            </p>
+
+            <div className="mt-4 space-y-3">
+              {(readiness?.blockers || []).map((item) => (
+                <p key={item} className="rounded-lg border border-red-400/25 bg-red-400/10 p-3 text-sm text-red-100">
+                  {item}
+                </p>
+              ))}
+              {(readiness?.warnings || []).map((item) => (
+                <p key={item} className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-3 text-sm text-yellow-100">
+                  {item}
+                </p>
+              ))}
+              {readiness?.ready && !(readiness?.warnings || []).length && (
+                <p className="rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-3 text-sm text-cyan-100">
+                  Readiness este verde. Dacă Render raportează timeout, verifică Logs/Metrics pentru cold start sau query-uri lente.
+                </p>
+              )}
+              {readiness?.renderNote && (
+                <p className="text-xs leading-5 text-gray-500">{readiness.renderNote}</p>
+              )}
+            </div>
+          </aside>
+        </section>
+
+        <section className="mt-8 grid gap-4 xl:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-black text-amber-200">
+                  <SearchX size={16} /> Probleme de scanare și recomandări
+                </p>
+                <h2 className="mt-2 text-2xl font-black">Cele mai recente semnale</h2>
+              </div>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <thead className="text-gray-400">
+                  <tr>
+                    <th className="border-b border-white/10 py-3">Semnal</th>
+                    <th className="border-b border-white/10 py-3">Sursă</th>
+                    <th className="border-b border-white/10 py-3">Magazin</th>
+                    <th className="border-b border-white/10 py-3">Rezultate</th>
+                    <th className="border-b border-white/10 py-3">Dată</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(scanIssues.recent || []).map((item) => (
+                    <tr key={item.id}>
+                      <td className="border-b border-white/5 py-3 font-bold text-white">{item.query}</td>
+                      <td className="border-b border-white/5 py-3 text-gray-300">{item.source}</td>
+                      <td className="border-b border-white/5 py-3 text-gray-400">{item.store}</td>
+                      <td className="border-b border-white/5 py-3 text-amber-200">{item.resultCount}</td>
+                      <td className="border-b border-white/5 py-3 text-gray-400">{formatDate(item.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!(scanIssues.recent || []).length && (
+                <EmptyState>Nu există semnale recente de scanare sau alternative slabe.</EmptyState>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+            <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+              <Bell size={16} /> Plăți și emailuri
+            </p>
+            <h2 className="mt-2 text-2xl font-black">Evenimente recente</h2>
+            <div className="mt-4 space-y-3">
+              {(payments.recentEvents || []).map((event) => {
+                const isError = event.type === "payment_error";
+                return (
+                  <article key={event.id} className="rounded-lg border border-white/10 bg-black/20 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-black text-white">{event.userEmail}</p>
+                        <p className="mt-1 text-sm text-gray-400">
+                          {event.source} · {formatDate(event.createdAt)}
+                        </p>
+                      </div>
+                      <EventPill tone={isError ? "danger" : "default"}>
+                        {isError ? "eroare" : event.type}
+                      </EventPill>
+                    </div>
+                    {event.metadata?.error && (
+                      <p className="mt-3 text-sm leading-6 text-red-100">{event.metadata.error}</p>
+                    )}
+                    {event.metadata?.coins && (
+                      <p className="mt-3 text-sm font-bold text-yellow-100">
+                        {event.metadata.coins} CeCoins
+                      </p>
+                    )}
+                  </article>
+                );
+              })}
+              {!(payments.recentEvents || []).length && (
+                <EmptyState>Nu există evenimente recente de plată în intervalul selectat.</EmptyState>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h2 className="text-2xl font-black">Sistem și email</h2>
+              <h2 className="text-2xl font-black">Sistem email</h2>
               <p className="mt-2 text-sm text-gray-400">
-                Trimite un email de test către adresa profesională a site-ului.
+                Trimite un email de test către adresa profesională a site-ului. Testele apar apoi în monitorizare.
               </p>
+              {email.lastProviderError && (
+                <p className="mt-3 rounded-lg border border-red-400/25 bg-red-400/10 p-3 text-sm text-red-100">
+                  Ultima eroare provider: {email.lastProviderError}
+                </p>
+              )}
             </div>
-            <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[380px]">
+            <div className="flex w-full flex-col gap-2 md:w-auto md:min-w-[420px]">
               <label className="text-xs font-black uppercase text-gray-400" htmlFor="admin-email-test">
                 Destinatar test
               </label>
@@ -168,7 +468,7 @@ export default function AdminPage() {
                 <button
                   onClick={sendEmailTest}
                   disabled={emailBusy}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-400 px-5 py-3 font-black text-black hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-5 py-3 font-black text-black hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Mail size={17} /> {emailBusy ? "Se trimite..." : "Testează email"}
                 </button>
@@ -177,52 +477,10 @@ export default function AdminPage() {
           </div>
         </section>
 
-        <section className="mt-8 rounded-lg border border-white/10 bg-[#11171d] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-black">Planuri utilizatori</h2>
-              <p className="mt-2 text-sm text-gray-400">Activează manual Free, Pro sau Family.</p>
-            </div>
-            <button onClick={loadAdmin} title="Reîncarcă" className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-white/15 hover:bg-white/10">
-              <RefreshCw size={17} />
-            </button>
-          </div>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead className="text-gray-400">
-                <tr>
-                  <th className="border-b border-white/10 py-3">Email</th>
-                  <th className="border-b border-white/10 py-3">Admin</th>
-                  <th className="border-b border-white/10 py-3">Plan</th>
-                  <th className="border-b border-white/10 py-3">Acțiuni</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((item) => (
-                  <tr key={item.id}>
-                    <td className="border-b border-white/5 py-3">{item.email}</td>
-                    <td className="border-b border-white/5 py-3">{item.is_admin ? "da" : "nu"}</td>
-                    <td className="border-b border-white/5 py-3 font-bold text-emerald-300">{item.plan || "free"}</td>
-                    <td className="border-b border-white/5 py-3">
-                      <div className="flex flex-wrap gap-2">
-                        {["free", "pro", "family"].map((plan) => (
-                          <button key={plan} onClick={() => updateUserPlan(item.id, plan)} className="rounded-md border border-white/15 px-3 py-1.5 font-bold hover:bg-white/10">
-                            {plan}
-                          </button>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="mt-8 rounded-lg border border-white/10 bg-[#11171d] p-5">
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <p className="flex items-center gap-2 text-sm font-bold text-amber-200">
+              <p className="flex items-center gap-2 text-sm font-black text-amber-200">
                 <SearchX size={16} /> Produse negăsite
               </p>
               <h2 className="mt-2 text-2xl font-black">Ce caută oamenii și lipsește</h2>
@@ -230,9 +488,6 @@ export default function AdminPage() {
                 Interogări cu zero rezultate în ultimele 30 de zile. Prioritizează-le pentru import sau verificare manuală.
               </p>
             </div>
-            <button onClick={loadAdmin} title="Reîncarcă lipsurile" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-bold hover:bg-white/10">
-              <RefreshCw size={16} /> Reîncarcă
-            </button>
           </div>
 
           <div className="mt-5 overflow-x-auto">
@@ -253,55 +508,112 @@ export default function AdminPage() {
                     <td className="border-b border-white/5 py-3 text-gray-300">{item.store}</td>
                     <td className="border-b border-white/5 py-3 text-gray-400">{item.source}</td>
                     <td className="border-b border-white/5 py-3 font-black text-amber-200">{item.count}</td>
-                    <td className="border-b border-white/5 py-3 text-gray-400">
-                      {item.lastSeen ? new Date(item.lastSeen).toLocaleString("ro-RO") : "-"}
+                    <td className="border-b border-white/5 py-3 text-gray-400">{formatDate(item.lastSeen)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!misses.length && <EmptyState>Nu există încă produse negăsite în perioada selectată.</EmptyState>}
+          </div>
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black">Planuri utilizatori</h2>
+              <p className="mt-2 text-sm text-gray-400">
+                Folosește activarea manuală doar pentru suport punctual sau testare internă.
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left text-sm">
+              <thead className="text-gray-400">
+                <tr>
+                  <th className="border-b border-white/10 py-3">Email</th>
+                  <th className="border-b border-white/10 py-3">Admin</th>
+                  <th className="border-b border-white/10 py-3">Plan</th>
+                  <th className="border-b border-white/10 py-3">Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((item) => (
+                  <tr key={item.id}>
+                    <td className="border-b border-white/5 py-3">{item.email}</td>
+                    <td className="border-b border-white/5 py-3">{item.is_admin ? "da" : "nu"}</td>
+                    <td className="border-b border-white/5 py-3 font-bold text-cyan-200">{item.plan || "free"}</td>
+                    <td className="border-b border-white/5 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {["free", "pro", "family"].map((plan) => (
+                          <button
+                            key={plan}
+                            onClick={() => updateUserPlan(item.id, plan)}
+                            className="rounded-md border border-white/15 px-3 py-1.5 font-bold hover:bg-white/10"
+                          >
+                            {plan}
+                          </button>
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {!misses.length && (
-              <p className="mt-4 rounded-lg border border-white/10 bg-black/20 p-4 text-sm text-gray-400">
-                Nu există încă produse negăsite în perioada selectată.
-              </p>
-            )}
           </div>
         </section>
 
         <section className="mt-8">
-          <div className="flex items-center justify-between gap-4">
-            <h2 className="text-2xl font-black">Propuneri recente</h2>
-          </div>
+          <h2 className="text-2xl font-black">Propuneri recente</h2>
           <div className="mt-4 space-y-3">
             {submissions.map((item) => (
-              <article key={item.id} className="rounded-lg border border-white/10 bg-[#11171d] p-5">
+              <article key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <p className="text-xs font-bold uppercase text-emerald-300">{item.status}</p>
+                    <p className="text-xs font-bold uppercase text-cyan-200">{item.status}</p>
                     <h3 className="mt-1 text-xl font-black">{item.product_name}</h3>
-                    <p className="mt-1 text-sm text-gray-400">{item.brand || "Brand nespecificat"} · {item.store}</p>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {item.brand || "Brand nespecificat"} · {item.store}
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button onClick={() => review(item.id)} className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10">
+                    <button
+                      onClick={() => review(item.id)}
+                      className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10"
+                    >
                       <RefreshCw size={15} /> Verifică
                     </button>
-                    <button onClick={() => approve(item.id)} className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-3 py-2 text-sm font-black text-black hover:bg-emerald-300">
+                    <button
+                      onClick={() => approve(item.id)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-200 px-3 py-2 text-sm font-black text-black hover:bg-white"
+                    >
                       <CheckCircle2 size={15} /> Publică
                     </button>
-                    <button onClick={() => remove(item.id)} title="Șterge propunerea" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10">
+                    <button
+                      onClick={() => remove(item.id)}
+                      title="Șterge propunerea"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10"
+                    >
                       <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
               </article>
             ))}
-            {!submissions.length && <p className="rounded-lg border border-white/10 bg-[#11171d] p-5 text-gray-400">Nu există propuneri de verificat.</p>}
+            {!submissions.length && <EmptyState>Nu există propuneri de verificat.</EmptyState>}
           </div>
         </section>
 
-        <Link href="/privacy" className="mt-8 inline-block text-sm font-bold text-emerald-300 hover:text-emerald-200">
-          Politica de confidențialitate
-        </Link>
+        <div className="mt-8 flex flex-wrap gap-4 text-sm font-bold">
+          <Link href="/support" className="text-cyan-200 hover:text-white">
+            Suport
+          </Link>
+          <Link href="/privacy" className="text-cyan-200 hover:text-white">
+            Politica de confidențialitate
+          </Link>
+          <Link href="/terms" className="text-cyan-200 hover:text-white">
+            Termeni
+          </Link>
+        </div>
       </section>
     </main>
   );

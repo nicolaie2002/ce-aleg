@@ -3559,6 +3559,29 @@ def record_search_event(search_text, store=None, result_count=0, source="search"
     ))
 
 
+def record_user_event(user_id, event_type, source=None, metadata=None, commit=False):
+    if not user_id or not db.session.get(User, user_id):
+        return None
+
+    event = UsageEvent(
+        user_id=user_id,
+        event_type=str(event_type or "event").strip()[:40],
+        source=str(source or "").strip()[:40] or None,
+        metadata_json=json.dumps(metadata or {}),
+    )
+    db.session.add(event)
+
+    if commit:
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            app.logger.exception("Monitoring event could not be saved.")
+            return None
+
+    return event
+
+
 def infer_alternative_criteria_from_request(request_text):
     text_value = normalize_search_text(request_text)
     criteria = []
@@ -5416,6 +5439,18 @@ def send_admin_email_test():
 
     if not sent:
         provider_error = LAST_EMAIL_PROVIDER_ERROR or "Providerul nu a returnat detalii."
+        record_user_event(
+            g.current_user.id,
+            "email_test",
+            EMAIL_PROVIDER,
+            {
+                "sent": False,
+                "to": to_email,
+                "from": EMAIL_FROM,
+                "providerError": provider_error,
+            },
+            commit=True,
+        )
         return jsonify({
             "sent": False,
             "error": f"Emailul de test nu a putut fi trimis. {provider_error}",
@@ -5423,6 +5458,18 @@ def send_admin_email_test():
             "from": EMAIL_FROM,
             "to": to_email,
         }), 502
+
+    record_user_event(
+        g.current_user.id,
+        "email_test",
+        EMAIL_PROVIDER,
+        {
+            "sent": True,
+            "to": to_email,
+            "from": EMAIL_FROM,
+        },
+        commit=True,
+    )
 
     return jsonify({
         "sent": True,
@@ -6102,10 +6149,35 @@ def start_checkout():
             )
         except Exception as error:
             app.logger.warning("Stripe checkout session failed: %s", error)
+            record_user_event(
+                user.id,
+                "payment_error",
+                "subscription_checkout",
+                {
+                    "plan": plan,
+                    "billingInterval": billing_interval,
+                    "priceEnv": price_env_name,
+                    "error": str(error)[:500],
+                },
+                commit=True,
+            )
             return jsonify({
                 "error": "Plata nu a putut fi pornita momentan.",
                 "code": "stripe_checkout_failed",
             }), 502
+
+        record_user_event(
+            user.id,
+            "payment_checkout_started",
+            "subscription_checkout",
+            {
+                "plan": plan,
+                "billingInterval": billing_interval,
+                "sessionId": checkout_session.id,
+                "priceEnv": price_env_name,
+            },
+            commit=True,
+        )
 
         return jsonify({
             "mode": "stripe",
@@ -6454,10 +6526,36 @@ def start_cecoin_checkout():
         if detail:
             message = f"{message} Detalii Stripe: {detail[:280]}"
 
+        record_user_event(
+            user.id,
+            "payment_error",
+            "cecoins_checkout",
+            {
+                "packId": pack["id"],
+                "coins": int(pack["coins"]),
+                "priceEnv": pack["priceEnv"],
+                "error": detail[:500],
+            },
+            commit=True,
+        )
+
         return jsonify({
             "error": message,
             "code": "cecoins_checkout_failed",
         }), 502
+
+    record_user_event(
+        user.id,
+        "payment_checkout_started",
+        "cecoins_checkout",
+        {
+            "packId": pack["id"],
+            "coins": int(pack["coins"]),
+            "sessionId": checkout_session.id,
+            "priceEnv": pack["priceEnv"],
+        },
+        commit=True,
+    )
 
     return jsonify({
         "mode": "stripe",
@@ -6523,6 +6621,197 @@ def sync_cecoin_checkout_session():
 # =========================
 # Admin
 # =========================
+
+def admin_iso(value):
+    return value.isoformat() + "Z" if value else None
+
+
+def get_usage_event_user_email(event):
+    user = db.session.get(User, event.user_id) if event and event.user_id else None
+    return user.email if user else "cont șters"
+
+
+def usage_event_to_admin_dict(event):
+    metadata = parse_usage_metadata(event)
+    return {
+        "id": event.id,
+        "type": event.event_type,
+        "source": event.source,
+        "userId": event.user_id,
+        "userEmail": get_usage_event_user_email(event),
+        "createdAt": admin_iso(event.created_at),
+        "metadata": metadata,
+    }
+
+
+def search_event_to_admin_dict(event):
+    return {
+        "id": event.id,
+        "query": event.search_text,
+        "store": event.store or "Fără magazin ales",
+        "source": event.source or "search",
+        "resultCount": int(event.result_count or 0),
+        "createdAt": admin_iso(event.created_at),
+    }
+
+
+@app.route("/admin/monitoring", methods=["GET"])
+def get_admin_monitoring():
+    days = request.args.get("days", default=7, type=int)
+    limit = request.args.get("limit", default=16, type=int)
+    safe_days = max(1, min(days or 7, 90))
+    safe_limit = max(5, min(limit or 16, 50))
+    since = datetime.utcnow() - timedelta(days=safe_days)
+    readiness = get_publication_readiness()
+
+    issue_filter = or_(
+        SearchEvent.result_count == 0,
+        SearchEvent.source == "alternatives_low",
+    )
+    issue_query = SearchEvent.query.filter(
+        SearchEvent.created_at >= since,
+        issue_filter,
+    )
+
+    issue_source_rows = (
+        db.session.query(
+            SearchEvent.source.label("source"),
+            func.count(SearchEvent.id).label("count"),
+            func.max(SearchEvent.created_at).label("last_seen"),
+        )
+        .filter(
+            SearchEvent.created_at >= since,
+            issue_filter,
+        )
+        .group_by(SearchEvent.source)
+        .order_by(func.count(SearchEvent.id).desc())
+        .all()
+    )
+
+    recent_issue_events = issue_query.order_by(
+        SearchEvent.created_at.desc()
+    ).limit(safe_limit).all()
+
+    payment_event_types = [
+        "payment_checkout_started",
+        "payment_error",
+        "cecoin_purchase",
+    ]
+    payment_events = UsageEvent.query.filter(
+        UsageEvent.event_type.in_(payment_event_types),
+        UsageEvent.created_at >= since,
+    ).order_by(UsageEvent.created_at.desc()).limit(safe_limit).all()
+
+    cecoin_purchase_events = UsageEvent.query.filter(
+        UsageEvent.event_type == "cecoin_purchase",
+        UsageEvent.created_at >= since,
+    ).all()
+    cecoin_purchase_total = 0
+    cecoin_revenue_events = 0
+
+    for event in cecoin_purchase_events:
+        metadata = parse_usage_metadata(event)
+        cecoin_purchase_total += int(metadata.get("coins") or 0)
+        cecoin_revenue_events += 1
+
+    email_test_events = UsageEvent.query.filter(
+        UsageEvent.event_type == "email_test",
+        UsageEvent.created_at >= since,
+    ).order_by(UsageEvent.created_at.desc()).limit(safe_limit).all()
+
+    active_subscriptions = Subscription.query.filter(
+        Subscription.plan.in_(["pro", "family"]),
+        Subscription.status == "active",
+    ).count()
+    recent_subscription_updates = Subscription.query.filter(
+        Subscription.updated_at >= since,
+    ).order_by(Subscription.updated_at.desc()).limit(safe_limit).all()
+
+    return jsonify({
+        "windowDays": safe_days,
+        "generatedAt": admin_iso(datetime.utcnow()),
+        "backend": {
+            "ready": bool(readiness.get("ready")),
+            "environment": readiness.get("environment"),
+            "database": readiness.get("database"),
+            "blockers": readiness.get("blockers", []),
+            "warnings": readiness.get("warnings", []),
+            "renderNote": "Dacă Render anunță health check timeout, verifică Logs și Metrics pentru cold start, conexiuni DB sau request-uri lente.",
+        },
+        "scanIssues": {
+            "total": issue_query.count(),
+            "barcodeNotFound": SearchEvent.query.filter(
+                SearchEvent.created_at >= since,
+                SearchEvent.source == "barcode_not_found",
+            ).count(),
+            "analysisNotFound": SearchEvent.query.filter(
+                SearchEvent.created_at >= since,
+                SearchEvent.source == "analysis_not_found",
+            ).count(),
+            "alternativesLow": SearchEvent.query.filter(
+                SearchEvent.created_at >= since,
+                SearchEvent.source == "alternatives_low",
+            ).count(),
+            "bySource": [
+                {
+                    "source": row.source or "search",
+                    "count": int(row.count or 0),
+                    "lastSeen": admin_iso(row.last_seen),
+                }
+                for row in issue_source_rows
+            ],
+            "recent": [search_event_to_admin_dict(event) for event in recent_issue_events],
+        },
+        "payments": {
+            "activeSubscriptions": active_subscriptions,
+            "proUsers": Subscription.query.filter_by(plan="pro", status="active").count(),
+            "familyUsers": Subscription.query.filter_by(plan="family", status="active").count(),
+            "checkoutErrors": UsageEvent.query.filter(
+                UsageEvent.event_type == "payment_error",
+                UsageEvent.created_at >= since,
+            ).count(),
+            "checkoutStarted": UsageEvent.query.filter(
+                UsageEvent.event_type == "payment_checkout_started",
+                UsageEvent.created_at >= since,
+            ).count(),
+            "cecoinPurchases": cecoin_revenue_events,
+            "cecoinsSold": cecoin_purchase_total,
+            "recentEvents": [usage_event_to_admin_dict(event) for event in payment_events],
+            "recentSubscriptions": [
+                {
+                    "userId": subscription.user_id,
+                    "userEmail": subscription.user.email if subscription.user else "cont șters",
+                    "plan": subscription.plan,
+                    "status": subscription.status,
+                    "provider": subscription.provider,
+                    "currentPeriodEnd": admin_iso(subscription.current_period_end),
+                    "updatedAt": admin_iso(subscription.updated_at),
+                }
+                for subscription in recent_subscription_updates
+            ],
+        },
+        "email": {
+            "configured": is_email_configured(),
+            "provider": EMAIL_PROVIDER,
+            "from": EMAIL_FROM,
+            "replyTo": get_email_reply_to() or EMAIL_FROM,
+            "lastProviderError": LAST_EMAIL_PROVIDER_ERROR,
+            "testCount": UsageEvent.query.filter(
+                UsageEvent.event_type == "email_test",
+                UsageEvent.created_at >= since,
+            ).count(),
+            "recentTests": [usage_event_to_admin_dict(event) for event in email_test_events],
+        },
+        "catalog": {
+            "products": Product.query.count(),
+            "pendingSubmissions": ProductSubmission.query.filter(
+                ProductSubmission.status != "approved"
+            ).count(),
+            "priceObservations": PriceObservation.query.count(),
+            "searches": SearchEvent.query.filter(SearchEvent.created_at >= since).count(),
+        },
+    })
+
 
 @app.route("/admin/overview", methods=["GET"])
 def get_admin_overview():
