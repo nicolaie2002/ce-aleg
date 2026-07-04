@@ -1,4 +1,5 @@
 ﻿from flask import Flask, request, jsonify, send_from_directory, g
+from flask import Response
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -7,6 +8,7 @@ from PIL import Image, ImageOps
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 import base64
+import csv
 import json
 import os
 import time
@@ -14,7 +16,7 @@ import re
 import unicodedata
 import requests
 import smtplib
-from io import BytesIO
+from io import BytesIO, StringIO
 from uuid import uuid4
 from difflib import SequenceMatcher
 from email.message import EmailMessage
@@ -349,6 +351,7 @@ EMAIL_VERIFICATION_MAX_AGE = int(
 )
 ACCOUNT_DELETE_MAX_AGE = int(os.environ.get("ACCOUNT_DELETE_MAX_AGE", str(24 * 60 * 60)))
 LAST_EMAIL_PROVIDER_ERROR = ""
+ADMIN_ALERT_THROTTLE = {}
 
 PLAN_CATALOG = {
     "free": {
@@ -915,6 +918,42 @@ def render_brand_email(preheader, title, intro, button_label=None, button_url=No
       </body>
     </html>
     """
+
+
+def send_admin_alert(subject, intro, details=None, alert_key=None, min_interval_seconds=3600):
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+
+    if not admin_email or not is_valid_email_address(admin_email) or not is_email_configured():
+        return False
+
+    key = alert_key or subject
+    now = time.time()
+    last_sent_at = ADMIN_ALERT_THROTTLE.get(key, 0)
+
+    if now - last_sent_at < min_interval_seconds:
+        return False
+
+    ADMIN_ALERT_THROTTLE[key] = now
+    text_body = "\n".join([
+        subject,
+        "",
+        intro,
+        "",
+        *(str(item) for item in (details or [])),
+        "",
+        f"Admin: {FRONTEND_PUBLIC_URL}/admin",
+    ])
+    html_body = render_brand_email(
+        "Alertă admin",
+        subject,
+        intro,
+        "Deschide admin",
+        f"{FRONTEND_PUBLIC_URL}/admin",
+        details or [],
+        tone="danger",
+    )
+
+    return send_transactional_email(admin_email, f"[Ce aleg] {subject}", text_body, html_body)
 
 
 def send_welcome_email(user):
@@ -3005,6 +3044,9 @@ ADMIN_ENDPOINTS = {
     "get_admin_overview",
     "get_admin_submissions",
     "get_admin_search_misses",
+    "export_admin_search_misses",
+    "export_admin_alternative_reports",
+    "export_admin_payment_events",
     "delete_admin_product",
     "admin_update_user_plan",
     "get_readiness",
@@ -3050,6 +3092,7 @@ AUTH_ENDPOINTS = {
     "update_family_profile",
     "delete_family_profile",
     "request_account_deletion",
+    "report_alternative_issue",
 }
 
 USER_PATH_ENDPOINTS = {
@@ -3123,6 +3166,11 @@ def enforce_access_controls():
 
     if endpoint in {"ai_extract_product_info", "get_open_food_facts_alternatives"} and not rate_limit(
         endpoint, 30, 60
+    ):
+        return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
+
+    if endpoint in {"contact_support", "track_analytics_event", "report_alternative_issue"} and not rate_limit(
+        endpoint, 20, 60
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
@@ -3580,6 +3628,177 @@ def record_user_event(user_id, event_type, source=None, metadata=None, commit=Fa
             return None
 
     return event
+
+
+ALLOWED_ANALYTICS_EVENTS = {
+    "landing_cta",
+    "scan_started",
+    "barcode_lookup",
+    "add_to_cart",
+    "add_to_favorites",
+    "alternative_report",
+    "pricing_checkout",
+    "cecoins_checkout",
+    "support_message",
+    "register_started",
+    "login_success",
+}
+
+
+@app.route("/analytics/event", methods=["POST"])
+def track_analytics_event():
+    data = request.get_json(silent=True) or {}
+    event_name = str(data.get("name") or "").strip().lower().replace(" ", "_")
+
+    if event_name not in ALLOWED_ANALYTICS_EVENTS:
+        return jsonify({"ok": True, "ignored": True})
+
+    user = get_current_user()
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    safe_metadata = {
+        str(key)[:50]: str(value)[:250]
+        for key, value in metadata.items()
+        if value is not None
+    }
+
+    if user:
+        record_user_event(
+            user.id,
+            f"ui_{event_name}",
+            "frontend",
+            safe_metadata,
+            commit=True,
+        )
+
+    return jsonify({"ok": True})
+
+
+@app.route("/feedback/alternative", methods=["POST"])
+def report_alternative_issue():
+    user = g.current_user
+    data = request.get_json(silent=True) or {}
+    alternative_product = data.get("product") if isinstance(data.get("product"), dict) else {}
+    scanned_product = data.get("scannedProduct") if isinstance(data.get("scannedProduct"), dict) else {}
+    alternative_name = str(alternative_product.get("name") or "").strip()
+    scanned_name = str(scanned_product.get("name") or "").strip()
+    store = str(data.get("store") or "").strip()[:100]
+    request_text = str(data.get("request") or "").strip()[:250]
+    reason = str(data.get("reason") or "wrong_recommendation").strip()[:80]
+
+    if not alternative_name:
+        return jsonify({"error": "Alternativa raportată nu este validă."}), 400
+
+    metadata = {
+        "reason": reason,
+        "store": store,
+        "request": request_text,
+        "scannedProduct": {
+            "name": scanned_name,
+            "barcode": str(scanned_product.get("barcode") or "").strip()[:32],
+            "category": str(scanned_product.get("category") or "").strip()[:120],
+            "family": get_product_recommendation_family(scanned_product),
+        },
+        "alternativeProduct": {
+            "name": alternative_name,
+            "barcode": str(alternative_product.get("barcode") or "").strip()[:32],
+            "brand": str(alternative_product.get("brand") or "").strip()[:120],
+            "category": str(alternative_product.get("category") or "").strip()[:120],
+            "source": str(alternative_product.get("source") or "").strip()[:80],
+            "family": get_product_recommendation_family(alternative_product),
+        },
+    }
+
+    record_user_event(user.id, "alternative_report", "alternatives", metadata, commit=False)
+    record_search_event(
+        scanned_name or metadata["scannedProduct"]["barcode"] or alternative_name,
+        store=store,
+        result_count=0,
+        source="alternative_report",
+        user_id=user.id,
+    )
+    db.session.commit()
+
+    send_admin_alert(
+        "Alternativă raportată",
+        "Un utilizator a marcat o recomandare ca nepotrivită.",
+        [
+            f"Utilizator: {user.email}",
+            f"Produs scanat: {scanned_name or '-'}",
+            f"Alternativă: {alternative_name}",
+            f"Magazin: {store or '-'}",
+            f"Cerință: {request_text or '-'}",
+        ],
+        alert_key="alternative_report",
+        min_interval_seconds=900,
+    )
+
+    return jsonify({"message": "Mulțumim. Raportarea a fost salvată."})
+
+
+@app.route("/support/contact", methods=["POST"])
+def contact_support():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip().lower()
+    topic = str(data.get("topic") or "Suport").strip()[:120]
+    message = str(data.get("message") or "").strip()
+    user = get_current_user()
+
+    if not is_valid_email_address(email):
+        return jsonify({"error": "Introdu o adresă de email validă."}), 400
+
+    if len(message) < 10:
+        return jsonify({"error": "Scrie câteva detalii despre problemă."}), 400
+
+    if len(message) > 4000:
+        return jsonify({"error": "Mesajul este prea lung. Te rugăm să îl scurtezi."}), 400
+
+    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower() or get_email_reply_to()
+
+    if not admin_email or not is_email_configured():
+        return jsonify({"error": "Emailul de suport nu este configurat complet."}), 503
+
+    details = [
+        f"De la: {email}",
+        f"Cont logat: {user.email if user else 'nu'}",
+        f"Subiect: {topic}",
+    ]
+    html_body = render_brand_email(
+        "Mesaj suport",
+        f"Mesaj nou: {topic}",
+        message,
+        "Deschide admin",
+        f"{FRONTEND_PUBLIC_URL}/admin",
+        details,
+        tone="standard",
+    )
+    text_body = "\n".join([
+        f"Mesaj nou: {topic}",
+        "",
+        message,
+        "",
+        *details,
+    ])
+
+    sent = send_transactional_email(
+        admin_email,
+        f"[Ce aleg] Suport: {topic}",
+        text_body,
+        html_body,
+    )
+
+    if not sent:
+        return jsonify({"error": "Mesajul nu a putut fi trimis momentan."}), 502
+
+    if user:
+        record_user_event(
+            user.id,
+            "support_message",
+            "support",
+            {"topic": topic, "email": email},
+            commit=True,
+        )
+
+    return jsonify({"message": "Mesajul a fost trimis. Îți răspundem cât mai curând."})
 
 
 def infer_alternative_criteria_from_request(request_text):
@@ -6161,6 +6380,19 @@ def start_checkout():
                 },
                 commit=True,
             )
+            send_admin_alert(
+                "Eroare checkout abonament",
+                "Stripe nu a putut porni o plată pentru abonament.",
+                [
+                    f"Utilizator: {user.email}",
+                    f"Plan: {plan}",
+                    f"Perioadă: {billing_interval}",
+                    f"Price env: {price_env_name}",
+                    f"Eroare: {str(error)[:300]}",
+                ],
+                alert_key="subscription_checkout_error",
+                min_interval_seconds=900,
+            )
             return jsonify({
                 "error": "Plata nu a putut fi pornita momentan.",
                 "code": "stripe_checkout_failed",
@@ -6538,6 +6770,19 @@ def start_cecoin_checkout():
             },
             commit=True,
         )
+        send_admin_alert(
+            "Eroare checkout CeCoins",
+            "Stripe nu a putut porni o plată pentru CeCoins.",
+            [
+                f"Utilizator: {user.email}",
+                f"Pachet: {pack['id']}",
+                f"CeCoins: {pack['coins']}",
+                f"Price env: {pack['priceEnv']}",
+                f"Eroare: {detail[:300]}",
+            ],
+            alert_key="cecoins_checkout_error",
+            min_interval_seconds=900,
+        )
 
         return jsonify({
             "error": message,
@@ -6655,6 +6900,21 @@ def search_event_to_admin_dict(event):
     }
 
 
+def csv_response(filename, headers, rows):
+    buffer = StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=headers, extrasaction="ignore")
+    writer.writeheader()
+
+    for row in rows:
+        writer.writerow({header: row.get(header, "") for header in headers})
+
+    return Response(
+        buffer.getvalue(),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.route("/admin/monitoring", methods=["GET"])
 def get_admin_monitoring():
     days = request.args.get("days", default=7, type=int)
@@ -6699,6 +6959,11 @@ def get_admin_monitoring():
     ]
     payment_events = UsageEvent.query.filter(
         UsageEvent.event_type.in_(payment_event_types),
+        UsageEvent.created_at >= since,
+    ).order_by(UsageEvent.created_at.desc()).limit(safe_limit).all()
+
+    alternative_report_events = UsageEvent.query.filter(
+        UsageEvent.event_type == "alternative_report",
         UsageEvent.created_at >= since,
     ).order_by(UsageEvent.created_at.desc()).limit(safe_limit).all()
 
@@ -6752,6 +7017,10 @@ def get_admin_monitoring():
                 SearchEvent.created_at >= since,
                 SearchEvent.source == "alternatives_low",
             ).count(),
+            "alternativeReports": UsageEvent.query.filter(
+                UsageEvent.event_type == "alternative_report",
+                UsageEvent.created_at >= since,
+            ).count(),
             "bySource": [
                 {
                     "source": row.source or "search",
@@ -6761,6 +7030,9 @@ def get_admin_monitoring():
                 for row in issue_source_rows
             ],
             "recent": [search_event_to_admin_dict(event) for event in recent_issue_events],
+            "reportedAlternatives": [
+                usage_event_to_admin_dict(event) for event in alternative_report_events
+            ],
         },
         "payments": {
             "activeSubscriptions": active_subscriptions,
@@ -6811,6 +7083,147 @@ def get_admin_monitoring():
             "searches": SearchEvent.query.filter(SearchEvent.created_at >= since).count(),
         },
     })
+
+
+@app.route("/admin/export/search-misses.csv", methods=["GET"])
+def export_admin_search_misses():
+    days = request.args.get("days", default=30, type=int)
+    safe_days = max(1, min(days or 30, 180))
+    since = datetime.utcnow() - timedelta(days=safe_days)
+    rows = (
+        db.session.query(
+            SearchEvent.search_text.label("query"),
+            SearchEvent.store.label("store"),
+            SearchEvent.source.label("source"),
+            func.count(SearchEvent.id).label("count"),
+            func.max(SearchEvent.created_at).label("last_seen"),
+        )
+        .filter(SearchEvent.created_at >= since)
+        .filter(
+            or_(
+                SearchEvent.result_count == 0,
+                SearchEvent.source.in_(["alternatives_low", "alternative_report"]),
+            )
+        )
+        .group_by(SearchEvent.search_text, SearchEvent.store, SearchEvent.source)
+        .order_by(func.count(SearchEvent.id).desc(), func.max(SearchEvent.created_at).desc())
+        .limit(2000)
+        .all()
+    )
+
+    return csv_response(
+        "ce-aleg-search-misses.csv",
+        ["query", "store", "source", "count", "lastSeen"],
+        [
+            {
+                "query": row.query,
+                "store": row.store or "Fără magazin ales",
+                "source": row.source or "search",
+                "count": int(row.count or 0),
+                "lastSeen": admin_iso(row.last_seen),
+            }
+            for row in rows
+        ],
+    )
+
+
+@app.route("/admin/export/alternative-reports.csv", methods=["GET"])
+def export_admin_alternative_reports():
+    days = request.args.get("days", default=30, type=int)
+    safe_days = max(1, min(days or 30, 180))
+    since = datetime.utcnow() - timedelta(days=safe_days)
+    events = UsageEvent.query.filter(
+        UsageEvent.event_type == "alternative_report",
+        UsageEvent.created_at >= since,
+    ).order_by(UsageEvent.created_at.desc()).limit(2000).all()
+
+    rows = []
+
+    for event in events:
+        metadata = parse_usage_metadata(event)
+        scanned_product = metadata.get("scannedProduct") or {}
+        alternative_product = metadata.get("alternativeProduct") or {}
+        rows.append({
+            "createdAt": admin_iso(event.created_at),
+            "userEmail": get_usage_event_user_email(event),
+            "store": metadata.get("store") or "",
+            "request": metadata.get("request") or "",
+            "reason": metadata.get("reason") or "",
+            "scannedProduct": scanned_product.get("name") or metadata.get("scannedProductName") or "",
+            "scannedBarcode": scanned_product.get("barcode") or "",
+            "alternativeProduct": alternative_product.get("name") or "",
+            "alternativeBarcode": alternative_product.get("barcode") or "",
+            "alternativeSource": alternative_product.get("source") or "",
+        })
+
+    return csv_response(
+        "ce-aleg-alternative-reports.csv",
+        [
+            "createdAt",
+            "userEmail",
+            "store",
+            "request",
+            "reason",
+            "scannedProduct",
+            "scannedBarcode",
+            "alternativeProduct",
+            "alternativeBarcode",
+            "alternativeSource",
+        ],
+        rows,
+    )
+
+
+@app.route("/admin/export/payment-events.csv", methods=["GET"])
+def export_admin_payment_events():
+    days = request.args.get("days", default=30, type=int)
+    safe_days = max(1, min(days or 30, 180))
+    since = datetime.utcnow() - timedelta(days=safe_days)
+    events = UsageEvent.query.filter(
+        UsageEvent.event_type.in_([
+            "payment_checkout_started",
+            "payment_error",
+            "cecoin_purchase",
+            "cecoin_spend",
+        ]),
+        UsageEvent.created_at >= since,
+    ).order_by(UsageEvent.created_at.desc()).limit(2000).all()
+
+    rows = []
+
+    for event in events:
+        metadata = parse_usage_metadata(event)
+        rows.append({
+            "createdAt": admin_iso(event.created_at),
+            "userEmail": get_usage_event_user_email(event),
+            "type": event.event_type,
+            "source": event.source or "",
+            "plan": metadata.get("plan") or "",
+            "billingInterval": metadata.get("billingInterval") or "",
+            "packId": metadata.get("packId") or "",
+            "coins": metadata.get("coins") or "",
+            "priceEnv": metadata.get("priceEnv") or "",
+            "sessionId": metadata.get("sessionId") or metadata.get("stripeSessionId") or "",
+            "error": metadata.get("error") or "",
+        })
+
+    return csv_response(
+        "ce-aleg-payment-events.csv",
+        [
+            "createdAt",
+            "userEmail",
+            "type",
+            "source",
+            "plan",
+            "billingInterval",
+            "packId",
+            "coins",
+            "priceEnv",
+            "sessionId",
+            "error",
+        ],
+        rows,
+    )
 
 
 @app.route("/admin/overview", methods=["GET"])
@@ -7279,6 +7692,19 @@ def get_open_food_facts_alternatives():
             user_id=getattr(current_user, "id", None),
         )
         db.session.commit()
+        send_admin_alert(
+            "Alternative insuficiente",
+            "Un produs scanat a primit prea puține alternative utile.",
+            [
+                f"Produs: {scanned_product.get('name') or '-'}",
+                f"Cod: {barcode or '-'}",
+                f"Categorie: {category_tag or '-'}",
+                f"Familie: {scanned_family or '-'}",
+                f"Rezultate: {len(products)}",
+            ],
+            alert_key="alternatives_low",
+            min_interval_seconds=6 * 3600,
+        )
 
     return jsonify({
         "source": "catalog" if prefer_local_catalog else "openfoodfacts",
@@ -9983,14 +10409,55 @@ def get_alternative_identity_key(product_data):
     return f"name:{brand}:{name}:{quantity}"
 
 
+def get_loose_alternative_identity_key(product_data):
+    name = normalize_product_name_for_duplicate(product_data.get("name"))
+
+    if not name:
+        return ""
+
+    stopwords = {
+        "produs",
+        "product",
+        "with",
+        "and",
+        "the",
+        "pour",
+        "avec",
+        "fara",
+        "fără",
+        "zero",
+        "gust",
+        "aroma",
+        "aromă",
+    }
+    tokens = [
+        token
+        for token in re.findall(r"[a-z0-9]+", name)
+        if len(token) > 2 and token not in stopwords
+    ]
+    brand = normalize_search_text(product_data.get("brand") or "")
+    quantity = normalize_search_text(product_data.get("quantity") or "")
+    family = get_product_recommendation_family(product_data)
+
+    if not tokens:
+        return ""
+
+    return f"{family}:{brand}:{' '.join(tokens[:6])}:{quantity}"
+
+
 def dedupe_alternatives_by_identity(alternatives):
     deduped = []
     seen_keys = set()
+    seen_loose_keys = set()
 
     for candidate in alternatives:
         identity_key = get_alternative_identity_key(candidate)
+        loose_key = get_loose_alternative_identity_key(candidate)
 
         if identity_key and identity_key in seen_keys:
+            continue
+
+        if loose_key and loose_key in seen_loose_keys:
             continue
 
         if any(is_same_catalog_product(existing, candidate) for existing in deduped):
@@ -10000,6 +10467,9 @@ def dedupe_alternatives_by_identity(alternatives):
 
         if identity_key:
             seen_keys.add(identity_key)
+
+        if loose_key:
+            seen_loose_keys.add(loose_key)
 
     return deduped
 

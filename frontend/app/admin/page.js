@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   CreditCard,
   Database,
+  Download,
   Mail,
   RefreshCw,
   Search,
@@ -97,6 +98,18 @@ function EventPill({ children, tone = "default" }) {
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-black ${monitorTone(tone)}`}>
       {children}
     </span>
+  );
+}
+
+function ExportLink({ href, children }) {
+  return (
+    <a
+      href={href}
+      className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.045] px-3 py-2 text-sm font-black text-white transition hover:bg-white/10"
+    >
+      <Download size={15} />
+      {children}
+    </a>
   );
 }
 
@@ -307,6 +320,13 @@ export default function AdminPage() {
                 detail="Cazuri cu prea puține alternative bune pentru produsul scanat."
               />
               <StatCard
+                icon={Bell}
+                label="Alternative raportate"
+                value={compactNumber(scanIssues.alternativeReports)}
+                tone={scanIssues.alternativeReports ? "warning" : "default"}
+                detail="Recomandări marcate de utilizatori ca nepotrivite."
+              />
+              <StatCard
                 icon={CreditCard}
                 label="Checkout-uri"
                 value={compactNumber(payments.checkoutStarted)}
@@ -378,6 +398,14 @@ export default function AdminPage() {
                 </p>
                 <h2 className="mt-2 text-2xl font-black">Cele mai recente semnale</h2>
               </div>
+              <div className="flex flex-wrap justify-end gap-2">
+                <ExportLink href={`${API_URL}/admin/export/search-misses.csv`}>
+                  Export lipsuri
+                </ExportLink>
+                <ExportLink href={`${API_URL}/admin/export/alternative-reports.csv`}>
+                  Export rapoarte
+                </ExportLink>
+              </div>
             </div>
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[760px] text-left text-sm">
@@ -412,7 +440,12 @@ export default function AdminPage() {
             <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
               <Bell size={16} /> Plăți și emailuri
             </p>
-            <h2 className="mt-2 text-2xl font-black">Evenimente recente</h2>
+            <div className="flex items-center justify-between gap-4">
+              <h2 className="mt-2 text-2xl font-black">Evenimente recente</h2>
+              <ExportLink href={`${API_URL}/admin/export/payment-events.csv`}>
+                Export plăți
+              </ExportLink>
+            </div>
             <div className="mt-4 space-y-3">
               {(payments.recentEvents || []).map((event) => {
                 const isError = event.type === "payment_error";

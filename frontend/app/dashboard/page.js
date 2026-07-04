@@ -34,6 +34,7 @@ import { FamilyProfiles } from "../components/FamilyProfiles";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile } from "../utils/profilePreferences";
 import { readApiJson } from "../utils/apiResponse";
+import { trackEvent } from "../utils/analytics";
 
 const ACTION_TONES = {
   emerald: {
@@ -394,6 +395,10 @@ export default function DashboardPage() {
 
     setBuyingPackId(packId);
     setShopMessage("");
+    trackEvent("cecoins_checkout", {
+      packId,
+      source: "dashboard",
+    });
 
     try {
       const response = await fetch(`${API_URL}/gamification/coin-checkout`, {

@@ -1,14 +1,72 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Clock3, CreditCard, Mail, MessageCircle, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock3,
+  CreditCard,
+  Loader2,
+  Mail,
+  MessageCircle,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
+import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
+import { readApiJson } from "../utils/apiResponse";
+import { trackEvent } from "../utils/analytics";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
 
 export default function SupportPage() {
   const { pick } = useLocale();
+  const [email, setEmail] = useState("");
+  const [topic, setTopic] = useState("Întrebare despre cont");
+  const [message, setMessage] = useState("");
+  const [status, setStatus] = useState("");
+  const [statusTone, setStatusTone] = useState("info");
+  const [isSending, setIsSending] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+
+    if (isSending) return;
+
+    setIsSending(true);
+    setStatus("");
+
+    try {
+      const response = await fetch(`${API_URL}/support/contact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, topic, message }),
+      });
+      const data = await readApiJson(response, "Suport");
+
+      if (!response.ok) {
+        throw new Error(data.error || "Mesajul nu a putut fi trimis.");
+      }
+
+      setStatusTone("success");
+      setStatus(data.message || "Mesajul a fost trimis.");
+      setMessage("");
+      trackEvent("support_message", { topic });
+    } catch (error) {
+      setStatusTone("error");
+      setStatus(error.message || "Mesajul nu a putut fi trimis.");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  const statusClass =
+    statusTone === "success"
+      ? "border-cyan-300/30 bg-cyan-300/10 text-cyan-100"
+      : statusTone === "error"
+        ? "border-red-400/30 bg-red-400/10 text-red-100"
+        : "border-white/10 bg-white/[0.05] text-gray-200";
 
   return (
     <main className="min-h-screen text-white">
@@ -33,29 +91,100 @@ export default function SupportPage() {
             </h1>
             <p className="mt-4 max-w-2xl leading-8 text-gray-300">
               {pick(
-                "Scrie-ne pentru probleme de cont, abonament, plată, scanare, produse greșite sau ștergerea datelor.",
-                "Contact us for account, subscription, payment, scan, wrong product or data deletion issues."
+                "Trimite-ne mesajul tău pentru cont, abonament, plată, scanare, produse identificate greșit sau ștergerea datelor.",
+                "Send us a message for account, subscription, payment, scan, incorrect product or data deletion issues."
               )}
             </p>
-            <a
-              href={`mailto:${CONTACT_EMAIL}?subject=Suport%20Ce%20aleg`}
-              className="mt-7 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
-            >
-              <Mail size={18} />
-              {CONTACT_EMAIL}
-            </a>
+
+            <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+              <div>
+                <label htmlFor="support-email" className="text-sm font-black text-gray-200">
+                  Email
+                </label>
+                <input
+                  id="support-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                  placeholder="nume@email.ro"
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="support-topic" className="text-sm font-black text-gray-200">
+                  {pick("Subiect", "Topic")}
+                </label>
+                <select
+                  id="support-topic"
+                  value={topic}
+                  onChange={(event) => setTopic(event.target.value)}
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
+                >
+                  <option>Întrebare despre cont</option>
+                  <option>Problemă la plată</option>
+                  <option>Produs identificat greșit</option>
+                  <option>Alternative nepotrivite</option>
+                  <option>Ștergere date sau cont</option>
+                  <option>Parteneriat</option>
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="support-message" className="text-sm font-black text-gray-200">
+                  {pick("Mesaj", "Message")}
+                </label>
+                <textarea
+                  id="support-message"
+                  value={message}
+                  onChange={(event) => setMessage(event.target.value)}
+                  required
+                  minLength={10}
+                  rows={6}
+                  placeholder={pick(
+                    "Scrie ce s-a întâmplat și, dacă poți, include produsul, pagina și emailul contului.",
+                    "Tell us what happened and, if possible, include the product, page and account email."
+                  )}
+                  className="mt-2 w-full resize-y rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
+                />
+              </div>
+
+              {status && (
+                <p className={`rounded-2xl border p-4 text-sm ${statusClass}`}>
+                  {status}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={isSending}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
+              >
+                {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                {isSending ? pick("Se trimite...", "Sending...") : pick("Trimite mesajul", "Send message")}
+              </button>
+            </form>
+
+            <p className="mt-5 text-sm text-gray-400">
+              {pick("Poți scrie și direct la", "You can also email us directly at")}{" "}
+              <a href={`mailto:${CONTACT_EMAIL}`} className="font-bold text-cyan-200 hover:text-white">
+                {CONTACT_EMAIL}
+              </a>
+              .
+            </p>
           </div>
 
           <aside className="space-y-4">
             <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
               <Clock3 className="text-cyan-200" />
               <h2 className="mt-4 text-xl font-black">
-                {pick("Răspuns rapid", "Fast response")}
+                {pick("Răspuns cât mai rapid", "Fast response")}
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-400">
                 {pick(
-                  "Răspundem cât mai repede pentru probleme de cont, plată, scanare sau produse identificate greșit.",
-                  "We reply as quickly as possible for account, payment, scan or incorrect product issues."
+                  "Prioritizăm problemele de plată, acces la cont și scanări care dau rezultate greșite.",
+                  "We prioritize payment, account access and scan issues that return incorrect results."
                 )}
               </p>
             </div>
@@ -67,14 +196,8 @@ export default function SupportPage() {
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-400">
                 {pick(
-                  "Abonamentele pot fi administrate sau anulate din portalul Stripe. Dacă ai plătit din greșeală, ai o taxare duplicată sau planul nu s-a activat corect, scrie-ne cu emailul contului și numărul facturii.",
-                  "Subscriptions can be managed or cancelled from the Stripe customer portal. If you paid by mistake, were charged twice or the plan did not activate correctly, send us your account email and invoice number."
-                )}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-gray-400">
-                {pick(
-                  "Rambursările se analizează punctual, în funcție de plată, folosire și drepturile legale aplicabile.",
-                  "Refunds are reviewed case by case, based on payment, usage and applicable legal rights."
+                  "Abonamentele pot fi administrate sau anulate din portalul Stripe. Dacă plata s-a dublat sau planul nu s-a activat corect, trimite emailul contului și numărul facturii.",
+                  "Subscriptions can be managed or cancelled from the Stripe customer portal. If you were charged twice or your plan did not activate correctly, send your account email and invoice number."
                 )}
               </p>
             </div>
@@ -82,12 +205,12 @@ export default function SupportPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
               <ShieldCheck className="text-cyan-200" />
               <h2 className="mt-4 text-xl font-black">
-                {pick("Include detalii utile", "Include useful details")}
+                {pick("Date utile", "Useful details")}
               </h2>
               <p className="mt-2 text-sm leading-6 text-gray-400">
                 {pick(
-                  "Trimite emailul contului, pagina unde ai văzut problema și, dacă poți, o captură de ecran.",
-                  "Send the account email, the page where the issue happened and, if possible, a screenshot."
+                  "Include produsul, magazinul, pagina unde ai văzut problema și o captură de ecran dacă este disponibilă.",
+                  "Include the product, store, page where the issue happened and a screenshot if available."
                 )}
               </p>
             </div>

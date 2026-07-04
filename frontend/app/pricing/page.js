@@ -10,6 +10,7 @@ import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { readApiJson } from "../utils/apiResponse";
+import { trackEvent } from "../utils/analytics";
 
 const fallbackPlans = {
   free: {
@@ -421,6 +422,10 @@ export default function PricingPage() {
 
     setBusyPlan(`${plan}:${selectedBillingCycle}`);
     setMessage("");
+    trackEvent("pricing_checkout", {
+      plan,
+      billingCycle: selectedBillingCycle,
+    });
 
     try {
       const response = await fetch(`${API_URL}/billing/checkout`, {
@@ -489,6 +494,10 @@ export default function PricingPage() {
 
     setBusyCoinPack(packId);
     setCoinPackMessage("");
+    trackEvent("cecoins_checkout", {
+      packId,
+      source: "pricing",
+    });
 
     try {
       const response = await fetch(`${API_URL}/gamification/coin-checkout`, {

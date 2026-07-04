@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Heart, Loader2, Search, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Flag, Heart, Loader2, Search, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
+import { trackEvent } from "../utils/analytics";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
@@ -734,6 +735,9 @@ function AlternativesPageContent() {
   const [favoriteProduct, setFavoriteProduct] = useState("");
   const [pendingCartProductKey, setPendingCartProductKey] = useState("");
   const [pendingFavoriteProductKey, setPendingFavoriteProductKey] = useState("");
+  const [pendingReportProductKey, setPendingReportProductKey] = useState("");
+  const [reportedProductKey, setReportedProductKey] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [lookupNotice, setLookupNotice] = useState("");
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
@@ -1017,6 +1021,11 @@ function AlternativesPageContent() {
       }
 
       setAddedProduct(`${product.name} - ${storeName}`);
+      trackEvent("add_to_cart", {
+        source: "alternatives",
+        product: product.name,
+        store: storeName,
+      });
       window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
 
       setTimeout(() => {
@@ -1073,6 +1082,11 @@ function AlternativesPageContent() {
       } else {
         setFavoriteProduct(`${product.name} a fost salvat la favorite.`);
       }
+      trackEvent("add_to_favorites", {
+        source: "alternatives",
+        product: product.name,
+        store: storeName,
+      });
 
       setTimeout(() => {
         setFavoriteProduct("");
@@ -1081,6 +1095,57 @@ function AlternativesPageContent() {
       setErrorMessage(error.message);
     } finally {
       setPendingFavoriteProductKey("");
+    }
+  }
+
+  async function reportAlternative(product) {
+    const actionKey = getProductActionKey(product);
+
+    if (pendingReportProductKey === actionKey || reportedProductKey === actionKey) return;
+
+    if (!user) {
+      window.location.assign("/login");
+      return;
+    }
+
+    setErrorMessage("");
+    setReportMessage("");
+    setPendingReportProductKey(actionKey);
+
+    try {
+      const response = await fetch(`${API_URL}/feedback/alternative`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          product,
+          scannedProduct,
+          store: storeName,
+          request: alternativeSearch || preferenceRequest || selectedCriteria.join(", "),
+          reason: "wrong_recommendation",
+        }),
+      });
+      const data = await readJsonResponse(response, "Raportare alternativă");
+
+      if (!response.ok) {
+        throw new Error(data.error || "Raportarea nu a putut fi trimisă.");
+      }
+
+      setReportedProductKey(actionKey);
+      setReportMessage(data.message || "Raportarea a fost trimisă.");
+      trackEvent("alternative_report", {
+        source: "alternatives",
+        product: product.name,
+        scannedProduct: scannedProduct?.name || "",
+        store: storeName,
+      });
+
+      setTimeout(() => setReportMessage(""), 3000);
+    } catch (error) {
+      setErrorMessage(error.message);
+    } finally {
+      setPendingReportProductKey("");
     }
   }
 
@@ -1133,6 +1198,12 @@ function AlternativesPageContent() {
         {favoriteProduct && (
           <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-300">
             {favoriteProduct}
+          </div>
+        )}
+
+        {reportMessage && (
+          <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-cyan-300/30 bg-cyan-300/10 p-4 text-cyan-100">
+            {reportMessage}
           </div>
         )}
 
@@ -1454,6 +1525,26 @@ function AlternativesPageContent() {
                     {pendingFavoriteProductKey === getProductActionKey(product)
                       ? "Se salvează..."
                       : "Adaugă la favorite"}
+                  </button>
+
+                  <button
+                    onClick={() => reportAlternative(product)}
+                    disabled={
+                      pendingReportProductKey === getProductActionKey(product) ||
+                      reportedProductKey === getProductActionKey(product)
+                    }
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-gray-300 transition hover:-translate-y-0.5 hover:bg-white/10 hover:text-white disabled:cursor-default disabled:opacity-70"
+                  >
+                    {pendingReportProductKey === getProductActionKey(product) ? (
+                      <Loader2 size={17} className="animate-spin" />
+                    ) : (
+                      <Flag size={17} />
+                    )}
+                    {reportedProductKey === getProductActionKey(product)
+                      ? "Raportat"
+                      : pendingReportProductKey === getProductActionKey(product)
+                        ? "Se trimite..."
+                        : "Nu se potrivește"}
                   </button>
                 </div>
               </div>
