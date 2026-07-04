@@ -291,6 +291,9 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Brevo integrat
 - [x] Brevo trimite emailuri din productie
 - [x] Pagini Privacy si Terms
+- [x] Privacy/Terms actualizate cu contact, furnizori, drepturi utilizator, cookies, plati si nota ca verdictul este orientativ
+- [x] Support actualizat cu contact clar si politica simpla pentru abonamente/rambursari
+- [x] Procedura backup/export Supabase documentata in `docs/supabase-backup.md`
 - [x] Resetare parola si stergere cont prin email
 - [x] Rate limiting, limite payload si security headers
 - [x] Fisierele `.env`, bazele locale si uploadurile sunt ignorate de Git
@@ -304,6 +307,7 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Accente UI rafinate: verde pastrat pentru brand/scor, cyan/amber pentru navigatie si actiuni
 - [x] Admin: panou pentru produse negasite/cautari fara rezultat
 - [x] Recomandari: filtru anti-alternative gresite pentru apa/cola la bauturi cu cafeina
+- [x] Recomandari: blacklist explicit pentru familii incompatibile, inclusiv apa la energizante si bauturi la Buldak/taitei instant
 - [x] Recomandari: ranking mai strict dupa familie produs + cerinta utilizatorului
 - [x] Recomandari: fallback din catalogul mare Supabase inainte de recomandarile generice
 - [x] Scanare: codurile negasite sunt salvate in admin si nu consuma incercare gratuita

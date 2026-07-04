@@ -23,8 +23,8 @@ import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
-const LAST_UPDATED_RO = "22 iunie 2026";
-const LAST_UPDATED_EN = "June 22, 2026";
+const LAST_UPDATED_RO = "4 iulie 2026";
+const LAST_UPDATED_EN = "July 4, 2026";
 
 function InfoCard({ icon: Icon, title, children }) {
   return (

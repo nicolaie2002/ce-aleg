@@ -22,8 +22,8 @@ import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
-const LAST_UPDATED_RO = "22 iunie 2026";
-const LAST_UPDATED_EN = "June 22, 2026";
+const LAST_UPDATED_RO = "4 iulie 2026";
+const LAST_UPDATED_EN = "July 4, 2026";
 
 function TermCard({ icon: Icon, title, children }) {
   return (
@@ -62,7 +62,9 @@ export default function TermsPage() {
     pick("Free poate avea limite de scanări și un număr mai mic de alternative afișate.", "Free may have scan limits and fewer displayed alternatives."),
     pick("Pro și Family pot debloca scanări nelimitate, alternative suplimentare și funcții avansate.", "Pro and Family may unlock unlimited scans, extra alternatives and advanced features."),
     pick("Plățile și facturile sunt procesate prin Stripe; Ce aleg? nu stochează datele complete ale cardului.", "Payments and invoices are processed through Stripe; Ce aleg? does not store full card details."),
-    pick("Poți administra sau anula abonamentul din portalul de client. Drepturile tale legale de consumator rămân aplicabile.", "You can manage or cancel your subscription from the customer portal. Your statutory consumer rights remain unaffected."),
+    pick("Poți administra sau anula abonamentul din portalul de client. Anularea oprește reînnoirea următoare, dar accesul rămâne activ până la finalul perioadei deja plătite.", "You can manage or cancel your subscription from the customer portal. Cancellation stops the next renewal, but access remains active until the end of the already paid period."),
+    pick("Dacă ai o taxare duplicată, o plată făcută din greșeală sau planul nu s-a activat corect, scrie-ne la contact@cealeg.shop cu emailul contului și numărul facturii.", "If you were charged twice, paid by mistake or the plan did not activate correctly, contact contact@cealeg.shop with your account email and invoice number."),
+    pick("Rambursările se analizează punctual, în funcție de situația plății, folosirea serviciului și drepturile legale aplicabile.", "Refunds are reviewed case by case, based on the payment situation, service usage and applicable legal rights."),
   ];
 
   const thirdParties = [

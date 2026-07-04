@@ -8749,6 +8749,58 @@ def is_compatible_alternative(scanned_product, candidate):
         "spread",
         "nuts",
     }
+    non_food_beverage_blocks = beverage_families | {
+        "instant_noodles",
+        "lactate",
+        "fruit_yogurt",
+        "dairy_dessert",
+        "protein",
+        "salty_snack",
+        "sweet_snack",
+        "cereal",
+        "sauce",
+        "ice_cream",
+        "pizza",
+        "frozen",
+        "ready_meal",
+        "bread",
+        "meat",
+        "fish",
+        "spread",
+        "nuts",
+    }
+    incompatible_families = {
+        "instant_noodles": non_food_beverage_blocks - {"instant_noodles"},
+        "energy_drink": non_food_beverage_blocks - {"energy_drink", "coffee_drink", "caffeinated_beverage"},
+        "coffee_drink": non_food_beverage_blocks - {"coffee_drink", "energy_drink", "caffeinated_beverage"},
+        "caffeinated_beverage": non_food_beverage_blocks - {"coffee_drink", "energy_drink", "caffeinated_beverage"},
+        "cola": non_food_beverage_blocks - {"cola", "energy_drink", "caffeinated_beverage"},
+        "water": non_food_beverage_blocks - {"water"},
+        "fruit_yogurt": non_food_beverage_blocks - {"fruit_yogurt", "lactate"},
+        "lactate": non_food_beverage_blocks - {"fruit_yogurt", "lactate", "dairy_dessert"},
+        "dairy_dessert": non_food_beverage_blocks - {"dairy_dessert", "lactate", "fruit_yogurt"},
+        "meat": non_food_beverage_blocks - {"meat"},
+        "fish": non_food_beverage_blocks - {"fish"},
+        "ice_cream": non_food_beverage_blocks - {"ice_cream"},
+        "sauce": non_food_beverage_blocks - {"sauce"},
+        "spread": non_food_beverage_blocks - {"spread", "nuts"},
+    }
+
+    if candidate_family in incompatible_families.get(scanned_family, set()):
+        return False
+
+    if scanned_family == "general":
+        signal_rules = [
+            (["buldak", "ramen", "noodle", "taitei", "taitel"], {"instant_noodles"}),
+            (["iaurt", "yogurt", "yoghurt", "zuzu", "skyr"], {"fruit_yogurt", "lactate"}),
+            (["energiz", "red bull", "redbull", "monster", "hell", "taurina"], {"energy_drink", "caffeinated_beverage"}),
+            (["cafea", "coffee", "cappuccino", "latte", "espresso"], {"coffee_drink", "energy_drink", "caffeinated_beverage"}),
+            (["muschi", "mușchi", "file", "filet", "sunca", "șuncă", "salam", "prosciutto"], {"meat"}),
+        ]
+
+        for tokens, allowed_families in signal_rules:
+            if any(token in scanned_text for token in tokens):
+                return candidate_family in allowed_families
 
     if candidate_family == "water" and scanned_family != "water":
         return False
