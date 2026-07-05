@@ -5,10 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowRight,
+  AlertTriangle,
   BadgeCheck,
   Barcode,
   Camera,
   CheckCircle2,
+  CircleCheck,
+  CircleX,
   Crown,
   ScanLine,
   Search,
@@ -102,6 +105,54 @@ export default function Home() {
     { label: pick("Scor", "Score"), value: "8.7/10", accent: "text-cyan-200" },
     { label: pick("Zahăr", "Sugar"), value: "-42%", accent: "text-yellow-200" },
     { label: pick("Proteină", "Protein"), value: "+6g", accent: "text-cyan-200" },
+  ];
+
+  const verdictCards = [
+    {
+      icon: CircleCheck,
+      tone: "border-cyan-300/35 bg-cyan-300/10 text-cyan-100",
+      badge: pick("Așa da", "Good pick"),
+      title: pick("Merită pus în coș", "Worth adding to cart"),
+      score: "8.9",
+      detail: pick(
+        "Ingrediente clare, zahăr redus și profil potrivit pentru categoria lui.",
+        "Clear ingredients, lower sugar and a strong profile for its category."
+      ),
+      points: [
+        pick("mai puțin zahăr", "less sugar"),
+        pick("ingrediente simple", "simple ingredients"),
+      ],
+    },
+    {
+      icon: AlertTriangle,
+      tone: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
+      badge: pick("Mai verifică", "Check first"),
+      title: pick("Bun, dar cu atenție", "Good, with caveats"),
+      score: "6.8",
+      detail: pick(
+        "Poate fi ok ocazional, dar merită comparat dacă urmărești calorii sau aditivi.",
+        "Can be fine occasionally, but compare it if calories or additives matter."
+      ),
+      points: [
+        pick("porție mică", "small serving"),
+        pick("aditivi de urmărit", "additives to check"),
+      ],
+    },
+    {
+      icon: CircleX,
+      tone: "border-rose-300/35 bg-rose-300/10 text-rose-100",
+      badge: pick("Așa nu", "Poor fit"),
+      title: pick("Caută o alternativă", "Look for an alternative"),
+      score: "3.4",
+      detail: pick(
+        "Prea mult zahăr sau grăsimi pentru categoria lui. Aplicația îți arată variante apropiate.",
+        "Too much sugar or fat for its category. The app shows closer alternatives."
+      ),
+      points: [
+        pick("zahăr ridicat", "high sugar"),
+        pick("scor slab", "low score"),
+      ],
+    },
   ];
 
   return (
@@ -287,6 +338,90 @@ export default function Home() {
               <p className="mt-2 leading-7 text-gray-400">{detail}</p>
             </InteractiveSurface>
           ))}
+        </div>
+      </section>
+
+      <section className="border-b border-white/10 bg-transparent">
+        <div className="ce-shell ce-page">
+          <div className="grid gap-8 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
+            <div className="ce-reveal">
+              <p className="text-sm font-black text-cyan-200">
+                {pick("Verdict pe înțelesul tău", "Verdicts made simple")}
+              </p>
+              <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
+                {pick(
+                  "Vezi imediat ce merită, ce verifici și ce poți înlocui.",
+                  "See what is worth it, what needs checking and what you can replace."
+                )}
+              </h2>
+              <p className="mt-4 leading-8 text-gray-300">
+                {pick(
+                  "Fiecare rezultat explică pe scurt motivul scorului și păstrează comparația în aceeași familie de produse.",
+                  "Each result explains the score briefly and keeps comparisons inside the same product family."
+                )}
+              </p>
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur">
+                <p className="text-sm font-black text-white">
+                  {pick("Comparație rapidă", "Quick comparison")}
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-rose-300/25 bg-rose-300/10 p-4">
+                    <p className="text-xs font-black uppercase text-rose-100">
+                      {pick("Produs scanat", "Scanned product")}
+                    </p>
+                    <p className="mt-2 text-lg font-black">{pick("Zahăr ridicat", "High sugar")}</p>
+                    <p className="mt-1 text-sm text-gray-300">
+                      {pick("Scor mic pentru categoria lui.", "Low score for its category.")}
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 p-4">
+                    <p className="text-xs font-black uppercase text-cyan-100">
+                      {pick("Alternativă", "Alternative")}
+                    </p>
+                    <p className="mt-2 text-lg font-black">{pick("Mai echilibrat", "More balanced")}</p>
+                    <p className="mt-1 text-sm text-gray-300">
+                      {pick("Apropiat ca tip, mai bun ca profil.", "Same kind of product, better profile.")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              {verdictCards.map(({ icon: Icon, tone, badge, title, score, detail, points }, index) => (
+                <InteractiveSurface
+                  as="article"
+                  key={title}
+                  className={`ce-reveal ce-reveal-delay-${Math.min(index + 1, 3)} rounded-2xl border border-white/10 bg-white/[0.035] p-5 backdrop-blur transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.055]`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${tone}`}>
+                      <Icon size={15} />
+                      {badge}
+                    </span>
+                    <span className="rounded-full bg-white px-3 py-1 text-sm font-black text-black">
+                      {score}/10
+                    </span>
+                  </div>
+                  <div className="mt-6 rounded-xl border border-white/10 bg-black/25 p-4">
+                    <div className="h-20 rounded-lg bg-[linear-gradient(135deg,rgba(103,232,249,.16),rgba(250,204,21,.10),rgba(255,255,255,.04))]" />
+                    <h3 className="mt-4 text-xl font-black">{title}</h3>
+                    <p className="mt-2 min-h-[72px] text-sm leading-6 text-gray-300">{detail}</p>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {points.map((point) => (
+                      <span
+                        key={point}
+                        className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-bold text-gray-200"
+                      >
+                        {point}
+                      </span>
+                    ))}
+                  </div>
+                </InteractiveSurface>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
