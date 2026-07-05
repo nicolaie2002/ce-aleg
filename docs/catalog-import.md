@@ -88,6 +88,36 @@ Pentru fisiere primite de la GetRealPrice sau retaileri, exporta mai intai in CS
 Nu importa XLSX direct in productie; converteste-l in CSV ca sa fie clar ce coloane
 intra in baza.
 
+## Surse externe verificate
+
+Nu orice dataset alimentar trebuie importat in `products`. Catalogul principal trebuie
+sa contina produse de raft, ideal cu barcode, brand, imagine si categorie. Dataseturile
+generice pot strica recomandarile daca intra in aceeasi tabela cu produsele scanabile.
+
+Surse bune pentru catalog:
+
+- Open Food Facts export: bun pentru produse de raft, coduri de bare, imagini si
+  ingrediente. Este sursa principala pentru cresterea catalogului.
+- Feed-uri CSV de la magazine, parteneri sau surse romanesti: cele mai valoroase
+  pentru produse locale si preturi reale.
+
+Surse bune doar ca referinta nutritionala:
+
+- USDA FoodData Central Foundation Foods: alimente generale, fara produse romanesti
+  de raft si fara barcode. Bun pentru o tabela separata de referinte nutritionale,
+  nu pentru `products`.
+- Dataseturi nutritionale generale, cum ar fi fisiere cu categorii si valori
+  nutritionale pe 100 g: utile pentru validari si scoruri orientative, dar doar
+  daca licenta este clara.
+
+Surse de evitat pentru import direct:
+
+- Dataseturi de imagini pentru clasificare, cum ar fi Food-101N. Sunt utile pentru
+  cercetare sau antrenare vizuala, dar nu identifica sigur produse de raft romanesti
+  si nu contin barcode, preturi sau date comerciale.
+- Liste fara licenta clara. Nu le importa in productie pana nu este clar ca pot fi
+  folosite comercial.
+
 ## Recomandare practica
 
 - Pentru acoperire mare foloseste `--country world`, fiindca multe produse din Romania
