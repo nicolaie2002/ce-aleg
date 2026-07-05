@@ -100,6 +100,10 @@ Surse bune pentru catalog:
   ingrediente. Este sursa principala pentru cresterea catalogului.
 - Feed-uri CSV de la magazine, parteneri sau surse romanesti: cele mai valoroase
   pentru produse locale si preturi reale.
+- Nutritionix API: interesant pentru produse branduite si cautare dupa UPC, dar
+  trebuie verificat costul, limita API si drepturile comerciale inainte de integrare.
+  Nu il folosi ca dependenta obligatorie pentru scanare pana nu avem termenii si
+  pretul clar.
 
 Surse bune doar ca referinta nutritionala:
 
@@ -115,8 +119,15 @@ Surse de evitat pentru import direct:
 - Dataseturi de imagini pentru clasificare, cum ar fi Food-101N. Sunt utile pentru
   cercetare sau antrenare vizuala, dar nu identifica sigur produse de raft romanesti
   si nu contin barcode, preturi sau date comerciale.
+- Open Beauty Facts: foloseste acelasi ecosistem ca Open Food Facts, dar este pentru
+  cosmetice. Poate fi util mai tarziu daca Ce aleg? se extinde in zona de produse
+  cosmetice sau ingrijire, nu pentru catalogul alimentar actual.
 - Liste fara licenta clara. Nu le importa in productie pana nu este clar ca pot fi
   folosite comercial.
+
+Model de crestere recomandat, inspirat de Yuka: pornim din Open Food Facts, apoi
+crestem baza proprie prin produse contribuite de utilizatori, validare admin si
+feed-uri oficiale de la retaileri, producatori sau parteneri locali.
 
 ## Recomandare practica
 

@@ -69,6 +69,7 @@ contact@cealeg.shop
 - Selgros
 - La Cocos
 - Freshful/eMAG Supermarket
+- Eat&Track sau alte platforme romanesti cu date nutritionale si produse locale
 
 ## Producatori prioritari
 
@@ -84,3 +85,44 @@ contact@cealeg.shop
 - Ferrero
 - Mars
 - Hochland
+
+## Mesaj pentru platforme de date nutritionale
+
+Subiect: Propunere colaborare date produse romanesti pentru Ce aleg?
+
+Buna ziua,
+
+Sunt Nicolae, fondatorul Ce aleg?, o platforma online disponibila la
+https://www.cealeg.shop, care ajuta utilizatorii sa compare mai usor produse
+alimentare inainte de cumparare.
+
+Ce aleg? functioneaza ca un asistent smart pentru cumparaturi: utilizatorii pot
+scana coduri de bare sau pot cauta produse, iar platforma afiseaza un raport
+orientativ despre produs si alternative mai potrivite in functie de preferinte
+precum mai putin zahar, mai multa proteina, ingrediente mai simple sau raport
+calitate-pret mai bun.
+
+In prezent lucram cu un catalog de peste 29.000 de produse, construit din surse
+publice si contributii, insa pentru Romania ne intereseaza in mod special date
+locale, curate si cat mai apropiate de ce gasesc utilizatorii la raft.
+
+Ne-ar interesa sa aflam daca exista posibilitatea unei colaborari pentru acces la
+date nutritionale, categorii de produse sau informatii publice despre produse
+romanesti. Ne-ar ajuta in special codul de bare/EAN, denumirea in romana,
+brandul, categoria, ingredientele, alergenii, valorile nutritionale si, unde este
+posibil, imaginea produsului.
+
+O astfel de colaborare ar ajuta utilizatorii sa primeasca recomandari mai corecte,
+iar partenerul de date ar putea fi mentionat ca sursa sau partener acolo unde este
+cazul, in functie de termenii agreati.
+
+Putem adapta integrarea la formatul disponibil: CSV, XLSX, JSON, XML feed sau API.
+Daca este nevoie, putem discuta si un acord clar de utilizare a datelor.
+
+Multumesc pentru timpul acordat si astept cu interes un raspuns.
+
+Cu stima,
+Nicolae
+Ce aleg?
+https://www.cealeg.shop
+contact@cealeg.shop
