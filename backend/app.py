@@ -8845,17 +8845,19 @@ def build_product_from_open_food_facts(barcode, off_product, translate_ingredien
         category = "Deserturi lactate"
     elif has_any(["iaurt", "yogurt", "yoghurt", "skyr", "zuzu"]) and has_any(["fruct", "fructe", "capsuni", "strawberry", "piersici", "peach", "visine", "cherry", "afine", "blueberry", "zmeura", "raspberry", "padure", "berries"]):
         category = "Iaurturi cu fructe"
-    elif has_any(["cheese", "branza", "branzeturi", "cascaval", "mozzarella", "telemea", "feta"]):
+    elif has_any(["baby food", "baby milk", "infant", "bebelus", "bebeluș", "copii", "piure bebelusi", "piure bebeluși"]):
+        category = "Alimente pentru copii"
+    elif has_any(["cheese", "branza", "branzeturi", "brânză", "brânzeturi", "cascaval", "cașcaval", "mozzarella", "telemea", "feta", "cheddar", "gouda"]):
         category = "Lactate și brânzeturi"
-    elif "plant-based-milks" in tags_text or has_any(["lapte vegetal", "plant based milk", "oat drink", "almond drink", "soy drink"]):
+    elif "plant-based-milks" in tags_text or has_any(["lapte vegetal", "plant based milk", "oat drink", "almond drink", "soy drink", "bautura vegetala", "băutură vegetală"]):
         category = "Alternative vegetale"
-    elif "yogurt" in categories_lower or "dairy" in categories_lower or has_any(["iaurt", "yogurt", "yoghurt", "skyr", "lapte", "milk"]):
+    elif "yogurt" in categories_lower or "dairy" in categories_lower or has_any(["iaurt", "yogurt", "yoghurt", "skyr", "kefir", "chefir", "sana", "lapte batut", "lapte bătut", "lapte", "milk"]):
         category = "Lactate"
-    elif has_any(["protein bar", "protein", "proteic", "proteina", "whey", "sports nutrition"]):
+    elif has_any(["protein bar", "protein", "proteic", "proteina", "proteină", "whey", "sports nutrition", "protein powder"]):
         category = "Proteine și fitness"
     elif has_any(["chips", "crisps", "crackers", "popcorn", "salty snack", "pufule"]):
         category = "Snacks sărate"
-    elif "cereal" in categories_lower or has_any(["cereale", "cereal", "muesli", "granola", "oatmeal"]):
+    elif "cereal" in categories_lower or has_any(["cereale", "cereal", "muesli", "granola", "oatmeal", "fulgi ovaz", "fulgi ovăz"]):
         category = "Cereale"
     elif "bread" in categories_lower or "bakery" in categories_lower or has_any(["paine", "bread", "toast", "bagheta", "chifla"]):
         category = "Panificație"
@@ -8867,19 +8869,19 @@ def build_product_from_open_food_facts(barcode, off_product, translate_ingredien
         category = "Mese gata preparate"
     elif has_any(["sauce", "sos", "mustard", "mustar", "ketchup", "mayonnaise", "maioneza", "salsa", "condiment"]):
         category = "Sosuri și condimente"
-    elif has_any(["pasta", "paste", "rice", "orez", "beans", "lentils", "linte", "naut", "chickpeas", "fasole"]):
+    elif has_any(["pasta", "paste", "rice", "orez", "beans", "lentils", "linte", "naut", "năut", "chickpeas", "fasole"]):
         category = "Paste, orez și leguminoase"
-    elif has_any(["canned", "conserva", "conserve", "pickles", "muraturi", "olives", "masline"]):
+    elif has_any(["canned", "conserva", "conservă", "conserve", "pickles", "muraturi", "murături", "olives", "masline", "măsline"]):
         category = "Conserve și murături"
-    elif has_any(["oil", "ulei", "vinegar", "otet", "spice", "condiment"]):
+    elif has_any(["oil", "ulei", "vinegar", "otet", "oțet", "spice", "condiment"]):
         category = "Uleiuri și condimente"
-    elif "meat" in categories_lower or has_any(["carne", "meat", "salam", "sausage", "carnati", "ham"]):
+    elif "meat" in categories_lower or has_any(["carne", "meat", "salam", "sausage", "carnati", "cârnați", "ham", "sunca", "șuncă", "muschi", "mușchi", "file", "filet", "pastrama", "pastramă", "bacon", "prosciutto", "mortadella", "parizer"]):
         category = "Carne"
     elif has_any(["fish", "peste", "tuna", "ton", "somon", "salmon", "seafood"]):
         category = "Pește și fructe de mare"
     elif "fruit" in categories_lower or "vegetable" in categories_lower or has_any(["fruct", "vegetable", "legume", "salata"]):
         category = "Fructe și legume"
-    elif has_any(["spread", "crema tartinabila", "hazelnut spread", "peanut butter", "gem", "jam", "miere", "honey"]):
+    elif has_any(["spread", "crema tartinabila", "cremă tartinabilă", "hazelnut spread", "peanut butter", "unt arahide", "gem", "jam", "miere", "honey"]):
         category = "Creme și gemuri"
     elif has_any(["nuts", "nuci", "alune", "seeds", "seminte", "dried fruits"]):
         category = "Nuci și semințe"
@@ -9353,9 +9355,14 @@ def get_product_recommendation_family(product_data):
     nuts_words = ["nuts", "nuci", "alune", "seeds", "seminte"]
     ready_meal_words = ["ready meal", "sandwich", "salata", "supa", "soup"]
     frozen_words = ["frozen", "congelat", "congelata"]
+    baby_food_words = ["baby food", "baby milk", "infant", "bebelus", "bebeluș", "piure bebelusi", "piure bebeluși"]
+    plant_based_words = ["plant based", "vegan", "vegetal", "lapte vegetal", "bautura vegetala", "băutură vegetală"]
 
     if any(word in text_value for word in instant_noodle_words):
         return "instant_noodles"
+
+    if any(word in text_value for word in baby_food_words):
+        return "baby_food"
 
     if any(word in text_value for word in ice_cream_words):
         return "ice_cream"
@@ -9425,6 +9432,9 @@ def get_product_recommendation_family(product_data):
     if any(word in text_value for word in nuts_words):
         return "nuts"
 
+    if any(word in text_value for word in plant_based_words):
+        return "plant_based"
+
     if any(word in text_value for word in sweet_snack_words):
         return "sweet_snack"
 
@@ -9463,6 +9473,8 @@ def is_compatible_alternative(scanned_product, candidate):
         "fish",
         "spread",
         "nuts",
+        "baby_food",
+        "plant_based",
     }
     non_food_beverage_blocks = beverage_families | {
         "instant_noodles",
@@ -9483,6 +9495,8 @@ def is_compatible_alternative(scanned_product, candidate):
         "fish",
         "spread",
         "nuts",
+        "baby_food",
+        "plant_based",
     }
     incompatible_families = {
         "instant_noodles": non_food_beverage_blocks - {"instant_noodles"},
@@ -9499,6 +9513,8 @@ def is_compatible_alternative(scanned_product, candidate):
         "ice_cream": non_food_beverage_blocks - {"ice_cream"},
         "sauce": non_food_beverage_blocks - {"sauce"},
         "spread": non_food_beverage_blocks - {"spread", "nuts"},
+        "baby_food": non_food_beverage_blocks - {"baby_food"},
+        "plant_based": non_food_beverage_blocks - {"plant_based", "lactate", "fruit_yogurt"},
     }
 
     if candidate_family in incompatible_families.get(scanned_family, set()):
@@ -9624,6 +9640,7 @@ def get_off_alternative_category(product_data):
         "creme si gemuri": "en:spreads",
         "creme tartinabile": "en:spreads",
         "nuci si seminte": "en:nuts",
+        "alimente pentru copii": "en:baby-foods",
     }
 
     if any(word in product_text for word in ["iaurt", "yogurt", "yoghurt", "skyr", "zuzu"]) and any(word in product_text for word in ["fruct", "fructe", "capsuni", "strawberry", "piersici", "visine", "afine", "zmeura", "padure"]):
@@ -9646,6 +9663,9 @@ def get_off_alternative_category(product_data):
 
     if any(word in product_text for word in ["iaurt", "yogurt", "yoghurt", "skyr", "lapte", "milk"]):
         return "en:dairies"
+
+    if any(word in product_text for word in ["baby food", "baby milk", "bebelus", "bebelusi", "piure bebelusi"]):
+        return "en:baby-foods"
 
     if any(word in product_text for word in ["inghetata", "ice cream", "gelatelli", "gelato"]):
         return "en:ice-creams"
@@ -10542,6 +10562,8 @@ def get_local_catalog_alternatives(scanned_product, criteria):
             "fish": ["peste", "fish", "ton", "tuna", "somon", "salmon"],
             "spread": ["spread", "crema", "tartinabila", "nutella", "unt arahide", "peanut butter", "gem"],
             "nuts": ["nuci", "alune", "nuts", "seeds", "seminte"],
+            "baby_food": ["baby", "infant", "bebelus", "bebelusi", "piure"],
+            "plant_based": ["vegetal", "vegan", "plant based", "lapte vegetal", "bautura vegetala"],
             "bread": ["paine", "bread", "toast", "bagheta", "chifla"],
             "ready_meal": ["ready meal", "sandwich", "salata", "supa"],
             "frozen": ["frozen", "congelat", "congelata"],
