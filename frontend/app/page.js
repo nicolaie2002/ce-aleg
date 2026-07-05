@@ -110,47 +110,50 @@ export default function Home() {
   const verdictCards = [
     {
       icon: CircleCheck,
+      image: "/products/skyr.jpg",
       tone: "border-cyan-300/35 bg-cyan-300/10 text-cyan-100",
       badge: pick("Așa da", "Good pick"),
-      title: pick("Merită pus în coș", "Worth adding to cart"),
+      title: pick("Skyr simplu", "Plain skyr"),
       score: "8.9",
       detail: pick(
-        "Ingrediente clare, zahăr redus și profil potrivit pentru categoria lui.",
-        "Clear ingredients, lower sugar and a strong profile for its category."
+        "Proteină bună, zahăr redus și ingrediente ușor de înțeles.",
+        "Good protein, lower sugar and easy-to-understand ingredients."
       ),
       points: [
         pick("mai puțin zahăr", "less sugar"),
-        pick("ingrediente simple", "simple ingredients"),
+        pick("mai multă proteină", "more protein"),
       ],
     },
     {
       icon: AlertTriangle,
+      image: "/products/lapte-ovaz.jpg",
       tone: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
       badge: pick("Mai verifică", "Check first"),
-      title: pick("Bun, dar cu atenție", "Good, with caveats"),
+      title: pick("Băutură vegetală", "Plant drink"),
       score: "6.8",
       detail: pick(
-        "Poate fi ok ocazional, dar merită comparat dacă urmărești calorii sau aditivi.",
-        "Can be fine occasionally, but compare it if calories or additives matter."
+        "Poate fi potrivită, dar compară zahărul, uleiurile și lista de aditivi.",
+        "Can be a good fit, but compare sugar, oils and additives."
       ),
       points: [
-        pick("porție mică", "small serving"),
+        pick("verifică zahărul", "check sugar"),
         pick("aditivi de urmărit", "additives to check"),
       ],
     },
     {
       icon: CircleX,
+      image: "/products/baton-ovaz.jpg",
       tone: "border-rose-300/35 bg-rose-300/10 text-rose-100",
       badge: pick("Așa nu", "Poor fit"),
-      title: pick("Caută o alternativă", "Look for an alternative"),
+      title: pick("Snack foarte dulce", "Very sweet snack"),
       score: "3.4",
       detail: pick(
-        "Prea mult zahăr sau grăsimi pentru categoria lui. Aplicația îți arată variante apropiate.",
-        "Too much sugar or fat for its category. The app shows closer alternatives."
+        "Când scorul e slab, primești variante apropiate din aceeași familie.",
+        "When the score is weak, you get close alternatives from the same family."
       ),
       points: [
         pick("zahăr ridicat", "high sugar"),
-        pick("scor slab", "low score"),
+        pick("caută alternativă", "find alternative"),
       ],
     },
   ];
@@ -343,56 +346,100 @@ export default function Home() {
 
       <section className="border-b border-white/10 bg-transparent">
         <div className="ce-shell ce-page">
-          <div className="grid gap-8 xl:grid-cols-[380px_minmax(0,1fr)] xl:items-start">
+          <div className="grid gap-8 xl:grid-cols-[420px_minmax(0,1fr)] xl:items-start">
             <div className="ce-reveal">
               <p className="text-sm font-black text-cyan-200">
                 {pick("Verdict pe înțelesul tău", "Verdicts made simple")}
               </p>
               <h2 className="mt-3 text-4xl font-black leading-tight md:text-5xl">
                 {pick(
-                  "Vezi imediat ce merită, ce verifici și ce poți înlocui.",
-                  "See what is worth it, what needs checking and what you can replace."
+                  "Nu primești doar un scor. Primești o alegere clară.",
+                  "You do not just get a score. You get a clear choice."
                 )}
               </h2>
               <p className="mt-4 leading-8 text-gray-300">
                 {pick(
-                  "Fiecare rezultat explică pe scurt motivul scorului și păstrează comparația în aceeași familie de produse.",
-                  "Each result explains the score briefly and keeps comparisons inside the same product family."
+                  "Rezultatul arată produsul scanat, motivul verdictului și o alternativă apropiată din aceeași familie de produse.",
+                  "The result shows the scanned product, the reason behind the verdict and a close alternative from the same product family."
                 )}
               </p>
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.035] p-4 backdrop-blur">
-                <p className="text-sm font-black text-white">
-                  {pick("Comparație rapidă", "Quick comparison")}
-                </p>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-xl border border-rose-300/25 bg-rose-300/10 p-4">
-                    <p className="text-xs font-black uppercase text-rose-100">
-                      {pick("Produs scanat", "Scanned product")}
-                    </p>
-                    <p className="mt-2 text-lg font-black">{pick("Zahăr ridicat", "High sugar")}</p>
-                    <p className="mt-1 text-sm text-gray-300">
-                      {pick("Scor mic pentru categoria lui.", "Low score for its category.")}
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-cyan-300/25 bg-cyan-300/10 p-4">
-                    <p className="text-xs font-black uppercase text-cyan-100">
-                      {pick("Alternativă", "Alternative")}
-                    </p>
-                    <p className="mt-2 text-lg font-black">{pick("Mai echilibrat", "More balanced")}</p>
-                    <p className="mt-1 text-sm text-gray-300">
-                      {pick("Apropiat ca tip, mai bun ca profil.", "Same kind of product, better profile.")}
-                    </p>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-              {verdictCards.map(({ icon: Icon, tone, badge, title, score, detail, points }, index) => (
+            <InteractiveSurface className="ce-reveal ce-reveal-delay-1 rounded-3xl border border-white/10 bg-white/[0.04] p-4 shadow-2xl backdrop-blur md:p-5">
+              <div className="grid gap-4 lg:grid-cols-[1fr_auto_1fr] lg:items-stretch">
+                <article className="rounded-2xl border border-rose-300/25 bg-rose-300/10 p-4">
+                  <p className="text-xs font-black uppercase text-rose-100">
+                    {pick("Produs scanat", "Scanned product")}
+                  </p>
+                  <div className="mt-4 flex gap-4">
+                    <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-white">
+                      <Image
+                        src="/products/baton-ovaz.jpg"
+                        alt={pick("Snack dulce scanat", "Scanned sweet snack")}
+                        fill
+                        sizes="112px"
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-2xl font-black">{pick("Snack dulce", "Sweet snack")}</h3>
+                      <p className="mt-2 text-sm leading-6 text-gray-300">
+                        {pick(
+                          "Zahăr ridicat și scor slab pentru categoria lui.",
+                          "High sugar and a weak score for its category."
+                        )}
+                      </p>
+                      <div className="mt-3 inline-flex rounded-full bg-rose-200 px-3 py-1 text-sm font-black text-black">
+                        3.4/10
+                      </div>
+                    </div>
+                  </div>
+                </article>
+
+                <div className="flex items-center justify-center">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full border border-cyan-300/25 bg-cyan-300/10 text-cyan-100 shadow-[0_0_26px_rgba(103,232,249,.18)]">
+                    <ArrowRight size={22} />
+                  </span>
+                </div>
+
+                <article className="rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4">
+                  <p className="text-xs font-black uppercase text-cyan-100">
+                    {pick("Alternativă recomandată", "Recommended alternative")}
+                  </p>
+                  <div className="mt-4 flex gap-4">
+                    <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-white">
+                      <Image
+                        src="/products/baton-proteic.jpg"
+                        alt={pick("Baton proteic recomandat", "Recommended protein bar")}
+                        fill
+                        sizes="112px"
+                        className="object-contain p-2"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-2xl font-black">{pick("Baton proteic", "Protein bar")}</h3>
+                      <p className="mt-2 text-sm leading-6 text-gray-300">
+                        {pick(
+                          "Mai multă proteină și profil mai echilibrat pentru aceeași nevoie.",
+                          "More protein and a more balanced profile for the same need."
+                        )}
+                      </p>
+                      <div className="mt-3 inline-flex rounded-full bg-cyan-200 px-3 py-1 text-sm font-black text-black">
+                        8.6/10
+                      </div>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </InteractiveSurface>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-3">
+              {verdictCards.map(({ icon: Icon, image, tone, badge, title, score, detail, points }, index) => (
                 <InteractiveSurface
                   as="article"
                   key={title}
-                  className={`ce-reveal ce-reveal-delay-${Math.min(index + 1, 3)} rounded-2xl border border-white/10 bg-white/[0.035] p-5 backdrop-blur transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.055]`}
+                  className={`ce-reveal ce-reveal-delay-${Math.min(index + 1, 3)} overflow-hidden rounded-2xl border border-white/10 bg-white/[0.04] p-4 backdrop-blur transition hover:-translate-y-1 hover:border-cyan-300/35 hover:bg-white/[0.065]`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${tone}`}>
@@ -403,10 +450,20 @@ export default function Home() {
                       {score}/10
                     </span>
                   </div>
-                  <div className="mt-6 rounded-xl border border-white/10 bg-black/25 p-4">
-                    <div className="h-20 rounded-lg bg-[linear-gradient(135deg,rgba(103,232,249,.16),rgba(250,204,21,.10),rgba(255,255,255,.04))]" />
-                    <h3 className="mt-4 text-xl font-black">{title}</h3>
-                    <p className="mt-2 min-h-[72px] text-sm leading-6 text-gray-300">{detail}</p>
+                  <div className="mt-5 flex gap-4">
+                    <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-white">
+                      <Image
+                        src={image}
+                        alt={title}
+                        fill
+                        sizes="96px"
+                        className="object-contain p-2"
+                      />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-xl font-black">{title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-gray-300">{detail}</p>
+                    </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     {points.map((point) => (
@@ -420,7 +477,6 @@ export default function Home() {
                   </div>
                 </InteractiveSurface>
               ))}
-            </div>
           </div>
         </div>
       </section>
