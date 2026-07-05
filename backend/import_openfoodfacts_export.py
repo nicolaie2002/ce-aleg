@@ -428,6 +428,7 @@ def import_export(
     allow_no_barcode,
     dry_run,
     progress_every,
+    skip_rows,
 ):
     scanned = imported = skipped = duplicates = failed = 0
     pending = 0
@@ -447,7 +448,10 @@ def import_export(
             for row in rows:
                 scanned += 1
 
-                if max_scan and scanned > max_scan:
+                if scanned <= skip_rows:
+                    continue
+
+                if max_scan and scanned > skip_rows + max_scan:
                     break
 
                 try:
@@ -553,6 +557,7 @@ def main():
     parser.add_argument("--strict-romania", action="store_false", dest="loose_romania")
     parser.add_argument("--limit", type=int, default=3000)
     parser.add_argument("--max-scan", type=int, default=500000)
+    parser.add_argument("--skip-rows", type=int, default=0)
     parser.add_argument("--batch-size", type=int, default=100)
     parser.add_argument("--allow-no-barcode", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -573,6 +578,7 @@ def main():
         allow_no_barcode=args.allow_no_barcode,
         dry_run=args.dry_run,
         progress_every=max(100, args.progress_every),
+        skip_rows=max(0, args.skip_rows),
     )
 
 

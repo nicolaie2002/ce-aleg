@@ -14,6 +14,13 @@ cd D:\proiecte\ce_aleg\backend
 .\venv\Scripts\python.exe import_openfoodfacts_export.py --country romania --limit 5000 --max-scan 800000 --allow-no-barcode --progress-every 5000
 ```
 
+Continuare dupa un batch deja rulat:
+
+```powershell
+cd D:\proiecte\ce_aleg\backend
+.\venv\Scripts\python.exe import_openfoodfacts_export.py --country romania --skip-rows 701639 --limit 5000 --max-scan 900000 --allow-no-barcode --progress-every 5000
+```
+
 Test fara sa scrie in baza:
 
 ```powershell
