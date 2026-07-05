@@ -2,6 +2,7 @@
 
 export function InteractiveSurface({
   as: Component = "div",
+  ambient = true,
   className = "",
   children,
   ...props
@@ -33,6 +34,7 @@ export function InteractiveSurface({
   return (
     <Component
       className={`ce-interactive-surface ${className}`}
+      data-ce-ambient={ambient ? "true" : undefined}
       onPointerMove={updateSurface}
       onPointerLeave={resetSurface}
       {...props}

@@ -341,6 +341,74 @@ textarea:focus {
   }
 }
 
+@property --surface-ambient-x {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --surface-ambient-y {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@property --surface-float-y {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes ce-surface-orbit {
+  0%,
+  100% {
+    --surface-ambient-x: -0.45deg;
+    --surface-ambient-y: 0.65deg;
+    --surface-float-y: 0px;
+  }
+
+  35% {
+    --surface-ambient-x: 0.7deg;
+    --surface-ambient-y: -0.55deg;
+    --surface-float-y: -3px;
+  }
+
+  70% {
+    --surface-ambient-x: 0.25deg;
+    --surface-ambient-y: 0.95deg;
+    --surface-float-y: 2px;
+  }
+}
+
+@keyframes ce-soft-card-float {
+  0%,
+  100% {
+    translate: 0 0;
+    transform: perspective(900px) rotateX(0deg) rotateY(0deg);
+  }
+
+  45% {
+    translate: 0 -3px;
+    transform: perspective(900px) rotateX(0.45deg) rotateY(-0.55deg);
+  }
+
+  75% {
+    translate: 0 1px;
+    transform: perspective(900px) rotateX(-0.3deg) rotateY(0.35deg);
+  }
+}
+
+@keyframes ce-sheen-breathe {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+
+  50% {
+    opacity: 0.58;
+  }
+}
+
 @utility bg-gradient-hero {
   background: var(--gradient-hero);
 }
@@ -450,15 +518,24 @@ textarea:focus {
   --surface-y: 35%;
   --surface-tilt-x: 0deg;
   --surface-tilt-y: 0deg;
+  --surface-ambient-x: 0deg;
+  --surface-ambient-y: 0deg;
+  --surface-float-y: 0px;
   position: relative;
   isolation: isolate;
   transform:
     perspective(1100px)
-    rotateX(var(--surface-tilt-x))
-    rotateY(var(--surface-tilt-y))
+    rotateX(calc(var(--surface-tilt-x) + var(--surface-ambient-x)))
+    rotateY(calc(var(--surface-tilt-y) + var(--surface-ambient-y)))
+    translate3d(0, var(--surface-float-y), 0)
     translateZ(0);
   transform-style: preserve-3d;
   will-change: transform;
+}
+
+.ce-interactive-surface[data-ce-ambient="true"] {
+  animation: ce-surface-orbit var(--ce-motion-duration, 9.5s) ease-in-out infinite;
+  animation-delay: calc(var(--ce-reveal-index, 0) * 120ms);
 }
 
 .ce-interactive-surface::before {
@@ -475,6 +552,11 @@ textarea:focus {
   transition: opacity 180ms ease;
 }
 
+.ce-interactive-surface[data-ce-ambient="true"]::before {
+  opacity: 0.38;
+  animation: ce-sheen-breathe 7s ease-in-out infinite;
+}
+
 .ce-interactive-surface::after {
   content: "";
   position: absolute;
@@ -487,12 +569,20 @@ textarea:focus {
 }
 
 .ce-interactive-surface:hover::before {
-  opacity: 1;
+  opacity: 0.72;
 }
 
 .ce-interactive-surface > * {
   position: relative;
   z-index: 1;
+}
+
+.ce-interactive-surface svg,
+.ce-panel-interactive svg,
+.ce-plan-card svg,
+.ce-store-logo-card svg,
+.ce-stat-card svg {
+  color: currentColor;
 }
 
 .ce-reveal {
@@ -509,6 +599,34 @@ textarea:focus {
 
 .ce-reveal-delay-3 {
   animation-delay: 240ms;
+}
+
+.ce-interactive-surface[data-ce-ambient="true"].ce-reveal {
+  animation:
+    ce-fade-up 520ms ease both,
+    ce-surface-orbit var(--ce-motion-duration, 9.5s) ease-in-out infinite;
+  animation-delay: 0ms, 620ms;
+}
+
+.ce-interactive-surface[data-ce-ambient="true"].ce-reveal-delay-1 {
+  animation-delay: 80ms, 700ms;
+}
+
+.ce-interactive-surface[data-ce-ambient="true"].ce-reveal-delay-2 {
+  animation-delay: 160ms, 780ms;
+}
+
+.ce-interactive-surface[data-ce-ambient="true"].ce-reveal-delay-3 {
+  animation-delay: 240ms, 860ms;
+}
+
+.ce-reveal.ce-pricing-note,
+.ce-reveal.ce-usage-banner,
+.ce-reveal.ce-family-panel {
+  animation:
+    ce-fade-up 520ms ease both,
+    ce-soft-card-float var(--ce-motion-duration, 10.5s) ease-in-out infinite;
+  animation-delay: 0ms, 620ms;
 }
 
 [data-ce-scroll-reveal="pending"] {
@@ -601,6 +719,45 @@ textarea:focus {
   box-shadow:
     0 24px 55px -34px oklch(0 0 0 / 76%),
     0 0 0 1px oklch(0.72 0.16 165 / 8%);
+}
+
+.ce-panel-interactive:not(.ce-interactive-surface),
+.ce-subtle-card:not(.ce-interactive-surface),
+.ce-stat-card:not(.ce-interactive-surface),
+.ce-home-demo-card:not(.ce-interactive-surface),
+.ce-plan-card:not(.ce-interactive-surface),
+.ce-store-logo-card:not(.ce-interactive-surface),
+.ce-pricing-note,
+.ce-usage-banner,
+.ce-family-panel {
+  transform-style: preserve-3d;
+  animation: ce-soft-card-float var(--ce-motion-duration, 10.5s) ease-in-out infinite;
+  animation-delay: calc(var(--ce-reveal-index, 0) * 120ms);
+  will-change: transform, translate;
+}
+
+.ce-panel-interactive:not(.ce-interactive-surface):nth-of-type(2n),
+.ce-subtle-card:not(.ce-interactive-surface):nth-of-type(2n),
+.ce-stat-card:not(.ce-interactive-surface):nth-of-type(2n),
+.ce-plan-card:not(.ce-interactive-surface):nth-of-type(2n),
+.ce-store-logo-card:not(.ce-interactive-surface):nth-of-type(2n) {
+  --ce-motion-duration: 12.5s;
+}
+
+.ce-panel-interactive:not(.ce-interactive-surface):nth-of-type(3n),
+.ce-subtle-card:not(.ce-interactive-surface):nth-of-type(3n),
+.ce-stat-card:not(.ce-interactive-surface):nth-of-type(3n),
+.ce-plan-card:not(.ce-interactive-surface):nth-of-type(3n),
+.ce-store-logo-card:not(.ce-interactive-surface):nth-of-type(3n) {
+  --ce-motion-duration: 14s;
+}
+
+.ce-panel-interactive:not(.ce-interactive-surface):hover,
+.ce-subtle-card:not(.ce-interactive-surface):hover,
+.ce-stat-card:not(.ce-interactive-surface):hover,
+.ce-plan-card:not(.ce-interactive-surface):hover,
+.ce-store-logo-card:not(.ce-interactive-surface):hover {
+  animation-play-state: paused;
 }
 
 .ce-nav-link {
@@ -839,6 +996,37 @@ textarea:focus {
 [data-theme="light"] button.bg-white:hover,
 [data-theme="light"] a.bg-white:hover {
   background-color: oklch(0.22 0.045 230) !important;
+}
+
+[data-theme="light"] .ce-interactive-surface,
+[data-theme="light"] .ce-panel-interactive,
+[data-theme="light"] .ce-subtle-card,
+[data-theme="light"] .ce-stat-card,
+[data-theme="light"] .ce-pricing-note,
+[data-theme="light"] .ce-usage-banner {
+  color: var(--foreground);
+}
+
+[data-theme="light"] .ce-interactive-surface::after {
+  border-color: oklch(0.24 0.035 240 / 16%);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 78%),
+    0 18px 50px -38px oklch(0.18 0.04 240 / 34%);
+}
+
+[data-theme="light"] .ce-interactive-surface[data-ce-ambient="true"]::before {
+  opacity: 0.28;
+}
+
+[data-theme="light"] .ce-subtle-card,
+[data-theme="light"] .ce-stat-card {
+  background:
+    linear-gradient(145deg, oklch(1 0 0 / 88%), oklch(0.965 0.014 232 / 78%));
+  box-shadow: 0 18px 50px -38px oklch(0.2 0.04 240 / 32%);
+}
+
+[data-theme="light"] .ce-stat-card::after {
+  opacity: 0.9;
 }
 
 [data-theme="light"] .bg-emerald-400,
@@ -1532,6 +1720,28 @@ textarea:focus {
   }
 }
 
+@media (max-width: 720px) {
+  .ce-interactive-surface[data-ce-ambient="true"] {
+    --ce-motion-duration: 16s;
+  }
+
+  .ce-panel-interactive:not(.ce-interactive-surface),
+  .ce-subtle-card:not(.ce-interactive-surface),
+  .ce-stat-card:not(.ce-interactive-surface),
+  .ce-home-demo-card:not(.ce-interactive-surface),
+  .ce-plan-card:not(.ce-interactive-surface),
+  .ce-store-logo-card:not(.ce-interactive-surface),
+  .ce-pricing-note,
+  .ce-usage-banner,
+  .ce-family-panel {
+    --ce-motion-duration: 18s;
+  }
+
+  .ce-interactive-surface[data-ce-ambient="true"]::before {
+    opacity: 0.24;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1544,5 +1754,18 @@ textarea:focus {
 
   .ce-interactive-surface {
     transform: none !important;
+  }
+
+  .ce-interactive-surface[data-ce-ambient="true"],
+  .ce-panel-interactive:not(.ce-interactive-surface),
+  .ce-subtle-card:not(.ce-interactive-surface),
+  .ce-stat-card:not(.ce-interactive-surface),
+  .ce-home-demo-card:not(.ce-interactive-surface),
+  .ce-plan-card:not(.ce-interactive-surface),
+  .ce-store-logo-card:not(.ce-interactive-surface),
+  .ce-pricing-note,
+  .ce-usage-banner,
+  .ce-family-panel {
+    animation: none !important;
   }
 }
