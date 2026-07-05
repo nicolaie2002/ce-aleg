@@ -543,25 +543,25 @@ export default function DashboardPage() {
   ];
   const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;
   const missionCopy = {
-    first_scan: {
-      title: pick("Prima scanare", "First scan"),
-      description: pick("Scanează primul produs și începe istoricul tău.", "Scan your first product and start your history."),
+    scan_3: {
+      title: pick("Scanează 3 produse", "Scan 3 products"),
+      description: pick("Compară produse noi și construiește istoricul zilei.", "Compare new products and build today's history."),
     },
-    smart_cart: {
-      title: pick("Coș pregătit", "Cart ready"),
-      description: pick("Adaugă 3 produse în coșul activ.", "Add 3 products to your active cart."),
+    cart_2: {
+      title: pick("Pune 2 produse în coș", "Add 2 products to cart"),
+      description: pick("Construiește lista pentru următoarea cumpărătură.", "Build the list for your next shopping trip."),
     },
-    favorites_keeper: {
-      title: pick("Favorite utile", "Useful favorites"),
-      description: pick("Salvează 3 produse la favorite.", "Save 3 products to favorites."),
+    favorite_1: {
+      title: pick("Salvează 1 favorit", "Save 1 favorite"),
+      description: pick("Păstrează un produs sau o alternativă la care vrei să revii.", "Save a product or alternative you want to revisit."),
     },
-    catalog_helper: {
-      title: pick("Ajutor pentru catalog", "Catalog helper"),
-      description: pick("Trimite un produs care este aprobat în catalog.", "Submit a product that gets approved in the catalog."),
+    catalog_1: {
+      title: pick("Adaugă 1 produs aprobat", "Add 1 approved product"),
+      description: pick("Trimite un produs lipsă; primești recompensa după aprobare.", "Submit a missing product; the reward is added after approval."),
     },
-    invite_starter: {
-      title: pick("Invită un prieten", "Invite a friend"),
-      description: pick("Un prieten își creează cont și confirmă emailul cu codul tău.", "A friend creates an account and verifies their email with your code."),
+    invite_1: {
+      title: pick("Invită prieteni", "Invite friends"),
+      description: pick("Primești automat 100 CeCoins pentru fiecare prieten care confirmă contul cu codul tău.", "You automatically get 100 CeCoins for every friend who verifies an account with your code."),
     },
   };
   const missionIcons = {
@@ -968,11 +968,15 @@ export default function DashboardPage() {
                             <MissionIcon size={16} />
                             {copy.title || mission.title || mission.label}
                           </p>
-                          {(mission.claimed || mission.claimedToday) && (
+                          {missionIsClaimable ? (
+                            <span className="rounded-full bg-cyan-200 px-2 py-1 text-[11px] font-black text-black">
+                              {pick("Gata", "Ready")}
+                            </span>
+                          ) : (mission.claimed || mission.claimedToday) ? (
                             <span className="rounded-full bg-violet-200 px-2 py-1 text-[11px] font-black text-black">
                               {mission.claimedToday ? pick("Revendicat azi", "Claimed today") : pick("Activat", "Active")}
                             </span>
-                          )}
+                          ) : null}
                         </div>
                         <p className="mt-2 text-xs leading-5 text-gray-400">
                           {copy.description || mission.description || mission.detail}

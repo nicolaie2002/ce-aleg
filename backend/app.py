@@ -1168,6 +1168,276 @@ def send_account_deletion_email(user):
     return sent, deletion_url
 
 
+def format_email_datetime(value):
+    if not value:
+        return "indisponibil"
+
+    try:
+        return value.strftime("%d.%m.%Y, %H:%M")
+    except Exception:
+        return str(value)
+
+
+def send_referral_bonus_email(user, inviter=None):
+    dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
+    inviter_name = inviter.name if inviter else "un prieten"
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        f"Contul tău a fost confirmat cu o invitație de la {inviter_name}.\n"
+        f"Ai primit {INVITE_BONUS_DAYS} zile de scanări nelimitate.\n\n"
+        f"Deschide dashboardul: {dashboard_url}\n"
+    )
+    html_body = render_brand_email(
+        "Bonus activat",
+        "Ai primit scanări nelimitate.",
+        f"Emailul a fost confirmat cu invitația de la {inviter_name}. Bonusul tău este activ.",
+        "Deschide dashboardul",
+        dashboard_url,
+        [
+            f"{INVITE_BONUS_DAYS} zile de scanări nelimitate.",
+            "Bonusul se aplică automat în cont.",
+            "Poți invita la rândul tău prieteni din dashboard.",
+        ],
+    )
+    return send_transactional_email(
+        user.email,
+        "Bonus invitație activat în Ce aleg?",
+        text_body,
+        html_body,
+    )
+
+
+def send_referral_inviter_email(inviter, invited_user=None):
+    dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
+    invited_name = invited_user.name if invited_user else "un prieten"
+    text_body = (
+        f"Salut, {inviter.name}!\n\n"
+        f"{invited_name} și-a confirmat contul folosind codul tău.\n"
+        f"Ai primit {INVITE_BONUS_DAYS} zile de scanări nelimitate și 100 CeCoins.\n\n"
+        f"Vezi progresul aici: {dashboard_url}\n"
+    )
+    html_body = render_brand_email(
+        "Invitație confirmată",
+        "Ai primit 100 CeCoins.",
+        f"{invited_name} și-a confirmat contul folosind codul tău. Recompensa a fost adăugată automat.",
+        "Vezi recompensele",
+        dashboard_url,
+        [
+            "100 CeCoins adăugați automat.",
+            f"{INVITE_BONUS_DAYS} zile de scanări nelimitate.",
+            "Poți urmări misiunile și clasamentul în dashboard.",
+        ],
+    )
+    return send_transactional_email(
+        inviter.email,
+        "Ai primit recompensă pentru invitație",
+        text_body,
+        html_body,
+    )
+
+
+def send_cecoins_purchase_email(user, pack, session=None):
+    dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
+    coins = int(pack.get("coins") or 0)
+    title = pack.get("title") or "CeCoins"
+    amount = None
+
+    if session:
+        amount_total = session.get("amount_total")
+        currency = str(session.get("currency") or "ron").upper()
+        try:
+            if amount_total is not None:
+                amount = f"{float(amount_total) / 100:.2f} {currency}"
+        except (TypeError, ValueError):
+            amount = None
+
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        f"Pachetul {title} a fost confirmat.\n"
+        f"Ai primit {coins} CeCoins în cont.\n\n"
+        f"Deschide dashboardul: {dashboard_url}\n"
+    )
+    details = [
+        f"Pachet: {title}",
+        f"CeCoins adăugați: {coins}",
+        "Soldul este actualizat automat în dashboard.",
+    ]
+
+    if amount:
+        details.insert(2, f"Valoare plătită: {amount}")
+
+    html_body = render_brand_email(
+        "CeCoins activați",
+        f"{coins} CeCoins au fost adăugați.",
+        "Plata a fost confirmată și pachetul tău este disponibil în cont.",
+        "Deschide dashboardul",
+        dashboard_url,
+        details,
+    )
+    return send_transactional_email(
+        user.email,
+        "CeCoins au fost adăugați în cont",
+        text_body,
+        html_body,
+    )
+
+
+def send_cecoin_reward_email(user, item):
+    dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
+    title = item.get("title") or "Recompensă"
+    cost = int(item.get("cost") or 0)
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        f"Recompensa {title} a fost activată.\n"
+        f"Cost: {cost} CeCoins.\n\n"
+        f"Vezi contul aici: {dashboard_url}\n"
+    )
+    details = [
+        f"Recompensă: {title}",
+        f"Cost: {cost} CeCoins",
+    ]
+
+    if item.get("bonusScans"):
+        details.append(f"Scanări bonus: {int(item.get('bonusScans') or 0)}")
+
+    if item.get("bonusDays"):
+        details.append(f"Acces nelimitat: {int(item.get('bonusDays') or 0)} zile")
+
+    html_body = render_brand_email(
+        "Recompensă activată",
+        f"{title} este activă.",
+        "Recompensa a fost aplicată în contul tău și poate fi folosită imediat.",
+        "Deschide dashboardul",
+        dashboard_url,
+        details,
+    )
+    return send_transactional_email(
+        user.email,
+        "Recompensă Ce aleg? activată",
+        text_body,
+        html_body,
+    )
+
+
+def send_product_submission_approved_email(user, submission, product=None, duplicate=False):
+    if not user:
+        return False
+
+    dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
+    product_name = submission.product_name or (product.name if product else "produsul trimis")
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        f"Produsul {product_name} a fost aprobat în catalogul Ce aleg?.\n"
+        f"Ai primit {SUBMISSION_APPROVAL_BONUS_CREDITS} scanare bonus.\n\n"
+        f"Vezi dashboardul: {dashboard_url}\n"
+    )
+    details = [
+        f"Produs: {product_name}",
+        f"Magazin: {submission.store or 'nespecificat'}",
+        f"Scanări bonus: +{SUBMISSION_APPROVAL_BONUS_CREDITS}",
+        (
+            "Produsul exista deja în catalog, iar propunerea ta a fost confirmată."
+            if duplicate
+            else "Produsul a fost publicat în catalog."
+        ),
+    ]
+    html_body = render_brand_email(
+        "Produs aprobat",
+        "Contribuția ta a fost aprobată.",
+        "Mulțumim pentru completarea catalogului. Recompensa a fost adăugată automat în cont.",
+        "Vezi dashboardul",
+        dashboard_url,
+        details,
+    )
+    return send_transactional_email(
+        user.email,
+        "Produs aprobat în Ce aleg?",
+        text_body,
+        html_body,
+    )
+
+
+def plan_display_name(plan):
+    normalized = str(plan or "").strip().lower()
+    return {
+        "pro": "Pro",
+        "family": "Family",
+        "free": "Free",
+    }.get(normalized, normalized.capitalize() or "Plan")
+
+
+def send_subscription_activated_email(user, plan, subscription=None):
+    pricing_url = f"{FRONTEND_PUBLIC_URL}/pricing"
+    plan_name = plan_display_name(plan)
+    period_end = (
+        format_email_datetime(subscription.current_period_end)
+        if subscription and subscription.current_period_end
+        else None
+    )
+    details = [
+        f"Plan activ: {plan_name}",
+        "Scanările și beneficiile planului sunt disponibile imediat în cont.",
+        "Abonamentul poate fi administrat din pagina Planuri.",
+    ]
+
+    if period_end:
+        details.insert(1, f"Perioadă activă până la: {period_end}")
+
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        f"Planul {plan_name} este activ în contul tău Ce aleg?.\n"
+        "Îl poți administra oricând din pagina Planuri.\n\n"
+        f"Deschide pagina Planuri: {pricing_url}\n"
+    )
+    html_body = render_brand_email(
+        "Plan activ",
+        f"Planul {plan_name} este activ.",
+        "Plata a fost confirmată și beneficiile abonamentului au fost activate în cont.",
+        "Administrează abonamentul",
+        pricing_url,
+        details,
+    )
+    return send_transactional_email(
+        user.email,
+        f"Planul {plan_name} este activ în Ce aleg?",
+        text_body,
+        html_body,
+    )
+
+
+def send_subscription_checkout_email_once(user, plan, session, subscription=None):
+    session_id = str((session or {}).get("id") or "").strip()
+
+    if not user or not session_id:
+        return False
+
+    existing_events = UsageEvent.query.filter_by(
+        user_id=user.id,
+        event_type="subscription_checkout_email",
+        source="stripe_checkout",
+    ).all()
+
+    if any(parse_usage_metadata(event).get("sessionId") == session_id for event in existing_events):
+        return False
+
+    sent = send_subscription_activated_email(user, plan, subscription)
+    db.session.add(
+        UsageEvent(
+            user_id=user.id,
+            event_type="subscription_checkout_email",
+            source="stripe_checkout",
+            metadata_json=json.dumps({
+                "sessionId": session_id,
+                "plan": plan,
+                "sent": bool(sent),
+                "sentAt": datetime.utcnow().isoformat() + "Z",
+            }),
+        )
+    )
+    db.session.commit()
+    return sent
+
+
 def delete_local_submission_file(image_path):
     prefix = "/uploads/submissions/"
 
@@ -1386,6 +1656,8 @@ def apply_referral_bonus_after_verification(user):
     )
     db.session.commit()
     clear_leaderboard_cache()
+    send_referral_bonus_email(user, inviter)
+    send_referral_inviter_email(inviter, user)
     return True
 
 
@@ -2254,6 +2526,7 @@ def handle_stripe_cecoin_checkout_completed(session):
     )
     db.session.commit()
     clear_leaderboard_cache()
+    send_cecoins_purchase_email(user, pack, session)
     return user
 
 
@@ -2284,17 +2557,25 @@ def handle_stripe_checkout_completed(session):
     if subscription_id and configure_stripe():
         synced_subscription = sync_stripe_subscription_by_id(subscription_id)
         if synced_subscription:
+            send_subscription_checkout_email_once(
+                user,
+                synced_subscription.plan,
+                session,
+                synced_subscription,
+            )
             return synced_subscription
 
     fallback_status = "active" if payment_status in {"paid", "no_payment_required"} else "incomplete"
 
-    return update_local_subscription_from_stripe(
+    local_subscription = update_local_subscription_from_stripe(
         user=user,
         plan=plan,
         status=fallback_status,
         customer_id=session.get("customer"),
         subscription_id=subscription_id,
     )
+    send_subscription_checkout_email_once(user, plan, session, local_subscription)
+    return local_subscription
 
 
 def is_paid_subscription(subscription):
@@ -6685,6 +6966,7 @@ def redeem_cecoin_reward():
     )
     db.session.commit()
     clear_leaderboard_cache()
+    send_cecoin_reward_email(g.current_user, item)
 
     return jsonify({
         "message": "Recompensa a fost activată.",
@@ -8397,6 +8679,12 @@ def approve_product_submission(submission_id):
             {"submissionId": submission.id, "productId": existing_product.id},
         )
         db.session.commit()
+        send_product_submission_approved_email(
+            contributor,
+            submission,
+            existing_product,
+            duplicate=True,
+        )
 
         return jsonify({
             "message": "Produsul exista deja în baza oficială. Propunerea a fost aprobată, iar utilizatorul a primit o scanare bonus.",
@@ -8468,6 +8756,12 @@ def approve_product_submission(submission_id):
         {"submissionId": submission.id},
     )
     db.session.commit()
+    send_product_submission_approved_email(
+        contributor,
+        submission,
+        new_product,
+        duplicate=False,
+    )
 
     return jsonify({
         "message": "Produsul a fost publicat în baza oficială, iar utilizatorul a primit o scanare bonus.",
