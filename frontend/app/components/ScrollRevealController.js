@@ -11,6 +11,7 @@ const revealSelectors = [
   ".ce-store-card",
   ".ce-stat-card",
   ".ce-family-panel",
+  ".ce-preference-card",
   ".ce-pricing-note",
   ".ce-usage-banner",
   "main article",
@@ -54,8 +55,8 @@ export function ScrollRevealController() {
         });
       },
       {
-        rootMargin: "0px 0px -10% 0px",
-        threshold: 0.12,
+        rootMargin: "0px 0px -14% 0px",
+        threshold: 0.08,
       }
     );
 

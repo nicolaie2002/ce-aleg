@@ -5,9 +5,21 @@ import Link from "next/link";
 import {
   AlertTriangle,
   ArrowLeft,
+  BadgeCheck,
+  BadgeDollarSign,
+  CandyOff,
   Check,
+  Flame,
+  Leaf,
+  MilkOff,
+  RotateCcw,
+  Save,
   ScanLine,
+  Scale,
+  ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
+  Sprout,
   Target,
   UserRound,
 } from "lucide-react";
@@ -25,6 +37,7 @@ import {
 const criteria = [
   {
     id: "cheap",
+    icon: BadgeDollarSign,
     ro: "Mai ieftin",
     en: "Cheaper",
     detailRo: "Alege variante cu preț mai bun când diferența merită.",
@@ -32,20 +45,23 @@ const criteria = [
   },
   {
     id: "protein",
+    icon: BadgeCheck,
     ro: "Mai multă proteină",
     en: "More protein",
-    detailRo: "Bun pentru satietate, sport sau gustari mai consistente.",
+    detailRo: "Bun pentru sațietate, sport sau gustări mai consistente.",
     detailEn: "Good for satiety, fitness and more filling snacks.",
   },
   {
     id: "low_calorie",
-    ro: "Mai putine calorii",
+    icon: Flame,
+    ro: "Mai puține calorii",
     en: "Fewer calories",
     detailRo: "Caută opțiuni mai ușoare per 100g sau per porție.",
     detailEn: "Look for lighter options per 100g or serving.",
   },
   {
     id: "low_sugar",
+    icon: CandyOff,
     ro: "Mai puțin zahăr",
     en: "Less sugar",
     detailRo: "Reduce zahărul când există alternative apropiate.",
@@ -53,27 +69,31 @@ const criteria = [
   },
   {
     id: "vegan",
+    icon: Sprout,
     ro: "De post",
     en: "Vegan",
-    detailRo: "Preferinte pentru produse vegetale sau potrivite pentru post.",
+    detailRo: "Preferințe pentru produse vegetale sau potrivite pentru post.",
     detailEn: "Prefer plant-based products.",
   },
   {
     id: "lactose_free",
-    ro: "Fara lactoza",
+    icon: MilkOff,
+    ro: "Fără lactoză",
     en: "Lactose-free",
-    detailRo: "Evita lactoza cand exista optiuni potrivite.",
+    detailRo: "Evită lactoza când există opțiuni potrivite.",
     detailEn: "Avoid lactose when suitable options exist.",
   },
   {
     id: "natural",
+    icon: Leaf,
     ro: "Ingrediente mai curate",
     en: "Cleaner ingredients",
-    detailRo: "Prioritizeaza liste de ingrediente mai scurte si mai clare.",
+    detailRo: "Prioritizează liste de ingrediente mai scurte și mai clare.",
     detailEn: "Prioritize shorter, clearer ingredient lists.",
   },
   {
     id: "value",
+    icon: Scale,
     ro: "Raport calitate-preț",
     en: "Best value",
     detailRo: "Echilibrează scorul, prețul și valorile nutriționale.",
@@ -84,6 +104,7 @@ const criteria = [
 const goals = [
   {
     id: "balanced",
+    icon: Target,
     ro: "Echilibru",
     en: "Balanced",
     detailRo: "Recomandări care combină scorul, ingredientele și valorile nutriționale.",
@@ -91,6 +112,7 @@ const goals = [
   },
   {
     id: "budget",
+    icon: BadgeDollarSign,
     ro: "Buget",
     en: "Budget",
     detailRo: "Prioritizează variante mai avantajoase când există prețuri comparabile.",
@@ -98,6 +120,7 @@ const goals = [
   },
   {
     id: "fitness",
+    icon: BadgeCheck,
     ro: "Proteină și sațietate",
     en: "Protein and satiety",
     detailRo: "Caută produse cu proteină mai bună și zahăr/calorii controlate.",
@@ -105,6 +128,7 @@ const goals = [
   },
   {
     id: "clean",
+    icon: Leaf,
     ro: "Ingrediente simple",
     en: "Simple ingredients",
     detailRo: "Favorizează produse cu etichete mai scurte și mai ușor de înțeles.",
@@ -137,6 +161,10 @@ export default function PreferencesPage() {
     () => criteria.filter((item) => selectedCriteria.includes(item.id)),
     [selectedCriteria]
   );
+  const activeGoal = goals.find((goal) => goal.id === selectedGoal) || goals[0];
+  const selectedAllergyLabels = selectedAllergies
+    .map((id) => allergyOptions.find((item) => item.id === id))
+    .filter(Boolean);
 
   function loadPreferencesForProfile(profile) {
     const savedPreferences = readProfilePreferences(profile?.id);
@@ -227,17 +255,50 @@ export default function PreferencesPage() {
         <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
           <InteractiveSurface className="ce-panel ce-lifted-shell p-6 md:p-8">
             <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
-              <SlidersHorizontal size={16} /> {pick("Preferinte de cumparare", "Shopping preferences")}
+              <SlidersHorizontal size={16} /> {pick("Preferințe de cumpărare", "Shopping preferences")}
             </p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight md:text-5xl">
-              {pick("Spune aplicatiei ce inseamna un produs mai bun.", "Tell the app what a better product means.")}
+              {pick("Spune aplicației ce înseamnă un produs mai bun.", "Tell the app what a better product means.")}
             </h1>
             <p className="mt-4 max-w-3xl leading-8 text-gray-300">
               {pick(
-                "Aceste alegeri sunt folosite cand ceri alternative dupa scanare. Daca ai plan Family, fiecare membru isi pastreaza profilul separat.",
+                "Aceste alegeri sunt folosite când compari alternative după scanare. Pentru planul Family, fiecare membru își păstrează propriul profil.",
                 "These choices are used when you ask for alternatives after scanning. With Family, every member keeps a separate profile."
               )}
             </p>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <div className="ce-preference-card rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <Sparkles className="h-5 w-5 text-cyan-200" />
+                <p className="mt-3 font-black">{pick("Recomandări mai clare", "Clearer recommendations")}</p>
+                <p className="mt-1 text-sm leading-6 text-gray-400">
+                  {pick(
+                    "Alternativele sunt ordonate după prioritățile tale, nu doar după scor.",
+                    "Alternatives are ranked by your priorities, not only by score."
+                  )}
+                </p>
+              </div>
+              <div className="ce-preference-card rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <ShieldCheck className="h-5 w-5 text-yellow-200" />
+                <p className="mt-3 font-black">{pick("Filtre importante", "Important filters")}</p>
+                <p className="mt-1 text-sm leading-6 text-gray-400">
+                  {pick(
+                    "Alergiile și ingredientele de evitat sunt tratate ca semnale de siguranță.",
+                    "Allergies and avoided ingredients are treated as safety signals."
+                  )}
+                </p>
+              </div>
+              <div className="ce-preference-card rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <UserRound className="h-5 w-5 text-cyan-200" />
+                <p className="mt-3 font-black">{pick("Profil activ", "Active profile")}</p>
+                <p className="mt-1 text-sm leading-6 text-gray-400">
+                  {pick(
+                    "Setările se aplică profilului selectat, ca recomandările să rămână personale.",
+                    "Settings apply to the selected profile so recommendations stay personal."
+                  )}
+                </p>
+              </div>
+            </div>
 
             <div className="mt-7 rounded-2xl border border-white/10 bg-black/20 p-4">
               <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
@@ -247,6 +308,7 @@ export default function PreferencesPage() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
                 {goals.map((goal) => {
                   const selected = selectedGoal === goal.id;
+                  const Icon = goal.icon;
 
                   return (
                     <button
@@ -257,14 +319,17 @@ export default function PreferencesPage() {
                         setSaved(false);
                         setSelectedGoal(goal.id);
                       }}
-                      className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
+                      className={`ce-preference-card rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
                         selected
                           ? "border-cyan-200 bg-cyan-200 text-black shadow-[0_18px_38px_-28px_rgba(103,232,249,.7)]"
                           : "border-white/10 bg-white/[0.035] hover:border-cyan-200/45 hover:bg-white/[0.07]"
                       }`}
                     >
                       <span className="flex items-center justify-between gap-3">
-                        <span className="font-black">{locale === "en" ? goal.en : goal.ro}</span>
+                        <span className="flex items-center gap-2 font-black">
+                          <Icon size={17} />
+                          {locale === "en" ? goal.en : goal.ro}
+                        </span>
                         {selected && <Check size={17} />}
                       </span>
                       <span className={`mt-2 block text-sm leading-6 ${selected ? "text-black/70" : "text-gray-400"}`}>
@@ -276,9 +341,28 @@ export default function PreferencesPage() {
               </div>
             </div>
 
-            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+            <div className="mt-7">
+              <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+                <div>
+                  <p className="text-sm font-black text-cyan-200">
+                    {pick("Priorități pentru alternative", "Alternative priorities")}
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black">
+                    {pick("Alege ce contează când compari produse.", "Choose what matters when comparing products.")}
+                  </h2>
+                </div>
+                <p className="max-w-sm text-sm leading-6 text-gray-400">
+                  {pick(
+                    "Poți combina mai multe criterii. Recomandările vor încerca să păstreze același tip de produs.",
+                    "You can combine multiple criteria. Recommendations will try to stay in the same product type."
+                  )}
+                </p>
+              </div>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {criteria.map((item) => {
                 const selected = selectedCriteria.includes(item.id);
+                const Icon = item.icon;
 
                 return (
                   <button
@@ -286,14 +370,17 @@ export default function PreferencesPage() {
                     type="button"
                     aria-pressed={selected}
                     onClick={() => toggleCriterion(item.id)}
-                    className={`rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
+                    className={`ce-preference-card rounded-xl border p-4 text-left transition hover:-translate-y-0.5 ${
                       selected
                         ? "border-cyan-200 bg-cyan-200 text-black shadow-[0_18px_38px_-28px_rgba(103,232,249,.7)]"
                         : "border-white/10 bg-white/[0.035] hover:border-cyan-200/45 hover:bg-white/[0.07]"
                     }`}
                   >
                     <span className="flex items-center justify-between gap-3">
-                      <span className="font-black">{locale === "en" ? item.en : item.ro}</span>
+                      <span className="flex items-center gap-2 font-black">
+                        <Icon size={17} />
+                        {locale === "en" ? item.en : item.ro}
+                      </span>
                       {selected && <Check size={17} />}
                     </span>
                     <span className={`mt-2 block text-sm leading-6 ${selected ? "text-black/70" : "text-gray-400"}`}>
@@ -302,6 +389,7 @@ export default function PreferencesPage() {
                   </button>
                 );
               })}
+              </div>
             </div>
 
             <div className="mt-7 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -353,7 +441,7 @@ export default function PreferencesPage() {
             </div>
 
             <label className="mt-7 block text-sm font-bold text-gray-300">
-              {pick("Cerinta personala", "Personal request")}
+              {pick("Cerință personală", "Personal request")}
               <textarea
                 value={request}
                 onChange={(event) => {
@@ -369,17 +457,19 @@ export default function PreferencesPage() {
             </label>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <button onClick={savePreferences} className="ce-premium-button rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100">
+              <button onClick={savePreferences} className="ce-premium-button inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 font-black text-black hover:bg-cyan-100">
+                <Save size={17} />
                 {pick("Salvează preferințele", "Save preferences")}
               </button>
-              <button onClick={resetPreferences} className="rounded-lg border border-white/15 px-5 py-3 font-bold text-gray-200 hover:bg-white/10">
-                {pick("Reseteaza", "Reset")}
+              <button onClick={resetPreferences} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-5 py-3 font-bold text-gray-200 hover:bg-white/10">
+                <RotateCcw size={17} />
+                {pick("Resetează", "Reset")}
               </button>
             </div>
 
             {saved && (
               <p role="status" aria-live="polite" className="mt-4 rounded-lg border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm text-cyan-100">
-                {pick("Preferintele au fost salvate pentru profilul activ.", "Preferences were saved for the active profile.")}
+                {pick("Preferințele au fost salvate pentru profilul activ.", "Preferences were saved for the active profile.")}
               </p>
             )}
           </InteractiveSurface>
@@ -395,29 +485,32 @@ export default function PreferencesPage() {
                 {activeProfile?.name || pick("Profil principal", "Main profile")}
               </h2>
               <p className="mt-3 inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-sm font-black text-cyan-100">
-                {locale === "en"
-                  ? goals.find((goal) => goal.id === selectedGoal)?.en
-                  : goals.find((goal) => goal.id === selectedGoal)?.ro}
+                {locale === "en" ? activeGoal.en : activeGoal.ro}
               </p>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/10 bg-black/22 p-3">
+                  <p className="text-xs font-bold text-gray-400">{pick("Criterii", "Criteria")}</p>
+                  <p className="mt-1 text-2xl font-black text-cyan-100">{selectedSummary.length}</p>
+                </div>
+                <div className="rounded-xl border border-white/10 bg-black/22 p-3">
+                  <p className="text-xs font-bold text-gray-400">{pick("Alergii", "Allergies")}</p>
+                  <p className="mt-1 text-2xl font-black text-yellow-100">{selectedAllergyLabels.length}</p>
+                </div>
+              </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {selectedSummary.map((item) => (
                   <span key={item.id} className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 text-sm text-cyan-100">
                     {locale === "en" ? item.en : item.ro}
                   </span>
                 ))}
-                {selectedAllergies.map((id) => {
-                  const option = allergyOptions.find((item) => item.id === id);
-                  if (!option) return null;
-
-                  return (
-                    <span key={id} className="inline-flex rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-sm text-yellow-100">
-                      {locale === "en" ? option.en : option.ro}
-                    </span>
-                  );
-                })}
+                {selectedAllergyLabels.map((option) => (
+                  <span key={option.id} className="inline-flex rounded-full border border-yellow-300/25 bg-yellow-300/10 px-3 py-1 text-sm text-yellow-100">
+                    {locale === "en" ? option.en : option.ro}
+                  </span>
+                ))}
                 {!selectedSummary.length && !selectedAllergies.length && (
                   <p className="text-sm leading-6 text-gray-400">
-                    {pick("Nu ai selectat inca prioritati.", "No priorities selected yet.")}
+                    {pick("Nu ai selectat încă priorități.", "No priorities selected yet.")}
                   </p>
                 )}
               </div>
@@ -429,7 +522,7 @@ export default function PreferencesPage() {
               {request && <p className="mt-5 rounded-xl border border-white/10 bg-black/24 p-4 text-sm leading-6 text-gray-300">{request}</p>}
               <Link href="/barcode-scan" className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100">
                 <ScanLine size={17} />
-                {pick("Scaneaza cu profilul activ", "Scan with active profile")}
+                {pick("Scanează cu profilul activ", "Scan with active profile")}
               </Link>
             </InteractiveSurface>
           </aside>
