@@ -118,6 +118,18 @@ OFF_FALLBACK_BARCODES_BY_CATEGORY = {
         "5449000000996",
         "9002490100070",
     ],
+    "en:beers": [
+        "5941314000087",
+        "5941300000138",
+        "5941314000018",
+        "5941284000072",
+        "5941284000096",
+    ],
+    "en:alcoholic-beverages": [
+        "5941314000087",
+        "5941300000138",
+        "5941314000018",
+    ],
     "en:energy-drinks": [
         "9002490100070",
         "000009042414",
@@ -1352,6 +1364,45 @@ def send_product_submission_approved_email(user, submission, product=None, dupli
     return send_transactional_email(
         user.email,
         "Produs aprobat în Ce aleg?",
+        text_body,
+        html_body,
+    )
+
+
+def send_alternative_report_fixed_email(user, scanned_product, alternative_product, old_category, new_category):
+    if not user:
+        return False
+
+    dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
+    scanned_name = str(scanned_product.get("name") or "produsul scanat").strip()
+    alternative_name = str(alternative_product.get("name") or "alternativa raportată").strip()
+    old_category = old_category or "neconfirmată"
+    new_category = new_category or "categorie actualizată"
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        "Îți mulțumim că ai raportat o alternativă nepotrivită.\n"
+        f"Am verificat produsul {alternative_name} și am actualizat categoria lui din "
+        f"{old_category} în {new_category}, ca recomandările viitoare să fie mai precise.\n\n"
+        f"Produs scanat: {scanned_name}\n"
+        f"Deschide dashboardul: {dashboard_url}\n"
+    )
+    html_body = render_brand_email(
+        "Raportare remediată",
+        "Am corectat alternativa raportată.",
+        "Îți mulțumim pentru raportare. Am verificat produsul și am actualizat categoria lui, ca recomandările viitoare să fie mai precise.",
+        "Deschide dashboardul",
+        dashboard_url,
+        [
+            f"Produs scanat: {scanned_name}",
+            f"Alternativă raportată: {alternative_name}",
+            f"Categorie veche: {old_category}",
+            f"Categorie nouă: {new_category}",
+            "Ne cerem scuze pentru recomandarea nepotrivită. Raportările ajută catalogul să devină mai bun.",
+        ],
+    )
+    return send_transactional_email(
+        user.email,
+        "Am corectat alternativa raportată",
         text_body,
         html_body,
     )
@@ -3969,6 +4020,12 @@ def report_alternative_issue():
     if not alternative_name:
         return jsonify({"error": "Alternativa raportată nu este validă."}), 400
 
+    fix_result = auto_fix_reported_alternative_category(alternative_product)
+    fixed_product = fix_result.get("product") if fix_result else None
+    fixed_product_data = product_to_dict(fixed_product) if fixed_product else alternative_product
+    fixed_category = str((fix_result or {}).get("newCategory") or alternative_product.get("category") or "").strip()
+    fixed_family = str((fix_result or {}).get("family") or get_product_recommendation_family(fixed_product_data)).strip()
+
     metadata = {
         "reason": reason,
         "store": store,
@@ -3983,11 +4040,20 @@ def report_alternative_issue():
             "name": alternative_name,
             "barcode": str(alternative_product.get("barcode") or "").strip()[:32],
             "brand": str(alternative_product.get("brand") or "").strip()[:120],
-            "category": str(alternative_product.get("category") or "").strip()[:120],
+            "category": (fixed_category or str(alternative_product.get("category") or "").strip())[:120],
             "source": str(alternative_product.get("source") or "").strip()[:80],
-            "family": get_product_recommendation_family(alternative_product),
+            "family": fixed_family,
         },
     }
+
+    if fix_result:
+        metadata["autoFix"] = {
+            "fixed": bool(fix_result.get("fixed")),
+            "productId": getattr(fixed_product, "id", None),
+            "oldCategory": str(fix_result.get("oldCategory") or "").strip()[:120],
+            "newCategory": str(fix_result.get("newCategory") or "").strip()[:120],
+            "family": fixed_family,
+        }
 
     record_user_event(user.id, "alternative_report", "alternatives", metadata, commit=False)
     record_search_event(
@@ -3999,6 +4065,15 @@ def report_alternative_issue():
     )
     db.session.commit()
 
+    if fix_result and fix_result.get("fixed"):
+        send_alternative_report_fixed_email(
+            user,
+            scanned_product,
+            alternative_product,
+            fix_result.get("oldCategory"),
+            fix_result.get("newCategory"),
+        )
+
     send_admin_alert(
         "Alternativă raportată",
         "Un utilizator a marcat o recomandare ca nepotrivită.",
@@ -4008,12 +4083,24 @@ def report_alternative_issue():
             f"Alternativă: {alternative_name}",
             f"Magazin: {store or '-'}",
             f"Cerință: {request_text or '-'}",
+            f"Corecție automată: {'da' if fix_result and fix_result.get('fixed') else 'nu'}",
+            f"Categorie nouă: {(fix_result or {}).get('newCategory') or '-'}",
         ],
         alert_key="alternative_report",
         min_interval_seconds=900,
     )
 
-    return jsonify({"message": "Mulțumim. Raportarea a fost salvată."})
+    message = (
+        "Mulțumim. Am verificat alternativa și am actualizat categoria produsului."
+        if fix_result and fix_result.get("fixed")
+        else "Mulțumim. Raportarea a fost salvată pentru verificare."
+    )
+
+    return jsonify({
+        "message": message,
+        "fixed": bool(fix_result and fix_result.get("fixed")),
+        "category": (fix_result or {}).get("newCategory"),
+    })
 
 
 @app.route("/support/contact", methods=["POST"])
@@ -9120,6 +9207,10 @@ def build_product_from_open_food_facts(barcode, off_product, translate_ingredien
         category = "Înghețată"
     elif has_any(["energy drink", "energiz", "red bull", "redbull", "monster", "hell", "burn", "rockstar", "taurina", "taurine"]) or "energy-drinks" in tags_text:
         category = "Băuturi energizante"
+    elif has_any(["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier", "heineken", "silva", "tuborg", "carlsberg", "peroni", "stella", "corona", "kozel", "lager", "pilsner", "radler"]) or "beers" in tags_text:
+        category = "Bere"
+    elif has_any(["alcool", "alcohol", "vin", "wine", "vodka", "whisky", "rom", "rum", "gin", "cidru", "cider", "lichior"]) or "alcoholic-beverages" in tags_text:
+        category = "Băuturi alcoolice"
     elif has_any(["coffee", "cafea", "cafe", "cappuccino", "capuccino", "latte", "mocha", "espresso", "ice coffee", "iced coffee", "cold brew", "frappe"]):
         category = "Băuturi cu cafea"
     elif has_any(["cola", "pepsi", "coca cola", "coca-cola", "cocacola", "soda", "soft drink", "carbonated drink"]):
@@ -9562,6 +9653,43 @@ def get_product_recommendation_family(product_data):
     ]
     caffeine_words = ["cafeina", "cofeina", "caffeine", "cafein"]
     cola_words = ["cola", "pepsi", "coca cola", "coca-cola"]
+    beer_words = [
+        "bere",
+        "beer",
+        "ursus",
+        "timisoreana",
+        "timișoreana",
+        "ciuc",
+        "bergenbier",
+        "heineken",
+        "silva",
+        "tuborg",
+        "carlsberg",
+        "peroni",
+        "stella",
+        "corona",
+        "kozel",
+        "lager",
+        "pilsner",
+        "pils",
+        "radler",
+    ]
+    alcohol_words = [
+        "alcool",
+        "alcohol",
+        "vin",
+        "wine",
+        "vodka",
+        "whisky",
+        "rom",
+        "rum",
+        "gin",
+        "cidru",
+        "cider",
+        "lichior",
+        "liqueur",
+        "spirits",
+    ]
     dairy_dessert_words = [
         "danette",
         "budinca",
@@ -9661,6 +9789,12 @@ def get_product_recommendation_family(product_data):
     if any(word in text_value for word in ice_cream_words):
         return "ice_cream"
 
+    if any(word in text_value for word in beer_words) or "en beers" in text_value:
+        return "beer"
+
+    if any(word in text_value for word in alcohol_words) or "alcoholic beverages" in text_value:
+        return "alcoholic_drink"
+
     if any(word in text_value for word in water_words) and not any(
         word in text_value
         for word in energy_words + coffee_words + caffeine_words + cola_words
@@ -9738,6 +9872,252 @@ def get_product_recommendation_family(product_data):
     return "general"
 
 
+CATEGORY_BY_RECOMMENDATION_FAMILY = {
+    "water": "Apă",
+    "cola": "Băuturi răcoritoare",
+    "beverage": "Băuturi",
+    "energy_drink": "Băuturi energizante",
+    "coffee_drink": "Băuturi cu cafea",
+    "caffeinated_beverage": "Băuturi cu cafeină",
+    "beer": "Bere",
+    "alcoholic_drink": "Băuturi alcoolice",
+    "dairy_dessert": "Deserturi lactate",
+    "fruit_yogurt": "Iaurturi cu fructe",
+    "lactate": "Lactate",
+    "protein": "Proteine și fitness",
+    "salty_snack": "Snacks sărate",
+    "sweet_snack": "Dulciuri",
+    "cereal": "Cereale",
+    "sauce": "Sosuri și condimente",
+    "ice_cream": "Înghețată",
+    "pizza": "Pizza",
+    "frozen": "Congelate",
+    "ready_meal": "Mese gata preparate",
+    "bread": "Panificație",
+    "meat": "Carne",
+    "fish": "Pește și fructe de mare",
+    "spread": "Creme și gemuri",
+    "nuts": "Nuci și semințe",
+    "baby_food": "Alimente pentru copii",
+    "plant_based": "Alternative vegetale",
+    "instant_noodles": "Tăiței instant",
+}
+
+
+def infer_catalog_category(product_data):
+    family = get_product_recommendation_family(product_data or {})
+    inferred = CATEGORY_BY_RECOMMENDATION_FAMILY.get(family)
+    current_category = str((product_data or {}).get("category") or "").strip()
+
+    if inferred:
+        return inferred
+
+    if current_category and normalize_search_text(current_category) not in {"altele", "other", "general"}:
+        return current_category[:100]
+
+    return "Altele"
+
+
+def should_update_reported_product_category(old_category, new_category):
+    old_normalized = normalize_search_text(old_category)
+    new_normalized = normalize_search_text(new_category)
+
+    if not new_normalized or new_normalized in {"altele", "other", "general"}:
+        return False
+
+    if not old_normalized or old_normalized in {"altele", "other", "general", "neconfirmata"}:
+        return True
+
+    return old_normalized != new_normalized
+
+
+def find_local_product_for_reported_alternative(product_data):
+    if not isinstance(product_data, dict):
+        return None
+
+    product_id = product_data.get("id")
+
+    try:
+        product_id = int(product_id)
+    except (TypeError, ValueError):
+        product_id = None
+
+    if product_id:
+        product = db.session.get(Product, product_id)
+
+        if product:
+            return product
+
+    barcode = str(product_data.get("barcode") or "").strip()
+
+    if barcode and not barcode.startswith("off-"):
+        product = Product.query.filter_by(barcode=barcode).first()
+
+        if product:
+            return product
+
+    name = str(product_data.get("name") or "").strip()
+
+    if not name:
+        return None
+
+    normalized_name = normalize_search_text(name)
+    tokens = [
+        token for token in normalized_name.split()
+        if len(token) >= 3 and not token.isdigit()
+    ][:4]
+
+    if not tokens:
+        return None
+
+    query = Product.query.filter(or_(*[
+        Product.name.ilike(f"%{token}%")
+        for token in tokens
+    ]))
+    store = str(product_data.get("store") or "").strip()
+
+    if store and store not in {"Open Food Facts", "Catalog online"}:
+        query = query.filter(or_(Product.store == store, Product.store == "Open Food Facts"))
+
+    best_product = None
+    best_ratio = 0
+
+    for product in query.limit(80).all():
+        ratio = SequenceMatcher(None, normalized_name, normalize_search_text(product.name)).ratio()
+
+        if ratio > best_ratio:
+            best_product = product
+            best_ratio = ratio
+
+    return best_product if best_ratio >= 0.9 else None
+
+
+def materialize_reported_alternative_product(product_data):
+    product = find_local_product_for_reported_alternative(product_data)
+
+    if product:
+        return product
+
+    barcode = str(product_data.get("barcode") or "").strip()
+
+    if barcode and not barcode.startswith("off-"):
+        try:
+            off_product = fetch_off_product_by_barcode(barcode)
+        except requests.RequestException as error:
+            app.logger.info("OFF product fetch failed during alternative report fix: %s", error)
+            off_product = None
+
+        if off_product:
+            try:
+                off_data = build_product_from_open_food_facts(barcode, off_product, translate_ingredients=False)
+                product = save_product_to_local_database(off_data)
+                setattr(product, "_created_from_report", True)
+                db.session.add(product)
+                return product
+            except Exception:
+                db.session.rollback()
+                app.logger.exception("Reported alternative could not be imported from OFF.")
+
+    name = str(product_data.get("name") or "").strip()
+
+    if not name:
+        return None
+
+    category = infer_catalog_category(product_data)
+    ingredients = str(product_data.get("ingredients") or "").strip()
+    calories = parse_optional_float(product_data.get("calories"))
+    protein = parse_optional_float(product_data.get("protein"))
+    sugar = parse_optional_float(product_data.get("sugar"))
+    fat = parse_optional_float(product_data.get("fat"))
+    score = parse_optional_float(product_data.get("score"))
+
+    if score is None:
+        score = calculate_product_score(category, calories, protein, sugar, fat, ingredients)
+
+    product = Product(
+        name=name[:150],
+        store=str(product_data.get("store") or product_data.get("source") or "Catalog online").strip()[:100] or "Catalog online",
+        category=category[:100],
+        barcode=barcode[:80] or None,
+        score=score if score is not None else 5.0,
+        tag=str(product_data.get("tag") or generate_product_tag(category, calories, protein, sugar, fat, ingredients) or "")[:100],
+        image=str(product_data.get("image") or "")[:255] or None,
+        price=parse_optional_float(product_data.get("price")),
+        price_text=str(product_data.get("priceText") or product_data.get("price_text") or "preț necunoscut")[:100],
+        calories=calories,
+        protein=protein,
+        sugar=sugar,
+        fat=fat,
+        vegan=bool(product_data.get("vegan")),
+        lactose_free=bool(product_data.get("lactoseFree") or product_data.get("lactose_free")),
+        natural=bool(product_data.get("natural")),
+        reason=str(product_data.get("reason") or generate_product_reason(category, calories, protein, sugar, fat, ingredients) or "")[:5000],
+        ingredients=ingredients[:5000] or None,
+    )
+    setattr(product, "_created_from_report", True)
+    db.session.add(product)
+    db.session.flush()
+    return product
+
+
+def auto_fix_reported_alternative_category(product_data):
+    product = materialize_reported_alternative_product(product_data)
+
+    if not product:
+        return None
+
+    product_dict = product_to_dict(product)
+    merged_data = {**product_dict, **(product_data or {})}
+    inferred_category = infer_catalog_category(merged_data)
+    old_category = product.category
+    created_from_report = bool(getattr(product, "_created_from_report", False))
+
+    if should_update_reported_product_category(old_category, inferred_category):
+        product.category = inferred_category[:100]
+        product.tag = generate_product_tag(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        product.reason = generate_product_reason(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        db.session.add(product)
+
+        return {
+            "fixed": True,
+            "product": product,
+            "oldCategory": old_category,
+            "newCategory": product.category,
+            "family": get_product_recommendation_family(product_to_dict(product)),
+        }
+
+    if created_from_report and normalize_search_text(product.category) not in {"altele", "other", "general"}:
+        return {
+            "fixed": True,
+            "product": product,
+            "oldCategory": str((product_data or {}).get("category") or "neconfirmată").strip() or "neconfirmată",
+            "newCategory": product.category,
+            "family": get_product_recommendation_family(product_to_dict(product)),
+        }
+
+    return {
+        "fixed": False,
+        "product": product,
+        "oldCategory": old_category,
+        "newCategory": product.category,
+        "family": get_product_recommendation_family(product_to_dict(product)),
+    }
+
+
 def is_compatible_alternative(scanned_product, candidate):
     scanned_family = get_product_recommendation_family(scanned_product)
     candidate_family = get_product_recommendation_family(candidate)
@@ -9750,6 +10130,8 @@ def is_compatible_alternative(scanned_product, candidate):
         "energy_drink",
         "coffee_drink",
         "caffeinated_beverage",
+        "beer",
+        "alcoholic_drink",
     }
     lactate_families = {"lactate", "fruit_yogurt", "dairy_dessert"}
     strict_food_families = {
@@ -9791,6 +10173,8 @@ def is_compatible_alternative(scanned_product, candidate):
         "nuts",
         "baby_food",
         "plant_based",
+        "beer",
+        "alcoholic_drink",
     }
     incompatible_families = {
         "instant_noodles": non_food_beverage_blocks - {"instant_noodles"},
@@ -9798,6 +10182,8 @@ def is_compatible_alternative(scanned_product, candidate):
         "coffee_drink": non_food_beverage_blocks - {"coffee_drink", "energy_drink", "caffeinated_beverage"},
         "caffeinated_beverage": non_food_beverage_blocks - {"coffee_drink", "energy_drink", "caffeinated_beverage"},
         "cola": non_food_beverage_blocks - {"cola", "energy_drink", "caffeinated_beverage"},
+        "beer": non_food_beverage_blocks - {"beer"},
+        "alcoholic_drink": non_food_beverage_blocks - {"alcoholic_drink", "beer"},
         "water": non_food_beverage_blocks - {"water"},
         "fruit_yogurt": non_food_beverage_blocks - {"fruit_yogurt", "lactate"},
         "lactate": non_food_beverage_blocks - {"fruit_yogurt", "lactate", "dairy_dessert"},
@@ -9820,6 +10206,7 @@ def is_compatible_alternative(scanned_product, candidate):
             (["iaurt", "yogurt", "yoghurt", "zuzu", "skyr"], {"fruit_yogurt", "lactate"}),
             (["energiz", "red bull", "redbull", "monster", "hell", "taurina"], {"energy_drink", "caffeinated_beverage"}),
             (["cafea", "coffee", "cappuccino", "latte", "espresso"], {"coffee_drink", "energy_drink", "caffeinated_beverage"}),
+            (["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier"], {"beer"}),
             (["muschi", "mușchi", "file", "filet", "sunca", "șuncă", "salam", "prosciutto"], {"meat"}),
         ]
 
@@ -9832,6 +10219,18 @@ def is_compatible_alternative(scanned_product, candidate):
 
     if scanned_family == "water":
         return candidate_family == "water"
+
+    if scanned_family == "beer":
+        return candidate_family == "beer"
+
+    if candidate_family == "beer" and scanned_family != "beer":
+        return False
+
+    if scanned_family == "alcoholic_drink":
+        return candidate_family in {"alcoholic_drink", "beer"}
+
+    if candidate_family == "alcoholic_drink" and scanned_family != "alcoholic_drink":
+        return False
 
     if scanned_family not in beverage_families and candidate_family in beverage_families:
         return False
@@ -9905,6 +10304,9 @@ def get_off_alternative_category(product_data):
         "bauturi racoritoare": "en:soft-drinks",
         "bauturi energizante": "en:energy-drinks",
         "bauturi cu cafea": "en:iced-coffees",
+        "bauturi cu cafeina": "en:caffeinated-beverages",
+        "bere": "en:beers",
+        "bauturi alcoolice": "en:alcoholic-beverages",
         "bauturi": "en:beverages",
         "lactate": "en:dairies",
         "iaurturi cu fructe": "en:fruit-yogurts",
@@ -9945,6 +10347,12 @@ def get_off_alternative_category(product_data):
 
     if any(word in product_text for word in ["hell", "red bull", "redbull", "monster", "energiz", "energy", "taurina", "taurine"]):
         return "en:energy-drinks"
+
+    if any(word in product_text for word in ["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier", "heineken", "silva", "tuborg", "carlsberg", "peroni", "stella", "corona", "kozel", "lager", "pilsner", "radler"]):
+        return "en:beers"
+
+    if any(word in product_text for word in ["alcool", "alcohol", "vin", "wine", "vodka", "whisky", "rom", "rum", "gin", "cidru", "cider", "lichior"]):
+        return "en:alcoholic-beverages"
 
     if any(word in product_text for word in ["buldak", "samyang", "ramen", "noodle", "noodles", "taitei", "nongshim", "yakisoba", "udon"]):
         return "en:instant-noodles"
@@ -10065,7 +10473,7 @@ def is_high_caffeine_candidate(product):
 def is_caffeine_relevant_candidate(product):
     product_family = get_product_recommendation_family(product)
 
-    if product_family in {"water", "cola", "instant_noodles", "lactate", "fruit_yogurt", "dairy_dessert"}:
+    if product_family in {"water", "cola", "beer", "alcoholic_drink", "instant_noodles", "lactate", "fruit_yogurt", "dairy_dessert"}:
         return False
 
     return product_family in {"energy_drink", "coffee_drink", "caffeinated_beverage"}
@@ -10086,6 +10494,8 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
             "energy_drink",
             "coffee_drink",
             "caffeinated_beverage",
+            "beer",
+            "alcoholic_drink",
         }
 
         if candidate_family == scanned_family:
@@ -10113,6 +10523,10 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
         }:
             score += 6
             reasons.append("băutură similară cu cafeină")
+        elif scanned_family == "beer" and candidate_family != "beer":
+            score -= 80
+        elif scanned_family == "alcoholic_drink" and candidate_family not in {"alcoholic_drink", "beer"}:
+            score -= 70
         elif scanned_family == "dairy_dessert" and candidate_family in {"dairy_dessert", "lactate"}:
             score += 5
             reasons.append("alternativă lactată apropiată")
@@ -10152,7 +10566,7 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
             reasons.append("conține cafeină")
         elif candidate_family == "cola":
             score -= 30
-        elif candidate_family == "water":
+        elif candidate_family in {"water", "beer", "alcoholic_drink"}:
             score -= 60
 
         if any(token in candidate_text for token in ["taurina", "taurine", "caffeine", "cafeina", "cofeina"]):
@@ -10841,6 +11255,8 @@ def get_local_catalog_alternatives(scanned_product, criteria):
             "energy_drink": ["energy", "energiz", "red bull", "redbull", "monster", "hell"],
             "coffee_drink": ["coffee", "cafea", "cappuccino", "latte", "espresso"],
             "caffeinated_beverage": ["caffeine", "cafeina", "taurina"],
+            "beer": ["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier", "heineken", "silva", "tuborg", "carlsberg", "peroni", "stella", "corona", "kozel", "lager", "pilsner", "radler"],
+            "alcoholic_drink": ["alcool", "alcohol", "vin", "wine", "vodka", "whisky", "rom", "rum", "gin", "cidru", "cider", "lichior"],
             "instant_noodles": ["buldak", "samyang", "ramen", "noodle", "taitei"],
             "fruit_yogurt": ["iaurt", "yogurt", "zuzu", "fruct"],
             "lactate": ["iaurt", "yogurt", "lapte", "dairy"],

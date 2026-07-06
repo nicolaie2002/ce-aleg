@@ -434,20 +434,20 @@ function ScanPageContent() {
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <a
+                href="#product-lookup"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-200 px-5 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-white"
+              >
+                <Search size={18} />
+                Caută produs după nume
+              </a>
               <Link
                 href={`/barcode-scan?store=${storeParam}`}
-                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-black/35 px-5 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
               >
                 <Barcode size={18} />
                 Scanează codul de bare
               </Link>
-              <a
-                href="#product-lookup"
-                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-black/35 px-5 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
-              >
-                <Search size={18} />
-                Caută după nume
-              </a>
             </div>
           </div>
 

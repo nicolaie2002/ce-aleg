@@ -910,7 +910,7 @@ export default function BarcodeScanPage() {
         detectedRef.current = true;
         setFoundProduct(data.product);
         setProductSource(data.source || "local");
-        setMessage("Produs identificat vizual și găsit în baza locală.");
+        setMessage("");
         stopScanner();
         return;
       }
@@ -977,12 +977,7 @@ export default function BarcodeScanPage() {
 
       setFoundProduct(data.product);
       setProductSource(data.source);
-
-      if (data.source === "local") {
-        setMessage("Produs găsit în baza locală.");
-      } else {
-        setMessage("Produs găsit în Open Food Facts.");
-      }
+      setMessage("");
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -1358,6 +1353,13 @@ export default function BarcodeScanPage() {
               >
                 {isLookingUp ? "Se caută..." : "Caută produsul"}
               </button>
+              <Link
+                href="/scan"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 font-semibold text-white transition hover:border-cyan-300/50 hover:bg-white/10"
+              >
+                <Search size={18} />
+                Caută după nume
+              </Link>
             </div>
           </div>
 
