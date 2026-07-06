@@ -10936,10 +10936,22 @@ def product_violates_user_preferences(product, preferences):
         return False
 
     text = product_text_for_recommendation(product)
+    selected_criteria = preferences.get("criteria") or []
     selected_allergies = preferences.get("allergies") or []
+
+    if not isinstance(selected_criteria, list):
+        selected_criteria = []
 
     if not isinstance(selected_allergies, list):
         selected_allergies = []
+
+    selected_criteria = {str(item).strip().lower() for item in selected_criteria}
+
+    if "vegan" in selected_criteria and not product_matches_vegan_preference(product):
+        return True
+
+    if "lactose_free" in selected_criteria and product_likely_contains_lactose(product):
+        return True
 
     for allergy in selected_allergies:
         keywords = PREFERENCE_ALLERGEN_KEYWORDS.get(str(allergy).strip().lower(), [])
