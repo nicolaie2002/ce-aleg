@@ -90,24 +90,93 @@ function normalizeCategory(category) {
 function getProductFamily(product) {
   const text = productSearchText(product);
 
+  if (text.includes("buldak") || text.includes("samyang") || text.includes("noodle") || text.includes("noodles") || text.includes("ramen") || text.includes("taitei")) return "instant_noodles";
+  if (text.includes("bere") || text.includes("beer") || text.includes("ursus") || text.includes("ciuc") || text.includes("bergenbier") || text.includes("heineken") || text.includes("lager") || text.includes("pilsner")) return "beer";
+  if (text.includes("alcool") || text.includes("alcohol") || text.includes("vin") || text.includes("wine") || text.includes("vodka") || text.includes("whisky") || text.includes("cidru")) return "alcoholic_drink";
   if (/\b(apa|water|mineral)\b/.test(text)) return "water";
   if (text.includes("energy") || text.includes("energiz") || text.includes("taurina")) return "energy_drink";
   if (text.includes("cafea") || text.includes("coffee") || text.includes("cappuccino") || text.includes("latte")) return "coffee_drink";
   if (text.includes("cola") || text.includes("pepsi")) return "cola";
-  if (text.includes("suc") || text.includes("juice") || text.includes("soft drink")) return "soft_drink";
-  if (text.includes("iaurt") || text.includes("yogurt") || text.includes("yoghurt")) return "yogurt";
-  if (text.includes("lapte") || text.includes("milk") || text.includes("branza") || text.includes("cheese")) return "dairy";
-  if (text.includes("muschi") || text.includes("sunca") || text.includes("ham") || text.includes("salam") || text.includes("prosciutto")) return "meat";
-  if (text.includes("buldak") || text.includes("noodle") || text.includes("noodles") || text.includes("ramen")) return "noodles";
+  if (text.includes("suc") || text.includes("juice") || text.includes("nectar") || text.includes("smoothie")) return "fruit_juice";
+  if (text.includes("ice tea") || text.includes("ceai rece") || text.includes("kombucha")) return "tea_drink";
+  if (text.includes("sport drink") || text.includes("isotonic") || text.includes("gatorade") || text.includes("powerade")) return "sports_drink";
+  if (text.includes("iaurt cu fruct") || text.includes("fruit yogurt") || (text.includes("iaurt") && text.includes("fruct"))) return "fruit_yogurt";
+  if (text.includes("iaurt") || text.includes("yogurt") || text.includes("yoghurt") || text.includes("skyr")) return "plain_yogurt";
+  if (text.includes("kefir") || text.includes("chefir") || text.includes("sana") || text.includes("lapte batut")) return "kefir";
+  if (text.includes("branza") || text.includes("branzeturi") || text.includes("cascaval") || text.includes("mozzarella") || text.includes("telemea") || text.includes("cheese")) return "cheese";
+  if (text.includes("lapte vegetal") || text.includes("bautura vegetala") || text.includes("oat drink") || text.includes("almond drink") || text.includes("soy drink")) return "plant_milk";
+  if (text.includes("iaurt vegetal") || text.includes("plant yogurt") || text.includes("soy yogurt")) return "plant_yogurt";
+  if (text.includes("lapte") || text.includes("milk")) return "milk";
+  if (text.includes("muschi file") || text.includes("sunca") || text.includes("ham") || text.includes("salam") || text.includes("prosciutto") || text.includes("bacon") || text.includes("parizer")) return "processed_meat";
+  if (text.includes("carne") || text.includes("porc") || text.includes("pui") || text.includes("curcan") || text.includes("beef") || text.includes("chicken")) return "fresh_meat";
+  if (text.includes("peste") || text.includes("fish") || text.includes("ton") || text.includes("tuna") || text.includes("somon") || text.includes("salmon")) return "fish";
+  if (text.includes("oua") || text.includes("egg")) return "eggs";
   if (text.includes("ciocolata") || text.includes("chocolate") || text.includes("nutella")) return "sweets";
   if (text.includes("biscuit") || text.includes("wafer") || text.includes("napolit")) return "biscuits";
-  if (text.includes("chips") || text.includes("snack") || text.includes("crisps")) return "snacks";
+  if (text.includes("chips") || text.includes("crisps") || text.includes("nachos")) return "chips";
+  if (text.includes("crackers") || text.includes("covrigei") || text.includes("sticks")) return "crackers";
+  if (text.includes("popcorn")) return "popcorn";
   if (text.includes("inghetata") || text.includes("ice cream") || text.includes("gelato")) return "ice_cream";
   if (text.includes("sos") || text.includes("sauce") || text.includes("ketchup") || text.includes("mustar")) return "sauce";
-  if (text.includes("cereale") || text.includes("cereal") || text.includes("granola")) return "cereal";
+  if (text.includes("ovaz") || text.includes("oat") || text.includes("granola") || text.includes("muesli")) return "oats_granola";
+  if (text.includes("cereale") || text.includes("cereal") || text.includes("corn flakes")) return "breakfast_cereal";
+  if (text.includes("paste") || text.includes("pasta") || text.includes("orez") || text.includes("rice") || text.includes("fasole") || text.includes("linte")) return "pasta_rice_legumes";
+  if (text.includes("conserva") || text.includes("muraturi") || text.includes("masline") || text.includes("pickles")) return "canned_pickles";
+  if (text.includes("croissant") || text.includes("patiserie") || text.includes("foietaj")) return "bakery_pastry";
+  if (text.includes("paine") || text.includes("bread") || text.includes("toast") || text.includes("bagheta")) return "bread";
+  if (text.includes("supa") || text.includes("soup") || text.includes("ciorba")) return "ready_soup";
+  if (text.includes("sandwich") || text.includes("salata") || text.includes("wrap")) return "sandwich_salad";
+  if (text.includes("pizza")) return "pizza";
+  if (text.includes("frozen") || text.includes("congelat")) return "frozen";
+  if (text.includes("spread") || text.includes("crema tartinabila") || text.includes("peanut butter") || text.includes("gem") || text.includes("miere")) return "spread";
+  if (text.includes("nuci") || text.includes("alune") || text.includes("nuts") || text.includes("seeds")) return "nuts";
 
   return normalizeCategory(product.category || "");
 }
+
+const familyCompatibility = {
+  water: ["water"],
+  fruit_juice: ["fruit_juice"],
+  tea_drink: ["tea_drink", "fruit_juice"],
+  sports_drink: ["sports_drink", "energy_drink"],
+  cola: ["cola"],
+  energy_drink: ["energy_drink", "coffee_drink", "caffeinated_beverage"],
+  coffee_drink: ["coffee_drink", "energy_drink", "caffeinated_beverage"],
+  caffeinated_beverage: ["coffee_drink", "energy_drink", "caffeinated_beverage"],
+  beer: ["beer"],
+  alcoholic_drink: ["alcoholic_drink", "beer"],
+  fruit_yogurt: ["fruit_yogurt", "plain_yogurt", "kefir", "plant_yogurt"],
+  plain_yogurt: ["plain_yogurt", "fruit_yogurt", "kefir", "plant_yogurt"],
+  kefir: ["kefir", "plain_yogurt"],
+  cheese: ["cheese"],
+  milk: ["milk", "plant_milk", "kefir"],
+  plant_milk: ["plant_milk", "milk"],
+  plant_yogurt: ["plant_yogurt", "plain_yogurt", "fruit_yogurt"],
+  chips: ["chips", "crackers", "popcorn", "snacks"],
+  crackers: ["crackers", "chips", "popcorn", "snacks"],
+  popcorn: ["popcorn", "chips", "crackers", "snacks"],
+  sweets: ["sweets"],
+  biscuits: ["biscuits"],
+  breakfast_cereal: ["breakfast_cereal", "oats_granola", "cereal"],
+  oats_granola: ["oats_granola", "breakfast_cereal", "cereal"],
+  sauce: ["sauce"],
+  pasta_rice_legumes: ["pasta_rice_legumes"],
+  canned_pickles: ["canned_pickles"],
+  processed_meat: ["processed_meat"],
+  fresh_meat: ["fresh_meat"],
+  meat: ["meat", "processed_meat", "fresh_meat"],
+  fish: ["fish"],
+  eggs: ["eggs"],
+  bread: ["bread"],
+  bakery_pastry: ["bakery_pastry"],
+  ready_soup: ["ready_soup"],
+  sandwich_salad: ["sandwich_salad"],
+  pizza: ["pizza"],
+  frozen: ["frozen"],
+  spread: ["spread"],
+  nuts: ["nuts"],
+  instant_noodles: ["instant_noodles"],
+};
 
 function areCompatibleFamilies(scannedProduct, candidate) {
   if (!scannedProduct) return true;
@@ -118,15 +187,8 @@ function areCompatibleFamilies(scannedProduct, candidate) {
   if (!scannedFamily || !candidateFamily) return true;
   if (scannedFamily === candidateFamily) return true;
 
-  const familyGroups = [
-    ["energy_drink", "coffee_drink", "cola", "soft_drink"],
-    ["yogurt", "dairy"],
-    ["snacks", "biscuits", "sweets"],
-  ];
-
-  return familyGroups.some(
-    (group) => group.includes(scannedFamily) && group.includes(candidateFamily)
-  );
+  const allowedFamilies = familyCompatibility[scannedFamily] || [scannedFamily];
+  return allowedFamilies.includes(candidateFamily);
 }
 
 function normalizeProductName(name) {
@@ -521,7 +583,13 @@ function getNormalizedPreferenceScore(products, product, field, preferHigher) {
 }
 
 function calculateAlternativeScore(products, product, criteriaList) {
-  let score = Number(product.score) || 0;
+  let score = Number(product.recommendationScore ?? product.score) || 0;
+
+  if (product.image) score += 1;
+  if (product.category && normalizeCategory(product.category) !== "altele") score += 1;
+  if ([product.calories, product.protein, product.sugar, product.fat].some((value) => Number.isFinite(Number(value)))) {
+    score += 1;
+  }
 
   if (criteriaList.includes("cheap")) {
     score += getNormalizedPreferenceScore(products, product, "price", false) * 10;
@@ -801,7 +869,8 @@ function AlternativesPageContent() {
   async function loadProducts(
     currentScannedProduct,
     criteriaIds = finalCriteriaIds,
-    requestText = preferenceRequest
+    requestText = preferenceRequest,
+    preferencesOverride = profilePreferences
   ) {
     let externalLookupWarning = "";
 
@@ -821,6 +890,7 @@ function AlternativesPageContent() {
                 product: currentScannedProduct,
                 criteria: criteriaIds,
                 request: requestText,
+                preferences: preferencesOverride || null,
               }),
             }
           );
@@ -921,7 +991,7 @@ function AlternativesPageContent() {
         ])
       );
 
-      loadProducts(parsedResult, savedCriteriaIds, savedPreferenceRequest);
+      loadProducts(parsedResult, savedCriteriaIds, savedPreferenceRequest, savedPreferences);
 
       fetch(`${API_URL}/billing/status`)
         .then((response) => (response.ok ? response.json() : null))
@@ -949,10 +1019,10 @@ function AlternativesPageContent() {
     const timer = window.setTimeout(() => {
       if (alternativeSearch.trim()) {
         setLookupNotice("Actualizam alternativele dupa cererea ta...");
-        void loadProducts(scannedProduct, combinedCriteriaIds, alternativeSearch);
+        void loadProducts(scannedProduct, combinedCriteriaIds, alternativeSearch, profilePreferences);
       } else {
         setLookupNotice("");
-        void loadProducts(scannedProduct, finalCriteriaIds, preferenceRequest);
+        void loadProducts(scannedProduct, finalCriteriaIds, preferenceRequest, profilePreferences);
       }
     }, 450);
 

@@ -7874,6 +7874,7 @@ def search_products_by_label():
 def get_open_food_facts_alternatives():
     data = request.get_json(silent=True) or {}
     scanned_product = data.get("product") or {}
+    preferences = data.get("preferences") or {}
     barcode = str(scanned_product.get("barcode") or "").strip()
     criteria = [
         str(item).strip()
@@ -8000,6 +8001,9 @@ def get_open_food_facts_alternatives():
         if not is_compatible_alternative(scanned_product, candidate):
             continue
 
+        if product_violates_user_preferences(candidate, preferences):
+            continue
+
         if "caffeine" in criteria and not is_caffeine_relevant_candidate(candidate):
             continue
 
@@ -8011,6 +8015,9 @@ def get_open_food_facts_alternatives():
     }
 
     for candidate in local_seed_alternatives:
+        if product_violates_user_preferences(candidate, preferences):
+            continue
+
         candidate_key = normalize_search_text(
             f"{candidate.get('barcode') or ''} {candidate.get('name') or ''}"
         )
@@ -9275,6 +9282,30 @@ def build_product_from_open_food_facts(barcode, off_product, translate_ingredien
     elif "beverage" in categories_lower or "drink" in categories_lower:
         category = "Băuturi"
 
+    inferred_family = get_product_recommendation_family({
+        "name": product_name,
+        "brand": brands,
+        "category": category,
+        "ingredients": ingredients,
+        "offCategories": categories_tags,
+    })
+    inferred_category = CATEGORY_BY_RECOMMENDATION_FAMILY.get(inferred_family)
+    broad_categories = {
+        "Altele",
+        "Băuturi",
+        "Lactate",
+        "Dulciuri",
+        "Snacks sărate",
+        "Cereale",
+        "Congelate",
+        "Mese gata preparate",
+        "Carne",
+        "Alternative vegetale",
+    }
+
+    if inferred_category and category in broad_categories:
+        category = inferred_category
+
     vegan = "en:vegan" in ingredients_analysis_tags or "en:vegan" in labels_tags
     lactose_free = "en:lactose-free" in labels_tags
     additives_n = off_product.get("additives_n")
@@ -9601,17 +9632,130 @@ def get_product_recommendation_family(product_data):
     if isinstance(off_categories, str):
         off_categories = [off_categories]
 
-    text_value = normalize_search_text(
-        " ".join([
+    label_parts = [
             str(product_data.get("name") or ""),
             str(product_data.get("brand") or ""),
             str(product_data.get("category") or ""),
             str(product_data.get("store") or ""),
-            str(product_data.get("ingredients") or ""),
             str(product_data.get("tag") or ""),
             " ".join(off_categories),
-        ])
-    )
+    ]
+    ingredients_part = str(product_data.get("ingredients") or "")
+    label_text_value = normalize_search_text(" ".join(label_parts))
+    text_value = normalize_search_text(" ".join([*label_parts, ingredients_part]))
+
+    def text_has_any(tokens):
+        return any(token in text_value for token in tokens)
+
+    def label_has_any(tokens):
+        return any(token in label_text_value for token in tokens)
+
+    yogurt_words = ["iaurt", "yogurt", "yoghurt", "zuzu", "activia", "skyr"]
+    yogurt_fruit_words = [
+        "fruct",
+        "fructe",
+        "capsuni",
+        "căpșuni",
+        "strawberry",
+        "zmeura",
+        "zmeură",
+        "raspberry",
+        "afine",
+        "blueberry",
+        "piersica",
+        "piersică",
+        "peach",
+        "cirese",
+        "cireșe",
+        "cherry",
+        "vanilie",
+        "vanilla",
+        "caise",
+        "apricot",
+    ]
+    if text_has_any(yogurt_words):
+        if text_has_any(yogurt_fruit_words):
+            return "fruit_yogurt"
+        return "plain_yogurt"
+
+    if label_has_any(["salam", "carnati", "cârnați", "ham", "prosciutto", "jambon", "sunca", "șuncă", "muschi file", "mușchi file", "bacon", "parizer", "mortadella", "pastrama", "pastramă", "mezel", "mezeluri"]):
+        return "processed_meat"
+
+    detailed_family_rules = [
+        (
+            "instant_noodles",
+            [
+                "buldak",
+                "samyang",
+                "ramen",
+                "noodle",
+                "noodles",
+                "taitei",
+                "taitel",
+                "taietei",
+                "instant noodles",
+                "cup noodles",
+                "nongshim",
+                "yakisoba",
+                "udon",
+                "soba",
+            ],
+        ),
+        ("baby_food", ["baby food", "baby milk", "infant", "bebelus", "bebeluș", "piure bebelusi", "piure bebeluși"]),
+        ("beer", ["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier", "heineken", "silva", "tuborg", "carlsberg", "peroni", "stella", "corona", "kozel", "lager", "pilsner", "radler", "en beers"]),
+        ("alcoholic_drink", ["alcool", "alcohol", "vin", "wine", "vodka", "whisky", "rom", "rum", "gin", "cidru", "cider", "lichior", "liqueur", "spirits", "alcoholic beverages"]),
+        ("energy_drink", ["energy", "energiz", "red bull", "redbull", "monster", "hell", "burn", "rockstar", "taurina", "taurine", "en energy-drinks"]),
+        ("coffee_drink", ["coffee", "cafea", "cafe", "cappuccino", "capuccino", "latte", "mocha", "espresso", "iced coffee", "ice coffee", "cold brew", "frappe", "en iced-coffees"]),
+        ("cola", ["cola", "pepsi", "coca cola", "coca-cola", "cocacola"]),
+        ("tea_drink", ["ice tea", "iced tea", "ceai rece", "ceai verde", "tea drink", "kombucha"]),
+        ("sports_drink", ["isotonic", "sport drink", "sports drink", "gatorade", "powerade", "electrolyte"]),
+        ("fruit_juice", ["suc", "juice", "nectar", "smoothie", "limonada", "limonadă", "orange juice", "apple juice", "en fruit-juices"]),
+        ("water", ["apa", "water", "mineral", "minerala", "minerale", "eau", "sidi", "aquafina", "ain atlas", "spring", "en waters"]),
+        ("ice_cream", ["inghetata", "înghețată", "ice cream", "icecream", "gelato", "sorbet", "gelatelli", "en ice-creams"]),
+        ("dairy_dessert", ["danette", "budinca", "budincă", "pudding", "custard", "desert lactat", "dairy dessert", "crema desert", "crème dessert"]),
+        ("fruit_yogurt", ["iaurt cu fruct", "iaurt fructe", "yogurt fruit", "fruit yogurt", "yoghurt fruit", "zuzu fruct", "activia fruct", "en fruit-yogurts"]),
+        ("plain_yogurt", ["iaurt natural", "iaurt grecesc", "greek yogurt", "plain yogurt", "yoghurt natural", "skyr", "en plain-yogurts"]),
+        ("kefir", ["kefir", "chefir", "sana", "lapte batut", "lapte bătut", "ayran"]),
+        ("cheese", ["branza", "brânză", "branzeturi", "brânzeturi", "cascaval", "cașcaval", "mozzarella", "telemea", "feta", "cheddar", "gouda", "emmental", "parmesan", "cream cheese", "brie", "camembert", "en cheeses"]),
+        ("milk", ["lapte", "milk", "uht", "semi-skimmed milk", "whole milk", "en milks"]),
+        ("plant_milk", ["lapte vegetal", "bautura vegetala", "băutură vegetală", "oat drink", "almond drink", "soy drink", "rice drink", "coconut drink", "plant-based milk", "plant based milk", "en plant-based-milks"]),
+        ("plant_yogurt", ["iaurt vegetal", "yogurt vegetal", "soy yogurt", "coconut yogurt", "plant-based yogurt", "plant based yogurt"]),
+        ("protein", ["protein", "proteic", "proteina", "proteină", "whey", "fitness", "protein bar", "protein powder", "sports nutrition"]),
+        ("chips", ["chips", "crisps", "cartofi chips", "potato chips", "nachos", "tortilla chips"]),
+        ("crackers", ["crackers", "saratele", "sărățele", "sticks", "covrigei", "pretzels"]),
+        ("popcorn", ["popcorn", "porumb expandat"]),
+        ("chocolate", ["ciocolata", "ciocolată", "chocolate", "praline", "trufe", "cacao bar"]),
+        ("biscuits_wafers", ["biscuit", "biscuiti", "biscuiți", "wafer", "napolitana", "napolitană", "cookies", "wafers"]),
+        ("candy", ["candy", "bomboane", "jeleuri", "caramele", "dropsuri", "lollipop"]),
+        ("oats_granola", ["ovaz", "ovăz", "oat", "oats", "oatmeal", "porridge", "granola", "muesli"]),
+        ("breakfast_cereal", ["cereale", "cereal", "corn flakes", "flakes", "fulgi", "en breakfast-cereals"]),
+        ("sauce", ["sos", "sauce", "mustar", "muștar", "ketchup", "maioneza", "maioneză", "mayonnaise", "salsa", "barbecue sauce", "dressing"]),
+        ("oil_vinegar_spices", ["ulei", "oil", "otet", "oțet", "vinegar", "spice", "condiment", "boia", "piper", "sare", "salt"]),
+        ("pasta_rice_legumes", ["paste", "pasta", "orez", "rice", "fasole", "beans", "linte", "lentils", "naut", "năut", "chickpeas", "couscous", "bulgur"]),
+        ("canned_pickles", ["conserva", "conservă", "conserve", "canned", "muraturi", "murături", "pickles", "masline", "măsline", "olives"]),
+        ("bread", ["paine", "pâine", "bread", "toast", "bagheta", "baghetă", "chifla", "chiflă", "lipie", "pita"]),
+        ("bakery_pastry", ["croissant", "foietaj", "patiserie", "pastry", "gogoasa", "gogoașă", "brioche", "placinta", "plăcintă"]),
+        ("processed_meat", ["salam", "sausage", "carnati", "cârnați", "ham", "prosciutto", "jambon", "sunca", "șuncă", "muschi file", "mușchi file", "bacon", "parizer", "mortadella", "pastrama", "pastramă"]),
+        ("fresh_meat", ["carne", "meat", "porc", "pork", "pui", "chicken", "curcan", "turkey", "vita", "vită", "beef", "filet", "file"]),
+        ("fish", ["peste", "pește", "fish", "ton", "tuna", "somon", "salmon", "seafood", "creveti", "creveți", "sardine"]),
+        ("eggs", ["oua", "ouă", "egg", "eggs"]),
+        ("spread", ["spread", "crema tartinabila", "cremă tartinabilă", "nutella", "peanut butter", "unt arahide", "gem", "jam", "miere", "honey", "hazelnut spread"]),
+        ("nuts", ["nuts", "nuci", "alune", "migdale", "almond", "cashew", "seeds", "seminte", "semințe", "dried fruits"]),
+        ("ready_soup", ["supa", "supă", "soup", "ciorba", "ciorbă", "instant soup"]),
+        ("sandwich_salad", ["sandwich", "salata", "salată", "wrap", "ready salad"]),
+        ("pizza", ["pizza"]),
+        ("frozen_vegetable", ["legume congelate", "frozen vegetables", "frozen vegetable"]),
+        ("frozen_meal", ["frozen meal", "mancare congelata", "mâncare congelată", "lasagna congelata", "fish fingers"]),
+        ("fruit_vegetable", ["fructe", "fruits", "legume", "vegetables", "salata verde", "roșii", "rosii", "mere", "banane"]),
+    ]
+
+    for family, tokens in detailed_family_rules:
+        if text_has_any(tokens):
+            if family in {"water", "oil_vinegar_spices"} and not label_has_any(tokens):
+                continue
+            if family == "water" and text_has_any(["energy", "energiz", "coffee", "cafea", "cola", "pepsi", "beer", "bere"]):
+                continue
+            return family
 
     water_words = [
         "apa",
@@ -9874,6 +10018,9 @@ def get_product_recommendation_family(product_data):
 
 CATEGORY_BY_RECOMMENDATION_FAMILY = {
     "water": "Apă",
+    "fruit_juice": "Sucuri și nectaruri",
+    "tea_drink": "Ceaiuri reci",
+    "sports_drink": "Băuturi pentru sport",
     "cola": "Băuturi răcoritoare",
     "beverage": "Băuturi",
     "energy_drink": "Băuturi energizante",
@@ -9883,19 +10030,45 @@ CATEGORY_BY_RECOMMENDATION_FAMILY = {
     "alcoholic_drink": "Băuturi alcoolice",
     "dairy_dessert": "Deserturi lactate",
     "fruit_yogurt": "Iaurturi cu fructe",
+    "plain_yogurt": "Iaurturi simple",
+    "kefir": "Kefir și lapte bătut",
+    "cheese": "Brânzeturi",
+    "milk": "Lapte",
     "lactate": "Lactate",
+    "plant_milk": "Băuturi vegetale",
+    "plant_yogurt": "Iaurturi vegetale",
     "protein": "Proteine și fitness",
     "salty_snack": "Snacks sărate",
+    "chips": "Chipsuri",
+    "crackers": "Crackers și covrigei",
+    "popcorn": "Popcorn",
     "sweet_snack": "Dulciuri",
+    "chocolate": "Ciocolată",
+    "biscuits_wafers": "Biscuiți și napolitane",
+    "candy": "Bomboane și jeleuri",
     "cereal": "Cereale",
+    "breakfast_cereal": "Cereale pentru mic dejun",
+    "oats_granola": "Ovăz, muesli și granola",
     "sauce": "Sosuri și condimente",
+    "oil_vinegar_spices": "Uleiuri, oțet și condimente",
+    "pasta_rice_legumes": "Paste, orez și leguminoase",
+    "canned_pickles": "Conserve și murături",
     "ice_cream": "Înghețată",
     "pizza": "Pizza",
     "frozen": "Congelate",
+    "frozen_vegetable": "Legume congelate",
+    "frozen_meal": "Mâncare congelată",
     "ready_meal": "Mese gata preparate",
+    "ready_soup": "Supe și ciorbe",
+    "sandwich_salad": "Sandwichuri și salate",
     "bread": "Panificație",
+    "bakery_pastry": "Patiserie",
     "meat": "Carne",
+    "processed_meat": "Mezeluri",
+    "fresh_meat": "Carne proaspătă",
     "fish": "Pește și fructe de mare",
+    "eggs": "Ouă",
+    "fruit_vegetable": "Fructe și legume",
     "spread": "Creme și gemuri",
     "nuts": "Nuci și semințe",
     "baby_food": "Alimente pentru copii",
@@ -10118,6 +10291,71 @@ def auto_fix_reported_alternative_category(product_data):
     }
 
 
+FAMILY_COMPATIBILITY = {
+    "water": {"water"},
+    "fruit_juice": {"fruit_juice"},
+    "tea_drink": {"tea_drink", "fruit_juice"},
+    "sports_drink": {"sports_drink", "energy_drink"},
+    "cola": {"cola"},
+    "beverage": {"beverage", "fruit_juice", "tea_drink", "sports_drink", "cola"},
+    "energy_drink": {"energy_drink", "coffee_drink", "caffeinated_beverage"},
+    "coffee_drink": {"coffee_drink", "energy_drink", "caffeinated_beverage"},
+    "caffeinated_beverage": {"coffee_drink", "energy_drink", "caffeinated_beverage"},
+    "beer": {"beer"},
+    "alcoholic_drink": {"alcoholic_drink", "beer"},
+    "dairy_dessert": {"dairy_dessert", "fruit_yogurt", "plain_yogurt"},
+    "fruit_yogurt": {"fruit_yogurt", "plain_yogurt", "kefir", "lactate", "plant_yogurt"},
+    "plain_yogurt": {"plain_yogurt", "fruit_yogurt", "kefir", "lactate", "plant_yogurt"},
+    "kefir": {"kefir", "plain_yogurt", "lactate"},
+    "cheese": {"cheese"},
+    "milk": {"milk", "plant_milk", "kefir"},
+    "lactate": {"lactate", "plain_yogurt", "fruit_yogurt", "kefir", "cheese", "milk", "dairy_dessert", "plant_milk", "plant_yogurt"},
+    "plant_milk": {"plant_milk", "milk"},
+    "plant_yogurt": {"plant_yogurt", "plain_yogurt", "fruit_yogurt"},
+    "plant_based": {"plant_based", "plant_milk", "plant_yogurt"},
+    "protein": {"protein"},
+    "chips": {"chips", "crackers", "popcorn", "salty_snack"},
+    "crackers": {"crackers", "chips", "popcorn", "salty_snack"},
+    "popcorn": {"popcorn", "chips", "crackers", "salty_snack"},
+    "salty_snack": {"salty_snack", "chips", "crackers", "popcorn"},
+    "chocolate": {"chocolate"},
+    "biscuits_wafers": {"biscuits_wafers"},
+    "candy": {"candy"},
+    "sweet_snack": {"sweet_snack", "chocolate", "biscuits_wafers", "candy"},
+    "breakfast_cereal": {"breakfast_cereal", "oats_granola", "cereal"},
+    "oats_granola": {"oats_granola", "breakfast_cereal", "cereal"},
+    "cereal": {"cereal", "breakfast_cereal", "oats_granola"},
+    "sauce": {"sauce"},
+    "oil_vinegar_spices": {"oil_vinegar_spices", "sauce"},
+    "pasta_rice_legumes": {"pasta_rice_legumes"},
+    "canned_pickles": {"canned_pickles"},
+    "ice_cream": {"ice_cream"},
+    "pizza": {"pizza", "frozen_meal"},
+    "frozen": {"frozen", "frozen_meal", "frozen_vegetable", "pizza"},
+    "frozen_vegetable": {"frozen_vegetable", "frozen"},
+    "frozen_meal": {"frozen_meal", "frozen", "pizza"},
+    "ready_meal": {"ready_meal", "ready_soup", "sandwich_salad"},
+    "ready_soup": {"ready_soup", "ready_meal"},
+    "sandwich_salad": {"sandwich_salad", "ready_meal"},
+    "bread": {"bread"},
+    "bakery_pastry": {"bakery_pastry"},
+    "meat": {"meat", "processed_meat", "fresh_meat"},
+    "processed_meat": {"processed_meat"},
+    "fresh_meat": {"fresh_meat", "meat"},
+    "fish": {"fish"},
+    "eggs": {"eggs"},
+    "fruit_vegetable": {"fruit_vegetable"},
+    "spread": {"spread"},
+    "nuts": {"nuts"},
+    "baby_food": {"baby_food"},
+    "instant_noodles": {"instant_noodles"},
+}
+
+
+def get_compatible_recommendation_families(family):
+    return FAMILY_COMPATIBILITY.get(family, {family})
+
+
 def is_compatible_alternative(scanned_product, candidate):
     scanned_family = get_product_recommendation_family(scanned_product)
     candidate_family = get_product_recommendation_family(candidate)
@@ -10125,6 +10363,9 @@ def is_compatible_alternative(scanned_product, candidate):
     candidate_text = product_text_for_recommendation(candidate)
     beverage_families = {
         "water",
+        "fruit_juice",
+        "tea_drink",
+        "sports_drink",
         "cola",
         "beverage",
         "energy_drink",
@@ -10133,7 +10374,17 @@ def is_compatible_alternative(scanned_product, candidate):
         "beer",
         "alcoholic_drink",
     }
-    lactate_families = {"lactate", "fruit_yogurt", "dairy_dessert"}
+    lactate_families = {
+        "lactate",
+        "fruit_yogurt",
+        "plain_yogurt",
+        "kefir",
+        "dairy_dessert",
+        "cheese",
+        "milk",
+        "plant_milk",
+        "plant_yogurt",
+    }
     strict_food_families = {
         "protein",
         "salty_snack",
@@ -10213,6 +10464,11 @@ def is_compatible_alternative(scanned_product, candidate):
         for tokens, allowed_families in signal_rules:
             if any(token in scanned_text for token in tokens):
                 return candidate_family in allowed_families
+
+    allowed_families = get_compatible_recommendation_families(scanned_family)
+
+    if scanned_family != "general" and allowed_families and candidate_family not in allowed_families:
+        return False
 
     if candidate_family == "water" and scanned_family != "water":
         return False
@@ -10301,6 +10557,9 @@ def get_off_alternative_category(product_data):
     category_map = {
         "apa": "en:waters",
         "sucuri": "en:fruit-juices",
+        "sucuri si nectaruri": "en:fruit-juices",
+        "ceaiuri reci": "en:iced-teas",
+        "bauturi pentru sport": "en:sports-drinks",
         "bauturi racoritoare": "en:soft-drinks",
         "bauturi energizante": "en:energy-drinks",
         "bauturi cu cafea": "en:iced-coffees",
@@ -10310,18 +10569,35 @@ def get_off_alternative_category(product_data):
         "bauturi": "en:beverages",
         "lactate": "en:dairies",
         "iaurturi cu fructe": "en:fruit-yogurts",
+        "iaurturi simple": "en:yogurts",
+        "kefir si lapte batut": "en:fermented-milks",
+        "branzeturi": "en:cheeses",
+        "lapte": "en:milks",
         "lactate si branzeturi": "en:cheeses",
         "deserturi lactate": "en:dairy-desserts",
         "snacks": "en:snacks",
         "snacks sarate": "en:salty-snacks",
+        "chipsuri": "en:chips-and-fries",
+        "crackers si covrigei": "en:crackers",
+        "popcorn": "en:popcorn",
         "dulciuri": "en:sweet-snacks",
+        "ciocolata": "en:chocolates",
+        "biscuiti si napolitane": "en:biscuits-and-cakes",
+        "bomboane si jeleuri": "en:candies",
         "cereale": "en:breakfast-cereals",
+        "cereale pentru mic dejun": "en:breakfast-cereals",
+        "ovaz muesli si granola": "en:mueslis",
         "carne": "en:meats",
+        "mezeluri": "en:processed-meats",
+        "carne proaspata": "en:meats",
         "peste si fructe de mare": "en:seafood",
+        "oua": "en:eggs",
         "panificatie": "en:breads",
+        "patiserie": "en:pastries",
         "fructe si legume": "en:fruits-and-vegetables",
         "sosuri si condimente": "en:condiments",
         "uleiuri si condimente": "en:condiments",
+        "uleiuri otet si condimente": "en:condiments",
         "paste orez si leguminoase": "en:pastas",
         "conserve si muraturi": "en:canned-foods",
         "taitei instant": "en:instant-noodles",
@@ -10330,8 +10606,14 @@ def get_off_alternative_category(product_data):
         "inghetata": "en:ice-creams",
         "pizza": "en:pizzas",
         "congelate": "en:frozen-foods",
+        "legume congelate": "en:frozen-vegetables",
+        "mancare congelata": "en:frozen-ready-meals",
         "mese gata preparate": "en:ready-meals",
+        "supe si ciorbe": "en:soups",
+        "sandwichuri si salate": "en:sandwiches",
         "alternative vegetale": "en:plant-based-foods-and-beverages",
+        "bauturi vegetale": "en:plant-based-milks",
+        "iaurturi vegetale": "en:plant-based-yogurts",
         "proteine si fitness": "en:sports-nutrition",
         "creme si gemuri": "en:spreads",
         "creme tartinabile": "en:spreads",
@@ -10341,6 +10623,24 @@ def get_off_alternative_category(product_data):
 
     if any(word in product_text for word in ["iaurt", "yogurt", "yoghurt", "skyr", "zuzu"]) and any(word in product_text for word in ["fruct", "fructe", "capsuni", "strawberry", "piersici", "visine", "afine", "zmeura", "padure"]):
         return "en:fruit-yogurts"
+
+    if any(word in product_text for word in ["branza", "brânză", "cascaval", "cașcaval", "telemea", "mozzarella", "feta", "cheddar", "gouda"]):
+        return "en:cheeses"
+
+    if any(word in product_text for word in ["salam", "sunca", "șuncă", "muschi file", "mușchi file", "carnati", "cârnați", "bacon", "prosciutto", "parizer"]):
+        return "en:processed-meats"
+
+    if any(word in product_text for word in ["chips", "crisps", "nachos", "tortilla chips"]):
+        return "en:chips-and-fries"
+
+    if any(word in product_text for word in ["biscuit", "napolitana", "napolitană", "wafer", "cookies"]):
+        return "en:biscuits-and-cakes"
+
+    if any(word in product_text for word in ["ciocolata", "ciocolată", "chocolate", "praline"]):
+        return "en:chocolates"
+
+    if any(word in product_text for word in ["ovaz", "ovăz", "oat", "muesli", "granola"]):
+        return "en:mueslis"
 
     if category in category_map:
         return category_map[category]
@@ -10479,16 +10779,196 @@ def is_caffeine_relevant_candidate(product):
     return product_family in {"energy_drink", "coffee_drink", "caffeinated_beverage"}
 
 
+def product_has_meaningful_nutrition(product):
+    values = [
+        safe_float(product.get(field))
+        for field in ("calories", "protein", "sugar", "fat")
+    ]
+    numeric_values = [value for value in values if value is not None]
+
+    if not numeric_values:
+        return False
+
+    if all(abs(value) < 0.01 for value in numeric_values):
+        return get_product_recommendation_family(product) == "water"
+
+    return True
+
+
+def get_catalog_quality_adjustment(product):
+    score = 0
+    category = normalize_search_text(product.get("category") or "")
+    family = get_product_recommendation_family(product)
+
+    if product.get("image"):
+        score += 2
+    else:
+        score -= 2
+
+    if category and category not in {"altele", "other", "general"} and family != "general":
+        score += 3
+    else:
+        score -= 4
+
+    nutrition_fields = [
+        safe_float(product.get(field))
+        for field in ("calories", "protein", "sugar", "fat")
+    ]
+    known_nutrition_count = sum(value is not None for value in nutrition_fields)
+    score += min(known_nutrition_count, 4)
+
+    if known_nutrition_count == 0:
+        score -= 7
+    elif not product_has_meaningful_nutrition(product):
+        score -= 5
+
+    if product.get("ingredients"):
+        score += 1.5
+    else:
+        score -= 1
+
+    if product.get("priceIsLocal") and product.get("price") is not None:
+        score += 1
+
+    if family == "general":
+        score -= 6
+
+    return score
+
+
+def has_clean_ingredient_profile(product):
+    if product.get("natural"):
+        return True
+
+    text = product_text_for_recommendation(product)
+    additive_hits = len(re.findall(r"\be\s*-?\d{3,4}[a-z]?\b", text))
+    risky_terms = [
+        "colorant",
+        "conservant",
+        "potentiator",
+        "potențiator",
+        "glutamat",
+        "aspartam",
+        "acesulfam",
+        "ulei de palmier",
+        "palm oil",
+    ]
+
+    if additive_hits >= 3 or any(term in text for term in risky_terms):
+        return False
+
+    ingredients = normalize_search_text(product.get("ingredients") or "")
+    ingredient_tokens = [
+        token.strip()
+        for token in re.split(r"[,;]", ingredients)
+        if token.strip()
+    ]
+
+    return bool(ingredient_tokens) and len(ingredient_tokens) <= 8
+
+
+def product_matches_vegan_preference(product):
+    family = get_product_recommendation_family(product)
+    text = product_text_for_recommendation(product)
+
+    if product.get("vegan") or family in {"plant_based", "plant_milk", "plant_yogurt"}:
+        return True
+
+    return any(token in text for token in ["vegan", "de post", "vegetal", "plant based", "plant-based"])
+
+
+def product_likely_contains_lactose(product):
+    family = get_product_recommendation_family(product)
+    text = product_text_for_recommendation(product)
+
+    if family in {"plant_based", "plant_milk", "plant_yogurt"}:
+        return False
+
+    lactose_terms = [
+        "lapte",
+        "milk",
+        "lactoza",
+        "lactose",
+        "zer",
+        "whey",
+        "smantana",
+        "smântână",
+        "cream",
+        "branza",
+        "brânză",
+        "iaurt",
+        "yogurt",
+    ]
+
+    return family in {
+        "lactate",
+        "fruit_yogurt",
+        "plain_yogurt",
+        "kefir",
+        "dairy_dessert",
+        "cheese",
+        "milk",
+    } or any(term in text for term in lactose_terms)
+
+
+PREFERENCE_ALLERGEN_KEYWORDS = {
+    "gluten": ["gluten", "grau", "wheat", "barley", "orz", "rye", "secara"],
+    "lactose": ["lapte", "milk", "lactoza", "lactose", "whey", "zer", "smantana", "smântână", "cream"],
+    "peanuts": ["arahide", "peanuts", "peanut"],
+    "nuts": ["alune", "hazelnut", "hazelnuts", "migdale", "almond", "cashew", "nuci", "walnut"],
+    "soy": ["soia", "soy", "soya"],
+    "egg": ["ou", "egg", "eggs"],
+    "fish": ["peste", "pește", "fish", "ton", "tuna", "somon", "salmon"],
+    "sesame": ["susan", "sesame"],
+}
+
+
+def split_preference_avoid_terms(value):
+    return [
+        item.strip()
+        for item in re.split(r"[,;\n]+", normalize_search_text(value or ""))
+        if len(item.strip()) >= 3
+    ]
+
+
+def product_violates_user_preferences(product, preferences):
+    if not isinstance(preferences, dict):
+        return False
+
+    text = product_text_for_recommendation(product)
+    selected_allergies = preferences.get("allergies") or []
+
+    if not isinstance(selected_allergies, list):
+        selected_allergies = []
+
+    for allergy in selected_allergies:
+        keywords = PREFERENCE_ALLERGEN_KEYWORDS.get(str(allergy).strip().lower(), [])
+
+        if keywords and any(keyword in text for keyword in keywords):
+            return True
+
+    for term in split_preference_avoid_terms(preferences.get("avoidIngredients") or ""):
+        if term in text:
+            return True
+
+    return False
+
+
 def score_off_alternative(products, product, criteria, scanned_product=None):
     score = float(product.get("score") or 0)
     reasons = []
     candidate_family = get_product_recommendation_family(product)
     candidate_text = product_text_for_recommendation(product)
+    criteria = set(criteria or [])
+    score += get_catalog_quality_adjustment(product)
 
     if scanned_product:
         scanned_family = get_product_recommendation_family(scanned_product)
         beverage_families = {
             "water",
+            "fruit_juice",
+            "tea_drink",
+            "sports_drink",
             "cola",
             "beverage",
             "energy_drink",
@@ -10499,9 +10979,12 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
         }
 
         if candidate_family == scanned_family:
-            family_bonus = 18 if scanned_family in {"instant_noodles", "fruit_yogurt"} else 8
+            family_bonus = 18 if scanned_family in {"instant_noodles", "fruit_yogurt", "processed_meat", "beer", "cheese"} else 10
             score += family_bonus
             reasons.append("aceeași categorie de produs")
+        elif candidate_family in get_compatible_recommendation_families(scanned_family):
+            score += 4
+            reasons.append("alternativă apropiată ca tip")
         elif scanned_family == "instant_noodles":
             score -= 80
         elif scanned_family == "fruit_yogurt" and candidate_family not in {"fruit_yogurt", "lactate"}:
@@ -10531,6 +11014,31 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
             score += 5
             reasons.append("alternativă lactată apropiată")
 
+        scanned_sugar = safe_float(scanned_product.get("sugar"))
+        candidate_sugar = safe_float(product.get("sugar"))
+        scanned_protein = safe_float(scanned_product.get("protein"))
+        candidate_protein = safe_float(product.get("protein"))
+        scanned_calories = safe_float(scanned_product.get("calories"))
+        candidate_calories = safe_float(product.get("calories"))
+
+        if "low_sugar" in criteria and scanned_sugar is not None and candidate_sugar is not None:
+            if candidate_sugar < scanned_sugar:
+                score += min(8, (scanned_sugar - candidate_sugar) * 0.5)
+            elif candidate_sugar > scanned_sugar:
+                score -= min(8, (candidate_sugar - scanned_sugar) * 0.35)
+
+        if "protein" in criteria and scanned_protein is not None and candidate_protein is not None:
+            if candidate_protein > scanned_protein:
+                score += min(7, (candidate_protein - scanned_protein) * 0.45)
+            elif candidate_protein < scanned_protein:
+                score -= min(5, (scanned_protein - candidate_protein) * 0.25)
+
+        if "low_calorie" in criteria and scanned_calories is not None and candidate_calories is not None:
+            if candidate_calories < scanned_calories:
+                score += min(7, (scanned_calories - candidate_calories) * 0.04)
+            elif candidate_calories > scanned_calories:
+                score -= min(6, (candidate_calories - scanned_calories) * 0.025)
+
     if (
         "cheap" in criteria
         and product.get("price") is not None
@@ -10539,20 +11047,36 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
         value = get_alternative_normalized_score(products, product, "price", False)
         score += value * 10
         reasons.append("preț observat mai bun")
+    elif "cheap" in criteria and product.get("price") is None:
+        score -= 2
 
     if "protein" in criteria:
         value = get_alternative_normalized_score(products, product, "protein", True)
         score += value * 10
         reasons.append("mai multă proteină")
 
+        protein_value = safe_float(product.get("protein"))
+        if protein_value is not None:
+            if protein_value >= 12:
+                score += 5
+            elif protein_value >= 8:
+                score += 3
+            elif protein_value < 2 and candidate_family not in {"water", "fruit_juice", "tea_drink", "cola", "energy_drink"}:
+                score -= 3
+
     if "low_sugar" in criteria:
         value = get_alternative_normalized_score(products, product, "sugar", False)
         score += value * 10
         reasons.append("mai puțin zahăr")
 
-        if safe_float(product.get("sugar")) == 0:
-            score += 2
+        sugar_value = safe_float(product.get("sugar"))
+        if sugar_value == 0:
+            score += 6
             reasons.append("fără zahăr")
+        elif sugar_value is not None and sugar_value <= 5:
+            score += 3
+        elif sugar_value is not None and sugar_value >= 15:
+            score -= 5
 
     if "caffeine" in criteria:
         if candidate_family == "energy_drink":
@@ -10578,9 +11102,40 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
         score += value * 10
         reasons.append("mai puține calorii")
 
+        calories_value = safe_float(product.get("calories"))
+        if calories_value is not None:
+            if calories_value <= 80:
+                score += 3
+            elif calories_value >= 300:
+                score -= 4
+
     if "value" in criteria:
         score += float(product.get("score") or 0) * 1.5
         reasons.append("scor nutrițional mai bun")
+
+    if "vegan" in criteria:
+        if product_matches_vegan_preference(product):
+            score += 14
+            reasons.append("potrivit pentru post")
+        elif candidate_family in {"meat", "processed_meat", "fresh_meat", "fish", "eggs", "milk", "cheese", "dairy_dessert", "fruit_yogurt", "plain_yogurt", "kefir", "lactate"}:
+            score -= 35
+
+    if "lactose_free" in criteria:
+        if product.get("lactoseFree") or candidate_family in {"plant_based", "plant_milk", "plant_yogurt"}:
+            score += 12
+            reasons.append("fără lactoză")
+        elif product_likely_contains_lactose(product):
+            score -= 22
+
+    if "natural" in criteria:
+        if has_clean_ingredient_profile(product):
+            score += 12
+            reasons.append("ingrediente mai curate")
+        else:
+            score -= 6
+
+    if not product_has_meaningful_nutrition(product) and candidate_family != "water":
+        score -= 8
 
     product["recommendationScore"] = round(score, 2)
     product["recommendationReason"] = (
@@ -11255,29 +11810,58 @@ def get_local_catalog_alternatives(scanned_product, criteria):
             "energy_drink": ["energy", "energiz", "red bull", "redbull", "monster", "hell"],
             "coffee_drink": ["coffee", "cafea", "cappuccino", "latte", "espresso"],
             "caffeinated_beverage": ["caffeine", "cafeina", "taurina"],
+            "fruit_juice": ["suc", "juice", "nectar", "smoothie"],
+            "tea_drink": ["ice tea", "iced tea", "ceai rece", "kombucha"],
+            "sports_drink": ["isotonic", "sport drink", "gatorade", "powerade"],
             "beer": ["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier", "heineken", "silva", "tuborg", "carlsberg", "peroni", "stella", "corona", "kozel", "lager", "pilsner", "radler"],
             "alcoholic_drink": ["alcool", "alcohol", "vin", "wine", "vodka", "whisky", "rom", "rum", "gin", "cidru", "cider", "lichior"],
             "instant_noodles": ["buldak", "samyang", "ramen", "noodle", "taitei"],
             "fruit_yogurt": ["iaurt", "yogurt", "zuzu", "fruct"],
-            "lactate": ["iaurt", "yogurt", "lapte", "dairy"],
+            "plain_yogurt": ["iaurt natural", "iaurt grecesc", "plain yogurt", "skyr"],
+            "kefir": ["kefir", "chefir", "sana", "lapte batut", "lapte bătut"],
+            "cheese": ["branza", "brânză", "cascaval", "cașcaval", "telemea", "mozzarella", "feta", "cheddar"],
+            "milk": ["lapte", "milk", "uht"],
+            "plant_milk": ["lapte vegetal", "bautura vegetala", "băutură vegetală", "oat drink", "almond drink", "soy drink"],
+            "plant_yogurt": ["iaurt vegetal", "plant yogurt", "soy yogurt"],
+            "lactate": ["iaurt", "yogurt", "lapte", "dairy", "branza", "brânză", "kefir"],
             "dairy_dessert": ["danette", "budinca", "pudding", "desert"],
             "ice_cream": ["inghetata", "ice cream", "gelato", "gelatelli"],
             "sauce": ["sos", "mustar", "ketchup", "salsa"],
-            "salty_snack": ["chips", "crisps", "snack", "pufule"],
-            "sweet_snack": ["ciocolata", "chocolate", "biscuit", "wafer"],
-            "cereal": ["cereale", "cereal", "granola", "muesli"],
+            "oil_vinegar_spices": ["ulei", "otet", "oțet", "condiment", "spice"],
+            "chips": ["chips", "crisps", "nachos"],
+            "crackers": ["crackers", "saratele", "sărățele", "sticks", "covrigei"],
+            "popcorn": ["popcorn"],
+            "salty_snack": ["chips", "crisps", "snack", "pufule", "crackers", "popcorn"],
+            "chocolate": ["ciocolata", "ciocolată", "chocolate", "praline"],
+            "biscuits_wafers": ["biscuit", "napolitana", "napolitană", "wafer", "cookies"],
+            "candy": ["bomboane", "candy", "jeleuri"],
+            "sweet_snack": ["ciocolata", "chocolate", "biscuit", "wafer", "bomboane"],
+            "breakfast_cereal": ["cereale", "cereal", "corn flakes", "fulgi"],
+            "oats_granola": ["ovaz", "ovăz", "oat", "granola", "muesli"],
+            "cereal": ["cereale", "cereal", "granola", "muesli", "ovaz", "ovăz"],
             "water": ["apa", "water", "mineral"],
             "cola": ["cola", "pepsi", "coca"],
+            "processed_meat": ["muschi file", "mușchi file", "sunca", "șuncă", "ham", "salam", "carnati", "cârnați", "prosciutto", "bacon", "parizer"],
+            "fresh_meat": ["carne", "porc", "pui", "curcan", "vita", "vită", "beef", "chicken"],
             "meat": ["muschi", "file", "filet", "sunca", "ham", "salam", "carne", "porc", "pui", "curcan", "prosciutto"],
             "fish": ["peste", "fish", "ton", "tuna", "somon", "salmon"],
+            "eggs": ["oua", "ouă", "egg"],
             "spread": ["spread", "crema", "tartinabila", "nutella", "unt arahide", "peanut butter", "gem"],
             "nuts": ["nuci", "alune", "nuts", "seeds", "seminte"],
             "baby_food": ["baby", "infant", "bebelus", "bebelusi", "piure"],
             "plant_based": ["vegetal", "vegan", "plant based", "lapte vegetal", "bautura vegetala"],
             "bread": ["paine", "bread", "toast", "bagheta", "chifla"],
+            "bakery_pastry": ["croissant", "patiserie", "foietaj", "gogoasa", "brioche"],
+            "ready_soup": ["supa", "supă", "soup", "ciorba", "ciorbă"],
+            "sandwich_salad": ["sandwich", "salata", "salată", "wrap"],
             "ready_meal": ["ready meal", "sandwich", "salata", "supa"],
+            "frozen_vegetable": ["legume congelate", "frozen vegetables"],
+            "frozen_meal": ["frozen meal", "mancare congelata", "mâncare congelată"],
             "frozen": ["frozen", "congelat", "congelata"],
             "pizza": ["pizza"],
+            "pasta_rice_legumes": ["paste", "pasta", "orez", "rice", "fasole", "linte", "naut", "năut"],
+            "canned_pickles": ["conserva", "conservă", "muraturi", "murături", "masline", "măsline"],
+            "fruit_vegetable": ["fructe", "legume", "fruits", "vegetables"],
         }.get(scanned_family, [])
 
         if family_keywords:
@@ -11301,11 +11885,7 @@ def get_local_catalog_alternatives(scanned_product, criteria):
         if is_same_catalog_product(scanned_product, product_data):
             continue
 
-        if candidate_family != scanned_family and scanned_family not in {
-            "beverage",
-            "caffeinated_beverage",
-            "lactate",
-        }:
+        if candidate_family not in get_compatible_recommendation_families(scanned_family):
             continue
 
         if not is_compatible_alternative(scanned_product, product_data):
