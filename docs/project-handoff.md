@@ -1,6 +1,6 @@
 # Ce aleg? - handoff proiect
 
-Ultima actualizare: 2026-07-11
+Ultima actualizare: 2026-07-12
 
 ## Pe scurt
 
@@ -42,7 +42,7 @@ Utilizator
 - Sitemap-ul a fost trimis în Google Search Console.
 - Stripe este trecut pe live și plățile reale au fost testate.
 - Brevo este configurat, domeniul are înregistrările verificate, iar `contact@cealeg.shop` redirecționează corect.
-- Catalogul are aproximativ 50.000 produse, conform ultimei raportări manuale.
+- Catalogul are 61.254 produse importate și validate în producție, conform endpoint-ului public de statistici.
 - Asistentul AI vizual real este marcat ca indisponibil / în dezvoltare, deoarece nu folosim momentan OpenAI Vision cu plată.
 - Fluxul principal se bazează pe barcode, OCR/căutare text și catalog.
 
@@ -57,6 +57,7 @@ Utilizator
 - Planuri Free / Pro / Family.
 - Stripe Checkout, Stripe Customer Portal și webhook pentru planuri.
 - CeCoins, misiuni, recompense și pachete Bronze / Gold / Diamond.
+- Pagină publică `Catalog România` cu statistici live despre catalog, lipsuri pe magazine și contribuții comunitare.
 - Admin cu monitorizare, căutare utilizatori după email și stare sistem.
 - Raportare alternative greșite.
 - Emailuri tranzacționale prin Brevo.
@@ -64,7 +65,15 @@ Utilizator
 
 ## Schimbări recente importante
 
-Ultimul pachet de lucru a optimizat scannerul de coduri de bare:
+Ultimul pachet de lucru a adăugat pagina publică `Catalog România`:
+
+- Frontend: `frontend/app/catalog-romania/page.js`
+- Backend: `GET /catalog/romania/stats`
+- Pagina afișează produse totale, acoperire coduri de bare/nutriție/imagini, categorii, magazine, lipsuri recente, top contribuitori și produse aprobate recent.
+- Link-uri adăugate în homepage, header desktop și acțiunile rapide din dashboard.
+- Endpoint-ul public folosește cache de 5 minute și nu expune emailuri sau date sensibile.
+
+Pachetul anterior a optimizat scannerul de coduri de bare:
 
 - Frontend: `frontend/app/barcode-scan/page.js`
 - Scannerul confirmă codul din mai multe citiri stabile înainte să facă lookup.
