@@ -54,14 +54,20 @@ OPEN_FOOD_FACTS_ALTERNATIVES_CACHE = {}
 OPEN_FOOD_FACTS_PRODUCT_CACHE = {}
 OPEN_FOOD_FACTS_ALTERNATIVES_CACHE_TTL = 10 * 60
 OPEN_FOOD_FACTS_PRODUCT_CACHE_TTL = 60 * 60
+OPEN_FOOD_FACTS_CACHE_MAX_ITEMS = int(os.environ.get("OPEN_FOOD_FACTS_CACHE_MAX_ITEMS", "900"))
 PRODUCT_SEARCH_RESULT_CACHE = {}
 PRODUCT_SEARCH_RESULT_CACHE_TTL = int(os.environ.get("PRODUCT_SEARCH_RESULT_CACHE_TTL", "900"))
+PRODUCT_SEARCH_RESULT_CACHE_MAX_ITEMS = int(os.environ.get("PRODUCT_SEARCH_RESULT_CACHE_MAX_ITEMS", "400"))
 OPEN_PRICES_CACHE = {}
 OPEN_PRICES_CACHE_TTL = 30 * 60
+OPEN_PRICES_CACHE_MAX_ITEMS = int(os.environ.get("OPEN_PRICES_CACHE_MAX_ITEMS", "800"))
 AI_STATUS_CACHE = {"created_at": 0, "data": None}
 AI_STATUS_CACHE_TTL = 30
 LEADERBOARD_CACHE = {}
 LEADERBOARD_CACHE_TTL = int(os.environ.get("LEADERBOARD_CACHE_TTL", "60"))
+RECOMMENDATION_FAMILY_CACHE = {}
+PRODUCT_RECOMMENDATION_TEXT_CACHE = {}
+RECOMMENDATION_DERIVED_CACHE_MAX_ITEMS = int(os.environ.get("RECOMMENDATION_DERIVED_CACHE_MAX_ITEMS", "6000"))
 APPROX_RON_EXCHANGE_RATES = {
     "RON": 1.0,
     "EUR": 5.0,
@@ -86,6 +92,51 @@ GLOBAL_RATE_LIMIT_WINDOW = int(os.environ.get("GLOBAL_RATE_LIMIT_WINDOW", "60"))
 AUTH_RATE_LIMIT = int(os.environ.get("AUTH_RATE_LIMIT", "5"))
 AUTH_RATE_LIMIT_WINDOW = int(os.environ.get("AUTH_RATE_LIMIT_WINDOW", str(15 * 60)))
 MAX_JSON_BODY_BYTES = int(os.environ.get("MAX_JSON_BODY_BYTES", str(200 * 1024)))
+
+
+def set_limited_cache_item(cache, key, value, max_items):
+    if key not in cache and len(cache) >= max(1, int(max_items or 1)):
+        cache.pop(next(iter(cache)), None)
+
+    cache[key] = value
+
+
+def get_product_family_cache_key(product_data):
+    if not isinstance(product_data, dict):
+        product_data = {}
+
+    off_categories = product_data.get("offCategories") or []
+
+    if isinstance(off_categories, str):
+        off_categories = (off_categories,)
+    elif isinstance(off_categories, (list, tuple, set)):
+        off_categories = tuple(str(item or "") for item in off_categories)
+    else:
+        off_categories = (str(off_categories or ""),)
+
+    return (
+        str(product_data.get("name") or ""),
+        str(product_data.get("brand") or ""),
+        str(product_data.get("category") or ""),
+        str(product_data.get("store") or ""),
+        str(product_data.get("tag") or ""),
+        str(product_data.get("ingredients") or ""),
+        off_categories,
+    )
+
+
+def get_product_text_cache_key(product_data):
+    if not isinstance(product_data, dict):
+        product_data = {}
+
+    return (
+        str(product_data.get("name") or ""),
+        str(product_data.get("brand") or ""),
+        str(product_data.get("category") or ""),
+        str(product_data.get("tag") or ""),
+        str(product_data.get("reason") or ""),
+        str(product_data.get("ingredients") or ""),
+    )
 
 OFF_FALLBACK_BARCODES_BY_CATEGORY = {
     "en:iced-coffees": [
@@ -3379,6 +3430,7 @@ ADMIN_ENDPOINTS = {
     "export_admin_search_misses",
     "export_admin_alternative_reports",
     "export_admin_payment_events",
+    "recategorize_admin_catalog",
     "delete_admin_product",
     "admin_update_user_plan",
     "get_readiness",
@@ -4220,10 +4272,15 @@ def get_cached_product_search_results(cache_key):
 
 
 def set_cached_product_search_results(cache_key, results):
-    PRODUCT_SEARCH_RESULT_CACHE[cache_key] = {
-        "created_at": time.time(),
-        "results": [dict(item) for item in results],
-    }
+    set_limited_cache_item(
+        PRODUCT_SEARCH_RESULT_CACHE,
+        cache_key,
+        {
+            "created_at": time.time(),
+            "results": [dict(item) for item in results],
+        },
+        PRODUCT_SEARCH_RESULT_CACHE_MAX_ITEMS,
+    )
 
 
 def product_to_analysis_result(product, uploaded_filename):
@@ -7287,6 +7344,126 @@ def csv_response(filename, headers, rows):
     )
 
 
+UNCATEGORIZED_CATEGORY_TERMS = [
+    "altele",
+    "other",
+    "general",
+    "categorie neconfirmata",
+    "categorie neconfirmată",
+    "neconfirmata",
+    "neconfirmată",
+]
+
+
+def uncategorized_product_filter():
+    return or_(
+        Product.category.is_(None),
+        *[
+            Product.category.ilike(term)
+            for term in UNCATEGORIZED_CATEGORY_TERMS
+        ],
+    )
+
+
+def count_uncategorized_products():
+    return Product.query.filter(uncategorized_product_filter()).count()
+
+
+def get_catalog_quality_snapshot():
+    total = Product.query.count()
+    with_barcode = Product.query.filter(
+        Product.barcode.isnot(None),
+        Product.barcode != "",
+    ).count()
+    with_image = Product.query.filter(
+        Product.image.isnot(None),
+        Product.image != "",
+    ).count()
+    with_nutrition = Product.query.filter(or_(
+        Product.calories.isnot(None),
+        Product.protein.isnot(None),
+        Product.sugar.isnot(None),
+        Product.fat.isnot(None),
+    )).count()
+    uncategorized = count_uncategorized_products()
+
+    return {
+        "products": total,
+        "uncategorizedProducts": uncategorized,
+        "withBarcode": with_barcode,
+        "withImage": with_image,
+        "withNutrition": with_nutrition,
+        "barcodeCoverage": round((with_barcode / total) * 100, 1) if total else 0,
+        "imageCoverage": round((with_image / total) * 100, 1) if total else 0,
+        "nutritionCoverage": round((with_nutrition / total) * 100, 1) if total else 0,
+        "uncategorizedRate": round((uncategorized / total) * 100, 1) if total else 0,
+    }
+
+
+def recategorize_catalog_products(limit=300, apply_changes=False, include_all=False):
+    safe_limit = max(1, min(int(limit or 300), 1000))
+    query = Product.query.order_by(Product.id.asc())
+
+    if not include_all:
+        query = query.filter(uncategorized_product_filter())
+
+    products = query.limit(safe_limit).all()
+    changes = []
+
+    for product in products:
+        product_data = product_to_dict(product)
+        old_category = product.category or "Altele"
+        new_category = infer_catalog_category(product_data)
+
+        if not should_update_reported_product_category(old_category, new_category):
+            continue
+
+        changes.append({
+            "id": product.id,
+            "name": product.name,
+            "barcode": product.barcode,
+            "oldCategory": old_category,
+            "newCategory": new_category,
+        })
+
+        if apply_changes:
+            product.category = new_category[:100]
+            product.score = calculate_product_score(
+                product.category,
+                product.calories,
+                product.protein,
+                product.sugar,
+                product.fat,
+                product.ingredients,
+            )
+            product.tag = generate_product_tag(
+                product.category,
+                product.calories,
+                product.protein,
+                product.sugar,
+                product.fat,
+                product.ingredients,
+            )
+            product.reason = generate_product_reason(
+                product.category,
+                product.calories,
+                product.protein,
+                product.sugar,
+                product.fat,
+                product.ingredients,
+            )
+
+    if apply_changes and changes:
+        db.session.commit()
+
+    return {
+        "scanned": len(products),
+        "changed": len(changes),
+        "applied": bool(apply_changes),
+        "changes": changes[:120],
+    }
+
+
 @app.route("/admin/monitoring", methods=["GET"])
 def get_admin_monitoring():
     days = request.args.get("days", default=7, type=int)
@@ -7447,7 +7624,7 @@ def get_admin_monitoring():
             "recentTests": [usage_event_to_admin_dict(event) for event in email_test_events],
         },
         "catalog": {
-            "products": Product.query.count(),
+            **get_catalog_quality_snapshot(),
             "pendingSubmissions": ProductSubmission.query.filter(
                 ProductSubmission.status != "approved"
             ).count(),
@@ -7603,6 +7780,7 @@ def get_admin_overview():
     return jsonify({
         "users": User.query.count(),
         "products": Product.query.count(),
+        "uncategorizedProducts": count_uncategorized_products(),
         "pendingSubmissions": ProductSubmission.query.filter(
             ProductSubmission.status != "approved"
         ).count(),
@@ -7660,6 +7838,47 @@ def get_admin_search_misses():
         }
         for row in rows
     ])
+
+
+@app.route("/admin/catalog/recategorize", methods=["GET", "POST"])
+def recategorize_admin_catalog():
+    data = request.get_json(silent=True) or {}
+    limit = request.args.get("limit", data.get("limit", 300), type=int)
+    include_all = str(
+        request.args.get("include_all", data.get("includeAll", "false"))
+    ).lower() in {"1", "true", "yes", "on"}
+    apply_changes = request.method == "POST" and str(
+        request.args.get("apply", data.get("apply", "false"))
+    ).lower() in {"1", "true", "yes", "on"}
+
+    result = recategorize_catalog_products(
+        limit=limit,
+        apply_changes=apply_changes,
+        include_all=include_all,
+    )
+
+    if apply_changes and result["changed"]:
+        record_user_event(
+            g.current_user.id,
+            "catalog_recategorized",
+            "admin",
+            {
+                "changed": result["changed"],
+                "scanned": result["scanned"],
+                "includeAll": include_all,
+            },
+            commit=True,
+        )
+
+    return jsonify({
+        **result,
+        "message": (
+            f"Am actualizat {result['changed']} produse."
+            if apply_changes
+            else f"Am găsit {result['changed']} produse care pot fi recategorizate."
+        ),
+        "catalog": get_catalog_quality_snapshot(),
+    })
 
 
 @app.route("/admin/products/<int:product_id>", methods=["DELETE"])
@@ -8041,22 +8260,41 @@ def get_open_food_facts_alternatives():
         alternatives.append(candidate)
         existing_alternative_keys.add(candidate_key)
 
+    normalization_stats = build_alternative_normalization_stats(alternatives)
+
     for alternative in alternatives:
-        score_off_alternative(alternatives, alternative, criteria, scanned_product)
+        score_off_alternative(
+            alternatives,
+            alternative,
+            criteria,
+            scanned_product,
+            normalization_stats,
+        )
 
     alternatives.sort(
         key=lambda product: product["recommendationScore"],
         reverse=True,
     )
-    attach_open_prices(alternatives[:18])
 
-    for alternative in alternatives:
-        score_off_alternative(alternatives, alternative, criteria, scanned_product)
+    price_lookup_limit = 24 if "cheap" in criteria else 8
+    attach_open_prices(alternatives[:price_lookup_limit])
 
-    alternatives.sort(
-        key=lambda product: product["recommendationScore"],
-        reverse=True,
-    )
+    if "cheap" in criteria:
+        normalization_stats = build_alternative_normalization_stats(alternatives)
+
+        for alternative in alternatives:
+            score_off_alternative(
+                alternatives,
+                alternative,
+                criteria,
+                scanned_product,
+                normalization_stats,
+            )
+
+        alternatives.sort(
+            key=lambda product: product["recommendationScore"],
+            reverse=True,
+        )
     alternatives = [
         product
         for product in alternatives
@@ -9524,10 +9762,15 @@ def get_open_prices_summary(barcode):
     else:
         summary = None
 
-    OPEN_PRICES_CACHE[barcode] = {
-        "created_at": now,
-        "summary": summary,
-    }
+    set_limited_cache_item(
+        OPEN_PRICES_CACHE,
+        barcode,
+        {
+            "created_at": now,
+            "summary": summary,
+        },
+        OPEN_PRICES_CACHE_MAX_ITEMS,
+    )
     return summary
 
 
@@ -9639,7 +9882,7 @@ def get_latest_local_price(barcode):
     })
 
 
-def get_product_recommendation_family(product_data):
+def _compute_product_recommendation_family(product_data):
     off_categories = product_data.get("offCategories") or []
 
     if isinstance(off_categories, str):
@@ -10259,6 +10502,23 @@ def get_product_recommendation_family(product_data):
         return "beverage"
 
     return "general"
+
+
+def get_product_recommendation_family(product_data):
+    cache_key = get_product_family_cache_key(product_data)
+    cached_family = RECOMMENDATION_FAMILY_CACHE.get(cache_key)
+
+    if cached_family:
+        return cached_family
+
+    family = _compute_product_recommendation_family(product_data)
+    set_limited_cache_item(
+        RECOMMENDATION_FAMILY_CACHE,
+        cache_key,
+        family,
+        RECOMMENDATION_DERIVED_CACHE_MAX_ITEMS,
+    )
+    return family
 
 
 FLAVOR_KEYWORDS = {
@@ -11843,19 +12103,48 @@ def get_alternative_numeric_value(product, field):
         return None
 
 
-def get_alternative_normalized_score(products, product, field, prefer_higher):
-    values = [
-        get_alternative_numeric_value(item, field)
-        for item in products
-    ]
-    values = [value for value in values if value is not None]
+def build_alternative_normalization_stats(products):
+    stats = {}
+
+    for field in ("price", "protein", "sugar", "calories"):
+        values = [
+            get_alternative_numeric_value(item, field)
+            for item in products
+        ]
+        values = [value for value in values if value is not None]
+
+        if values:
+            stats[field] = (min(values), max(values))
+
+    return stats
+
+
+def get_alternative_normalized_score(
+    products,
+    product,
+    field,
+    prefer_higher,
+    normalization_stats=None,
+):
     value = get_alternative_numeric_value(product, field)
 
-    if value is None or not values:
+    if value is None:
         return 0
 
-    minimum = min(values)
-    maximum = max(values)
+    if normalization_stats and field in normalization_stats:
+        minimum, maximum = normalization_stats[field]
+    else:
+        values = [
+            get_alternative_numeric_value(item, field)
+            for item in products
+        ]
+        values = [item_value for item_value in values if item_value is not None]
+
+        if not values:
+            return 0
+
+        minimum = min(values)
+        maximum = max(values)
 
     if minimum == maximum:
         return 1
@@ -11865,16 +12154,29 @@ def get_alternative_normalized_score(products, product, field, prefer_higher):
 
 
 def product_text_for_recommendation(product):
-    return normalize_search_text(
+    cache_key = get_product_text_cache_key(product)
+    cached_text = PRODUCT_RECOMMENDATION_TEXT_CACHE.get(cache_key)
+
+    if cached_text is not None:
+        return cached_text
+
+    text_value = normalize_search_text(
         " ".join([
-            str(product.get("name") or ""),
-            str(product.get("brand") or ""),
-            str(product.get("category") or ""),
-            str(product.get("tag") or ""),
-            str(product.get("reason") or ""),
-            str(product.get("ingredients") or ""),
+            cache_key[0],
+            cache_key[1],
+            cache_key[2],
+            cache_key[3],
+            cache_key[4],
+            cache_key[5],
         ])
     )
+    set_limited_cache_item(
+        PRODUCT_RECOMMENDATION_TEXT_CACHE,
+        cache_key,
+        text_value,
+        RECOMMENDATION_DERIVED_CACHE_MAX_ITEMS,
+    )
+    return text_value
 
 
 def is_high_caffeine_candidate(product):
@@ -12119,7 +12421,13 @@ def product_violates_user_preferences(product, preferences):
     return False
 
 
-def score_off_alternative(products, product, criteria, scanned_product=None):
+def score_off_alternative(
+    products,
+    product,
+    criteria,
+    scanned_product=None,
+    normalization_stats=None,
+):
     score = float(product.get("score") or 0)
     reasons = []
     candidate_family = get_product_recommendation_family(product)
@@ -12246,14 +12554,26 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
         and product.get("price") is not None
         and product.get("priceIsLocal")
     ):
-        value = get_alternative_normalized_score(products, product, "price", False)
+        value = get_alternative_normalized_score(
+            products,
+            product,
+            "price",
+            False,
+            normalization_stats,
+        )
         score += value * 10
         reasons.append("preț observat mai bun")
     elif "cheap" in criteria and product.get("price") is None:
         score -= 2
 
     if "protein" in criteria:
-        value = get_alternative_normalized_score(products, product, "protein", True)
+        value = get_alternative_normalized_score(
+            products,
+            product,
+            "protein",
+            True,
+            normalization_stats,
+        )
         score += value * 10
         reasons.append("mai multă proteină")
 
@@ -12267,7 +12587,13 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
                 score -= 3
 
     if "low_sugar" in criteria:
-        value = get_alternative_normalized_score(products, product, "sugar", False)
+        value = get_alternative_normalized_score(
+            products,
+            product,
+            "sugar",
+            False,
+            normalization_stats,
+        )
         score += value * 10
         reasons.append("mai puțin zahăr")
 
@@ -12300,7 +12626,13 @@ def score_off_alternative(products, product, criteria, scanned_product=None):
             reasons.append("ingrediente cu efect energizant")
 
     if "low_calorie" in criteria:
-        value = get_alternative_normalized_score(products, product, "calories", False)
+        value = get_alternative_normalized_score(
+            products,
+            product,
+            "calories",
+            False,
+            normalization_stats,
+        )
         score += value * 10
         reasons.append("mai puține calorii")
 
@@ -12381,10 +12713,15 @@ def fetch_off_products(params, cache_key):
     )
     response.raise_for_status()
     products = response.json().get("products", [])
-    OPEN_FOOD_FACTS_ALTERNATIVES_CACHE[cache_key] = {
-        "created_at": now,
-        "products": products,
-    }
+    set_limited_cache_item(
+        OPEN_FOOD_FACTS_ALTERNATIVES_CACHE,
+        cache_key,
+        {
+            "created_at": now,
+            "products": products,
+        },
+        OPEN_FOOD_FACTS_CACHE_MAX_ITEMS,
+    )
     return products
 
 
@@ -12407,10 +12744,19 @@ def fetch_off_product_by_barcode(barcode):
             "User-Agent": "CeAlegApp/1.0 (contact: contact@cealeg.shop)",
             "Accept": "application/json",
         },
-        timeout=15,
+        timeout=8,
     )
 
     if response.status_code == 404:
+        set_limited_cache_item(
+            OPEN_FOOD_FACTS_PRODUCT_CACHE,
+            cache_key,
+            {
+                "created_at": now,
+                "product": None,
+            },
+            OPEN_FOOD_FACTS_CACHE_MAX_ITEMS,
+        )
         return None
 
     response.raise_for_status()
@@ -12422,10 +12768,15 @@ def fetch_off_product_by_barcode(barcode):
         product = data.get("product") or {}
         product["code"] = str(data.get("code") or product.get("code") or barcode)
 
-    OPEN_FOOD_FACTS_PRODUCT_CACHE[cache_key] = {
-        "created_at": now,
-        "product": product,
-    }
+    set_limited_cache_item(
+        OPEN_FOOD_FACTS_PRODUCT_CACHE,
+        cache_key,
+        {
+            "created_at": now,
+            "product": product,
+        },
+        OPEN_FOOD_FACTS_CACHE_MAX_ITEMS,
+    )
     return product
 
 
@@ -12631,10 +12982,15 @@ def fetch_off_text_search_products(query_text):
                         response.raise_for_status()
                         products = response.json().get("products", [])
                         successful_request = True
-                        OPEN_FOOD_FACTS_ALTERNATIVES_CACHE[cache_key] = {
-                            "created_at": now,
-                            "products": products,
-                        }
+                        set_limited_cache_item(
+                            OPEN_FOOD_FACTS_ALTERNATIVES_CACHE,
+                            cache_key,
+                            {
+                                "created_at": now,
+                                "products": products,
+                            },
+                            OPEN_FOOD_FACTS_CACHE_MAX_ITEMS,
+                        )
                         break
                     except requests.RequestException as error:
                         last_error = error

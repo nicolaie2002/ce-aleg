@@ -318,6 +318,10 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Suport optional Google Analytics prin `NEXT_PUBLIC_GA_ID`
 - [x] Billing: schimbarea planului este blocata cat timp exista un abonament Pro/Family activ
 - [x] Billing: un plan se activeaza doar dupa confirmarea Stripe, prin Checkout/webhook
+- [x] Audit automat pentru toate paginile frontend, sitemap, robots si protectia rutelor
+- [x] Admin: monitorizare calitate catalog si recategorizare produse importate ca `Altele`
+- [x] Catalog Romania: script cap-coada pentru import Open Food Facts si recategorizare batch
+- [x] Pagina dedicata de misiuni pentru CeCoins, contributii catalog si clasament
 
 ### De facut de tine
 

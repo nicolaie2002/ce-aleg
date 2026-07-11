@@ -32,14 +32,12 @@ function createBarcodeReader() {
     BarcodeFormat.EAN_13,
     BarcodeFormat.EAN_8,
     BarcodeFormat.UPC_A,
-    BarcodeFormat.UPC_E,
-    BarcodeFormat.CODE_128,
-    BarcodeFormat.CODE_39,
+    BarcodeFormat.ITF,
   ]);
 
   return new BrowserMultiFormatReader(hints, {
-    delayBetweenScanAttempts: 120,
-    delayBetweenScanSuccess: 500,
+    delayBetweenScanAttempts: isLowPowerScannerDevice() ? 190 : 110,
+    delayBetweenScanSuccess: 650,
   });
 }
 
@@ -62,9 +60,26 @@ function hasValidGs1Checksum(barcode) {
 function isReliableScannedBarcode(barcode) {
   return (
     /^\d+$/.test(barcode) &&
+    !/^(\d)\1+$/.test(barcode) &&
     [8, 12, 13, 14].includes(barcode.length) &&
     hasValidGs1Checksum(barcode)
   );
+}
+
+const BARCODE_CONFIRMATION_WINDOW_MS = 2100;
+const BARCODE_CANDIDATE_TTL_MS = 2800;
+const BARCODE_DUPLICATE_LOOKUP_COOLDOWN_MS = 14000;
+
+const SCAN_SOURCE_CONFIG = {
+  native: { weight: 2.4, requiredCount: 2, requiredScore: 4.2 },
+  zxing: { weight: 2.5, requiredCount: 2, requiredScore: 4.2 },
+  rotated: { weight: 2.2, requiredCount: 2, requiredScore: 4.4 },
+  ocr: { weight: 1.5, requiredCount: 2, requiredScore: 3 },
+  manual: { weight: 5, requiredCount: 1, requiredScore: 1 },
+};
+
+function getScanSourceConfig(source) {
+  return SCAN_SOURCE_CONFIG[source] || SCAN_SOURCE_CONFIG.zxing;
 }
 
 function createCroppedCanvas(sourceCanvas, widthRatio, heightRatio) {
@@ -101,13 +116,26 @@ function createEnhancedCanvas(sourceCanvas, contrast = 1.7) {
 }
 
 function buildScanAttempts(canvas) {
+  const lowPowerDevice = isLowPowerScannerDevice();
   const wideCenterCrop = createCroppedCanvas(canvas, 0.98, 0.64);
-  const centerCrop = createCroppedCanvas(canvas, 0.92, 0.74);
   const narrowCenterCrop = createCroppedCanvas(canvas, 0.96, 0.42);
   const verticalCenterCrop = createCroppedCanvas(canvas, 0.64, 0.96);
 
+  if (lowPowerDevice) {
+    return [
+      canvas,
+      wideCenterCrop,
+      narrowCenterCrop,
+      verticalCenterCrop,
+      createEnhancedCanvas(narrowCenterCrop, 2.1),
+    ];
+  }
+
+  const centerCrop = createCroppedCanvas(canvas, 0.92, 0.74);
+
   return [
     canvas,
+    createEnhancedCanvas(canvas, 1.55),
     wideCenterCrop,
     centerCrop,
     narrowCenterCrop,
@@ -121,7 +149,7 @@ function buildScanAttempts(canvas) {
 function createOcrCanvas(video, angle = 0) {
   const radians = (angle * Math.PI) / 180;
   const swapsDimensions = angle === 90 || angle === 270;
-  const maxWidth = 1400;
+  const maxWidth = isLowPowerScannerDevice() ? 960 : 1400;
   const scale = Math.min(1, maxWidth / video.videoWidth);
   const frameWidth = Math.round(video.videoWidth * scale);
   const frameHeight = Math.round(video.videoHeight * scale);
@@ -191,6 +219,9 @@ export default function BarcodeScanPage() {
   const ocrEnabledRef = useRef(true);
   const detectedRef = useRef(false);
   const barcodeCandidatesRef = useRef(new Map());
+  const lookupInFlightRef = useRef(false);
+  const lookupCooldownRef = useRef(new Map());
+  const lastNativeScanAtRef = useRef(0);
 
   const [user, setUser] = useState(null);
   const [barcode, setBarcode] = useState("");
@@ -198,6 +229,7 @@ export default function BarcodeScanPage() {
   const [foundProduct, setFoundProduct] = useState(null);
   const [productSource, setProductSource] = useState("");
   const [lookupIssue, setLookupIssue] = useState("");
+  const [missingBarcodeCandidate, setMissingBarcodeCandidate] = useState(null);
   const [billingGate, setBillingGate] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
@@ -378,10 +410,12 @@ export default function BarcodeScanPage() {
     setFoundProduct(null);
     setProductSource("");
     setLookupIssue("");
+    setMissingBarcodeCandidate(null);
     setVisualCandidate(null);
     setBarcode("");
     setScanStatus("Pornesc camera...");
     detectedRef.current = false;
+    lastNativeScanAtRef.current = 0;
     barcodeCandidatesRef.current.clear();
     rotatedBarcodeReaderRef.current = createBarcodeReader();
 
@@ -423,14 +457,23 @@ export default function BarcodeScanPage() {
         await videoRef.current.play();
       }
 
+      const preferredFormats = ["ean_13", "ean_8", "upc_a", "itf"];
+      const supportedFormats =
+        typeof window.BarcodeDetector.getSupportedFormats === "function"
+          ? await window.BarcodeDetector.getSupportedFormats()
+          : preferredFormats;
+      const detectorFormats = preferredFormats.filter((format) =>
+        supportedFormats.includes(format)
+      );
       const detector = new window.BarcodeDetector({
-        formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128", "code_39"],
+        formats: detectorFormats.length ? detectorFormats : preferredFormats.slice(0, 3),
       });
 
       setScanStatus("Camera este pregătită. Încadrează codul de bare.");
       startRotatedBarcodeLoop();
       startBarcodeOcrLoop();
       startLiveVisionLoop();
+      const nativeScanInterval = isLowPowerScannerDevice() ? 210 : 130;
 
       async function scanFrame() {
         if (!videoRef.current || detectedRef.current) {
@@ -438,15 +481,20 @@ export default function BarcodeScanPage() {
         }
 
         try {
-          const codes = await detector.detect(videoRef.current);
+          const now = performance.now();
 
-          if (codes && codes.length > 0) {
-            const detectedCode = codes[0].rawValue;
+          if (now - lastNativeScanAtRef.current >= nativeScanInterval) {
+            lastNativeScanAtRef.current = now;
+            const codes = await detector.detect(videoRef.current);
 
-            if (detectedCode && !detectedRef.current) {
-              const detectionState = await handleDetectedBarcode(detectedCode, 2);
+            for (const code of codes || []) {
+              const detectedCode = code?.rawValue;
 
-              if (detectionState === "confirmed") return;
+              if (detectedCode && !detectedRef.current) {
+                const detectionState = await handleDetectedBarcode(detectedCode, "native");
+
+                if (detectionState === "confirmed") return;
+              }
             }
           }
         } catch {
@@ -486,7 +534,7 @@ export default function BarcodeScanPage() {
           if (result && !detectedRef.current) {
             const detectedCode = result.getText();
 
-            await handleDetectedBarcode(detectedCode, 2);
+            await handleDetectedBarcode(detectedCode, "zxing");
           } else if (!detectedRef.current) {
             setScanStatus(
               "Caut codul de bare. Apropie produsul, păstrează imaginea clară și evită reflexiile."
@@ -570,12 +618,36 @@ export default function BarcodeScanPage() {
       await scanRotatedBarcodeFrame();
 
       if (!detectedRef.current && videoRef.current?.srcObject) {
-        rotatedBarcodeTimerRef.current = setTimeout(scanNextFrame, 420);
+        rotatedBarcodeTimerRef.current = setTimeout(
+          scanNextFrame,
+          isLowPowerScannerDevice() ? 620 : 420
+        );
       }
     }, 250);
   }
 
-  async function handleDetectedBarcode(detectedCode, confidenceWeight = 1) {
+  function pruneBarcodeCandidates(now = Date.now()) {
+    for (const [candidateCode, candidate] of barcodeCandidatesRef.current) {
+      if (now - candidate.lastSeen > BARCODE_CANDIDATE_TTL_MS) {
+        barcodeCandidatesRef.current.delete(candidateCode);
+      }
+    }
+  }
+
+  function isBarcodeLookupCoolingDown(code, now = Date.now()) {
+    const cooldownUntil = lookupCooldownRef.current.get(code);
+
+    if (!cooldownUntil) return false;
+
+    if (cooldownUntil <= now) {
+      lookupCooldownRef.current.delete(code);
+      return false;
+    }
+
+    return true;
+  }
+
+  async function handleDetectedBarcode(detectedCode, source = "zxing") {
     if (!detectedCode || detectedRef.current) return "ignored";
 
     const normalizedCode = normalizeDetectedBarcode(detectedCode);
@@ -586,43 +658,53 @@ export default function BarcodeScanPage() {
     }
 
     const now = Date.now();
+    pruneBarcodeCandidates(now);
+
+    if (isBarcodeLookupCoolingDown(normalizedCode, now)) {
+      setScanStatus("Cod verificat recent. Caută un unghi mai clar dacă produsul nu apare.");
+      return "cooldown";
+    }
+
     const previousCandidate = barcodeCandidatesRef.current.get(normalizedCode);
-    const weight = Math.max(1, Math.min(2, Number(confidenceWeight) || 1));
+    const sourceConfig = getScanSourceConfig(source);
 
     if (previousCandidate && now - previousCandidate.lastSeen < 120) {
       return "pending";
     }
 
+    const sameCandidateIsFresh =
+      previousCandidate &&
+      now - previousCandidate.lastSeen < BARCODE_CONFIRMATION_WINDOW_MS;
+    const sourceHits = sameCandidateIsFresh
+      ? { ...(previousCandidate?.sourceHits || {}) }
+      : {};
+    sourceHits[source] = (sourceHits[source] || 0) + 1;
     const count =
-      previousCandidate && now - previousCandidate.lastSeen < 1800
+      sameCandidateIsFresh
         ? previousCandidate.count + 1
         : 1;
     const score =
-      previousCandidate && now - previousCandidate.lastSeen < 1800
-        ? previousCandidate.score + weight
-        : weight;
+      sameCandidateIsFresh
+        ? previousCandidate.score + sourceConfig.weight
+        : sourceConfig.weight;
     const firstSeen =
-      previousCandidate && now - previousCandidate.lastSeen < 1800
+      sameCandidateIsFresh
         ? previousCandidate.firstSeen
         : now;
-    const requiredScore = 4;
+    const requiredScore = sourceConfig.requiredScore;
+    const requiredCount = sourceConfig.requiredCount;
 
     barcodeCandidatesRef.current.set(normalizedCode, {
       count,
       score,
       firstSeen,
       lastSeen: now,
+      sourceHits,
     });
-
-    for (const [candidateCode, candidate] of barcodeCandidatesRef.current) {
-      if (now - candidate.lastSeen > 2500) {
-        barcodeCandidatesRef.current.delete(candidateCode);
-      }
-    }
 
     setBarcode(normalizedCode);
 
-    if (score < requiredScore) {
+    if (score < requiredScore || count < requiredCount) {
       setScanStatus("Am găsit codul. Confirm produsul...");
       return "pending";
     }
@@ -653,7 +735,9 @@ export default function BarcodeScanPage() {
     rotatedBarcodeRequestRef.current = true;
 
     try {
-      for (const angle of [0, 90, 180, 270]) {
+      const scanAngles = isLowPowerScannerDevice() ? [0, 90, 270] : [0, 90, 180, 270];
+
+      for (const angle of scanAngles) {
         if (detectedRef.current) return;
 
         const radians = (angle * Math.PI) / 180;
@@ -682,7 +766,7 @@ export default function BarcodeScanPage() {
         for (const attemptCanvas of attempts) {
           try {
             const result = reader.decodeFromCanvas(attemptCanvas);
-            const detectionState = await handleDetectedBarcode(result.getText(), 2);
+            const detectionState = await handleDetectedBarcode(result.getText(), "rotated");
 
             if (detectionState !== "invalid") {
               return;
@@ -750,7 +834,7 @@ export default function BarcodeScanPage() {
 
     try {
       const worker = await getOcrWorker();
-      const angles = [0, 90, 270, 180];
+      const angles = isLowPowerScannerDevice() ? [0, 90, 270] : [0, 90, 270, 180];
       const angle = angles[ocrPassRef.current % angles.length];
       ocrPassRef.current += 1;
       await worker.setParameters({
@@ -760,7 +844,7 @@ export default function BarcodeScanPage() {
       const candidates = extractValidOcrBarcodes(result.data.text);
 
       for (const candidate of candidates) {
-        const detectionState = await handleDetectedBarcode(candidate, 1);
+        const detectionState = await handleDetectedBarcode(candidate, "ocr");
 
         if (detectionState !== "invalid") {
           setScanStatus("Verific codul identificat...");
@@ -950,11 +1034,37 @@ export default function BarcodeScanPage() {
       return;
     }
 
+    if (!isReliableScannedBarcode(lookupCode)) {
+      setBarcode(lookupCode);
+      setMessage("Codul pare citit greșit. Verifică cifrele sau scanează din nou.");
+      setScanStatus("Cod nevalid. Apropie camera și păstrează produsul nemișcat.");
+      return;
+    }
+
+    if (lookupInFlightRef.current) {
+      setScanStatus("Caut deja produsul. Așteaptă câteva secunde...");
+      return;
+    }
+
+    const now = Date.now();
+    const coolingDown = isBarcodeLookupCoolingDown(lookupCode, now);
+
+    if (coolingDown && detectedRef.current) {
+      setScanStatus("Cod verificat recent. Încearcă un unghi mai clar dacă produsul nu apare.");
+      return;
+    }
+
+    lookupInFlightRef.current = true;
+    lookupCooldownRef.current.set(
+      lookupCode,
+      now + BARCODE_DUPLICATE_LOOKUP_COOLDOWN_MS
+    );
     setBarcode(lookupCode);
     setIsLookingUp(true);
     setMessage("");
     setFoundProduct(null);
     setLookupIssue("");
+    setMissingBarcodeCandidate(null);
     setBillingGate(null);
 
     try {
@@ -962,13 +1072,22 @@ export default function BarcodeScanPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        setLookupIssue(data.code || (response.status === 404 ? "external_product_not_found" : ""));
+
         if (data.code === "scan_limit_reached") {
           setBillingGate(data);
           setLookupIssue("scan_limit_reached");
         } else if (response.status === 404 || data.code === "external_product_not_found") {
-          shouldRestartAfterMiss = detectedRef.current;
+          shouldRestartAfterMiss = false;
+          setLookupIssue(data.code || "external_product_not_found");
+          setMissingBarcodeCandidate({
+            barcode: lookupCode,
+            source: detectedRef.current ? "scanner" : "manual",
+          });
           detectedRef.current = false;
           barcodeCandidatesRef.current.clear();
+          stopScanner();
+          setScanStatus("Produs negăsit. Confirmă codul citit înainte să îl adaugi.");
         }
         throw new Error(
           data.message || data.error || "Produsul nu a fost găsit."
@@ -977,14 +1096,16 @@ export default function BarcodeScanPage() {
 
       setFoundProduct(data.product);
       setProductSource(data.source);
+      setMissingBarcodeCandidate(null);
       setMessage("");
     } catch (error) {
       setMessage(error.message);
     } finally {
+      lookupInFlightRef.current = false;
       setIsLookingUp(false);
 
       if (shouldRestartAfterMiss) {
-        setScanStatus("Produs negasit. Continui scanarea cu un cod mai clar...");
+        setScanStatus("Produs negăsit. Continui scanarea cu un cod mai clar...");
         setTimeout(() => startScanner(), 500);
       }
     }
@@ -1115,6 +1236,22 @@ export default function BarcodeScanPage() {
     }
   }
 
+  function rescanMissingBarcode() {
+    setMissingBarcodeCandidate(null);
+    setLookupIssue("");
+    setMessage("");
+    setBarcode("");
+    setFoundProduct(null);
+    restartScanner();
+  }
+
+  function editMissingBarcode() {
+    setMissingBarcodeCandidate(null);
+    setLookupIssue("");
+    setMessage("Corectează codul din câmpul manual, apoi apasă Caută produsul.");
+    setScanStatus("Verifică cifrele tipărite sub codul de bare.");
+  }
+
   async function saveObservedPrice() {
     if (!user || !foundProduct?.barcode) return;
 
@@ -1182,12 +1319,17 @@ export default function BarcodeScanPage() {
     window.location.assign("/result?store=any");
   }
 
-  function buildSubmitProductLink() {
+  function buildSubmitProductLink(confirmed = false) {
     const params = new URLSearchParams();
 
     params.set("name", "");
     params.set("store", "Kaufland");
     params.set("barcode", barcode);
+    params.set("source", "barcode_not_found");
+
+    if (confirmed) {
+      params.set("barcode_confirmed", "1");
+    }
 
     return `/submit-product?${params.toString()}`;
   }
@@ -1566,6 +1708,9 @@ export default function BarcodeScanPage() {
           )}
 
           {!foundProduct && barcode && message && (
+            missingBarcodeCandidate ||
+            ["openfoodfacts_unavailable", "external_product_not_found", "external_catalog_unavailable"].includes(lookupIssue)
+          ) && (
             <div className="mt-6 rounded-3xl border border-yellow-300/30 bg-yellow-300/10 p-5">
               <h2 className="text-2xl font-bold text-yellow-300">
                 {lookupIssue === "openfoodfacts_unavailable"
@@ -1576,15 +1721,53 @@ export default function BarcodeScanPage() {
               <p className="mt-3 text-gray-300">
                 {lookupIssue === "openfoodfacts_unavailable"
                   ? "Produsul nu este în baza locală, iar verificarea Open Food Facts nu a putut fi făcută acum. Îl poți adăuga manual sau poți încerca din nou."
-                  : "Dacă produsul nu apare în baza locală sau în Open Food Facts, îl poți adăuga ca propunere."}
+                  : "Dacă produsul nu apare în baza locală sau în Open Food Facts, îl poți adăuga ca propunere. Mai întâi confirmă că am citit corect codul de bare."}
               </p>
 
-              <Link
-                href={buildSubmitProductLink()}
-                className="mt-5 inline-block rounded-2xl bg-yellow-300 px-6 py-3 font-semibold text-black hover:bg-yellow-200"
-              >
-                Contribuie produsul cu acest cod
-              </Link>
+              {missingBarcodeCandidate ? (
+                <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
+                  <p className="text-sm font-bold text-yellow-100">
+                    Cod citit de scanner
+                  </p>
+                  <code className="mt-2 block rounded-xl border border-yellow-300/25 bg-black/40 px-4 py-3 text-center font-mono text-2xl font-black tracking-[0.16em] text-white">
+                    {missingBarcodeCandidate.barcode}
+                  </code>
+                  <p className="mt-3 text-sm leading-6 text-gray-300">
+                    Verifică cifrele tipărite sub codul de bare. Dacă sunt corecte,
+                    trimitem formularul cu acest cod precompletat.
+                  </p>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <Link
+                      href={buildSubmitProductLink(true)}
+                      className="inline-flex items-center justify-center rounded-2xl bg-yellow-300 px-5 py-3 text-center font-semibold text-black hover:bg-yellow-200"
+                    >
+                      Da, codul e bun
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={rescanMissingBarcode}
+                      className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-white hover:bg-white/10"
+                    >
+                      Nu, rescanez
+                    </button>
+                    <button
+                      type="button"
+                      onClick={editMissingBarcode}
+                      className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-white hover:bg-white/10"
+                    >
+                      Corectez manual
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <Link
+                  href={buildSubmitProductLink(true)}
+                  className="mt-5 inline-block rounded-2xl bg-yellow-300 px-6 py-3 font-semibold text-black hover:bg-yellow-200"
+                >
+                  Contribuie produsul cu acest cod
+                </Link>
+              )}
             </div>
           )}
         </div>

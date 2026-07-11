@@ -32,6 +32,7 @@ const statLabels = {
   pendingSubmissions: "Propuneri de verificat",
   searches: "Căutări salvate",
   missingProducts: "Produse negăsite",
+  uncategorizedProducts: "Produse Altele",
   priceObservations: "Prețuri raportate",
   proUsers: "Utilizatori plătitori",
 };
@@ -124,6 +125,8 @@ export default function AdminPage() {
   const [emailBusy, setEmailBusy] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
+  const [catalogBusy, setCatalogBusy] = useState("");
+  const [catalogPreview, setCatalogPreview] = useState(null);
 
   async function loadAdmin() {
     setIsLoading(true);
@@ -231,6 +234,32 @@ export default function AdminPage() {
       setMessage("Emailul de test nu a putut fi trimis.");
     } finally {
       setEmailBusy(false);
+    }
+  }
+
+  async function recategorizeCatalog(apply = false) {
+    setCatalogBusy(apply ? "apply" : "preview");
+    setMessage(apply ? "Actualizez categoriile produselor..." : "Caut produse care pot fi recategorizate...");
+
+    try {
+      const response = await fetch(`${API_URL}/admin/catalog/recategorize?limit=500&apply=${apply ? "true" : "false"}`, {
+        method: apply ? "POST" : "GET",
+        headers: { "Content-Type": "application/json" },
+        body: apply ? JSON.stringify({ apply: true, limit: 500 }) : undefined,
+      });
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Catalogul nu a putut fi verificat.");
+      }
+
+      setCatalogPreview(data);
+      setMessage(data.message || "Verificarea catalogului s-a terminat.");
+      await loadAdmin();
+    } catch (error) {
+      setMessage(error.message || "Catalogul nu a putut fi verificat.");
+    } finally {
+      setCatalogBusy("");
     }
   }
 
@@ -478,6 +507,99 @@ export default function AdminPage() {
               )}
             </div>
           </div>
+        </section>
+
+        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                <Database size={16} /> Catalog România
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Calitate și recategorizare</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
+                Folosește recategorizarea pentru produsele importate ca `Altele`.
+                Algoritmul aplică taxonomia curentă, recalculează scorul și păstrează
+                recomandările în aceeași familie de produs.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => recategorizeCatalog(false)}
+                disabled={Boolean(catalogBusy)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
+              >
+                <Search size={16} />
+                {catalogBusy === "preview" ? "Verific..." : "Preview"}
+              </button>
+              <button
+                type="button"
+                onClick={() => recategorizeCatalog(true)}
+                disabled={Boolean(catalogBusy)}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-4 py-3 text-sm font-black text-black hover:bg-white disabled:opacity-60"
+              >
+                <CheckCircle2 size={16} />
+                {catalogBusy === "apply" ? "Aplic..." : "Aplică recategorizarea"}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <StatCard
+              label="Produse"
+              value={compactNumber(catalog.products)}
+              detail="Total în baza curentă"
+            />
+            <StatCard
+              label="Altele"
+              value={compactNumber(catalog.uncategorizedProducts)}
+              tone={catalog.uncategorizedProducts ? "warning" : "default"}
+              detail={`${catalog.uncategorizedRate ?? 0}% din catalog`}
+            />
+            <StatCard
+              label="Barcode"
+              value={`${catalog.barcodeCoverage ?? 0}%`}
+              detail={`${compactNumber(catalog.withBarcode)} produse`}
+            />
+            <StatCard
+              label="Imagini"
+              value={`${catalog.imageCoverage ?? 0}%`}
+              detail={`${compactNumber(catalog.withImage)} produse`}
+            />
+            <StatCard
+              label="Nutriție"
+              value={`${catalog.nutritionCoverage ?? 0}%`}
+              detail={`${compactNumber(catalog.withNutrition)} produse`}
+            />
+          </div>
+
+          {catalogPreview && (
+            <div className="mt-5 rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-black text-white">
+                  {catalogPreview.applied ? "Actualizare aplicată" : "Preview recategorizare"}
+                </p>
+                <EventPill tone={catalogPreview.changed ? "warning" : "default"}>
+                  {compactNumber(catalogPreview.changed)} schimbări din {compactNumber(catalogPreview.scanned)} verificate
+                </EventPill>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {(catalogPreview.changes || []).slice(0, 8).map((item) => (
+                  <article key={`${item.id}-${item.newCategory}`} className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
+                    <p className="font-bold text-white">{item.name}</p>
+                    <p className="mt-1 text-sm text-gray-400">
+                      {item.oldCategory} → <span className="text-cyan-100">{item.newCategory}</span>
+                    </p>
+                  </article>
+                ))}
+              </div>
+              {!(catalogPreview.changes || []).length && (
+                <p className="mt-3 text-sm text-gray-400">
+                  Nu am găsit produse care pot fi recategorizate în batch-ul verificat.
+                </p>
+              )}
+            </div>
+          )}
         </section>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">

@@ -28,6 +28,28 @@ cd D:\proiecte\ce_aleg\backend
 .\venv\Scripts\python.exe import_openfoodfacts_export.py --country romania --limit 20 --max-scan 20000 --allow-no-barcode --dry-run
 ```
 
+Dupa import, recategorizeaza produsele care au ramas la `Altele`:
+
+```powershell
+cd D:\proiecte\ce_aleg\backend
+.\venv\Scripts\python.exe recategorize_catalog.py --limit 1000
+.\venv\Scripts\python.exe recategorize_catalog.py --limit 1000 --apply
+```
+
+Comanda cap-coada pentru un batch Romania, cu preview de recategorizare:
+
+```powershell
+cd D:\proiecte\ce_aleg
+powershell -ExecutionPolicy Bypass -File scripts\import-romania-catalog.ps1 -Limit 5000 -MaxScan 800000
+```
+
+Cand preview-ul arata bine, ruleaza acelasi batch cu aplicarea recategorizarii:
+
+```powershell
+cd D:\proiecte\ce_aleg
+powershell -ExecutionPolicy Bypass -File scripts\import-romania-catalog.ps1 -Limit 5000 -MaxScan 800000 -ApplyRecategorize
+```
+
 Import controlat pentru lansare:
 
 ```powershell
@@ -135,6 +157,8 @@ feed-uri oficiale de la retaileri, producatori sau parteneri locali.
   sunt inregistrate cu branduri internationale sau cu tari multiple.
 - Pentru acoperire romaneasca foloseste mai intai `import_openfoodfacts_export.py`
   cu `--country romania`, apoi completeaza cu CSV-uri de la magazine sau parteneri.
+- Dupa fiecare batch mare ruleaza `recategorize_catalog.py --limit 1000 --apply`,
+  apoi verifica in admin sectiunea Catalog Romania pentru procentul ramas la `Altele`.
 - Daca apar raspunsuri `503`, lasa comanda sa continue. Scriptul sare peste pagina
   temporar indisponibila si continua categoria.
 - Nu porni mai multe importuri in paralel pe aceeasi baza. Mai bine rulezi batch-uri

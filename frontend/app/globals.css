@@ -453,6 +453,16 @@ textarea:focus {
   margin-inline: auto;
 }
 
+.ce-mobile-snap-row {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ce-mobile-snap-row::-webkit-scrollbar {
+  display: none;
+}
+
 .ce-page {
   padding-block: clamp(1.5rem, 3.8vw, 4.5rem);
 }

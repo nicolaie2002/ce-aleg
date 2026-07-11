@@ -41,6 +41,9 @@ if ($LASTEXITCODE -eq 0) {
 
 Write-Host "Checking frontend lint..."
 Push-Location $frontendDir
+Write-Host "Checking frontend routes..."
+& (Join-Path $PSScriptRoot "verify-routes.ps1") -FrontendDir $frontendDir
+
 & npm.cmd run lint
 
 Write-Host "Building frontend..."

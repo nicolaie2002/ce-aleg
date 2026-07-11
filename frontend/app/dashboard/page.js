@@ -96,6 +96,7 @@ export default function DashboardPage() {
     { href: "/barcode-scan", title: pick("Scanează codul", "Scan barcode"), description: pick("Identifică rapid produsul cu telefonul și vezi verdictul.", "Identify the product quickly with your phone and see the verdict."), icon: Barcode, tone: "emerald" },
     { href: "/store", title: pick("Caută produs", "Search products"), description: pick("Găsește produse în catalog după nume și magazin.", "Find products in the catalog by name and store."), icon: ScanLine, tone: "cyan" },
     { href: "/cart", title: pick("Coșul meu", "My cart"), description: pick("Produse grupate pentru următoarea cumpărătură.", "Products grouped for your next shopping trip."), icon: ShoppingCart, tone: "amber" },
+    { href: "/missions", title: pick("Misiuni", "Missions"), description: pick("Câștigă CeCoins și ajută catalogul României să crească.", "Earn CeCoins and help the Romania catalog grow."), icon: Gift, tone: "amber" },
     { href: "/preferences", title: pick("Preferințe", "Preferences"), description: pick("Setează cum alegi alternativele.", "Set how alternatives should be chosen."), icon: SlidersHorizontal, tone: "violet" },
     { href: "/live-assistant", title: pick("AI vizual în curând", "AI visual coming soon"), description: pick("Scanarea prin cod de bare este activă. Identificarea după ambalaj va fi disponibilă pentru Pro și Family.", "Barcode scanning is active. Package recognition will be available for Pro and Family."), icon: ScanLine, tone: "violet" },
     { href: "/history", title: pick("Istoric", "History"), description: pick("Revino la scanările și analizele recente.", "Return to your recent scans and analyses."), icon: Clock3, tone: "cyan" },
@@ -752,7 +753,7 @@ export default function DashboardPage() {
               </p>
             </div>
 
-            <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-[480px]">
+            <div className="grid w-full grid-cols-2 gap-2 xl:w-[480px]">
               {walletCards.map(({ label, value, detail, icon: Icon, image, tone, actionHref, actionLabel }) => (
                 <div key={label} className={`relative rounded-lg border p-3 pr-9 ${tone}`}>
                   <div className="flex items-center justify-between gap-3">
@@ -1098,7 +1099,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {[
               [pick("Produse în coș", "Cart products"), counts.cart, "ce-stat-cyan", "text-cyan-200"],
               [pick("Scanări salvate", "Saved scans"), counts.history, "ce-stat-cyan", "text-cyan-200"],
@@ -1129,7 +1130,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="mt-8 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+          <div className="ce-mobile-snap-row mt-8 flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 2xl:grid-cols-4">
             {actions.map(({ href, title, description, icon: Icon, tone }) => {
               const selectedTone = ACTION_TONES[tone] || ACTION_TONES.cyan;
 
@@ -1138,7 +1139,7 @@ export default function DashboardPage() {
                   as={Link}
                   key={href}
                   href={href}
-                  className={`group flex items-center gap-4 rounded-lg border p-5 transition hover:-translate-y-0.5 ${selectedTone.card}`}
+                  className={`group flex min-w-[82vw] snap-start items-center gap-4 rounded-lg border p-5 transition hover:-translate-y-0.5 md:min-w-0 ${selectedTone.card}`}
                 >
                   <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${selectedTone.icon}`}>
                     <Icon size={23} />

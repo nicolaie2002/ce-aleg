@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   Barcode,
   Crown,
+  Gift,
   LayoutDashboard,
   Radio,
   ScanLine,
@@ -23,7 +24,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
   const { pick } = useLocale();
   const pathname = usePathname();
   const [cartCount, setCartCount] = useState(0);
-  const navigation = [
+  const desktopNavigation = [
     {
       href: "/dashboard",
       label: pick("Acasă", "Home"),
@@ -35,6 +36,12 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
       label: pick("Scanează", "Scan"),
       desktopLabel: pick("Scanare", "Scanner"),
       icon: Barcode,
+    },
+    {
+      href: "/missions",
+      label: pick("Misiuni", "Missions"),
+      desktopLabel: pick("Misiuni", "Missions"),
+      icon: Gift,
     },
     {
       href: "/live-assistant",
@@ -49,6 +56,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
       icon: ShoppingCart,
     },
   ];
+  const mobileNavigation = desktopNavigation.filter(({ href }) => href !== "/live-assistant");
 
   function isActive(href) {
     return pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));
@@ -162,7 +170,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex" aria-label={pick("Navigare principală", "Main navigation")}>
-            {navigation.map(({ href, desktopLabel, icon: Icon }) => (
+            {desktopNavigation.map(({ href, desktopLabel, icon: Icon }) => (
               <Link
                 key={href}
                 href={href}
@@ -208,7 +216,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
         className="ce-mobile-dock fixed inset-x-3 bottom-3 z-40 grid grid-cols-5 border border-white/12 bg-[#0b1118]/94 p-1.5 shadow-2xl backdrop-blur-xl lg:hidden"
         aria-label={pick("Navigare mobilă", "Mobile navigation")}
       >
-        {navigation.map(({ href, label, icon: Icon }) => (
+        {mobileNavigation.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}
             href={href}

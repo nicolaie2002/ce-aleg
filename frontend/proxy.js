@@ -42,6 +42,7 @@ export const config = {
     "/favorites/:path*",
     "/history/:path*",
     "/live-assistant/:path*",
+    "/missions/:path*",
     "/preferences/:path*",
     "/result/:path*",
     "/scan/:path*",

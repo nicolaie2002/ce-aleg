@@ -15,6 +15,7 @@ export default function robots() {
         "/favorites",
         "/history",
         "/live-assistant",
+        "/missions",
         "/preferences",
         "/reset-password",
         "/result",

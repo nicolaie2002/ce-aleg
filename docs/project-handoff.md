@@ -6,6 +6,17 @@ Ultima actualizare: 2026-07-11
 
 Ce aleg? este o aplicație web publică pentru scanarea produselor alimentare, afișarea unui verdict orientativ și recomandarea de alternative mai potrivite după categorie, preferințe și criterii precum zahăr mai puțin, proteină mai multă, preț mai bun sau altă aromă.
 
+## Goal
+
+Obiectivul proiectului este să lansăm și să creștem `Ce aleg?` ca un asistent de cumpărături pentru România, rapid și ușor de folosit pe telefon, care ajută utilizatorii să scaneze produse la raft, să înțeleagă rapid eticheta și să aleagă alternative mai potrivite. Produsul trebuie să fie suficient de stabil pentru trafic public, plăți reale, conturi reale și promovare pe TikTok/Google, cu accent pe:
+
+- scanare coduri de bare cât mai rapidă și precisă;
+- catalog mare și relevant pentru produse din România;
+- alternative corecte în aceeași familie de produs, nu recomandări fără sens;
+- monetizare prin Pro, Family, CeCoins și bonusuri/recompense;
+- protecție cont, plăți, emailuri, privacy/terms și admin pentru monitorizare;
+- experiență mobilă fluidă, clară și profesională.
+
 Site public: https://www.cealeg.shop  
 Frontend Vercel: https://ce-aleg.vercel.app  
 Backend Render: https://cealeg-api.onrender.com  
@@ -51,9 +62,19 @@ Utilizator
 - Emailuri tranzacționale prin Brevo.
 - Privacy, Terms, Support și documente de go-live.
 
-## Ultima schimbare importantă
+## Schimbări recente importante
 
-Ultimul pachet de lucru a extins masiv taxonomia pentru recomandări:
+Ultimul pachet de lucru a optimizat scannerul de coduri de bare:
+
+- Frontend: `frontend/app/barcode-scan/page.js`
+- Scannerul confirmă codul din mai multe citiri stabile înainte să facă lookup.
+- S-au redus formatele citite la cele relevante pentru produse de supermarket: `EAN-13`, `EAN-8`, `UPC-A`, `ITF`.
+- Codurile invalide sunt respinse local prin checksum GS1 înainte să ajungă la backend.
+- S-a adăugat cooldown pentru același cod și protecție împotriva lookup-urilor duplicate.
+- Detectorul nativ este throttled ca să nu proceseze inutil fiecare frame pe telefoane slabe.
+- Fallback-ul ZXing/OCR folosește aceeași logică de confirmare.
+
+Pachetul anterior a extins masiv taxonomia pentru recomandări:
 
 - Backend: `backend/app.py`
 - Frontend: `frontend/app/alternatives/page.js`
@@ -231,4 +252,3 @@ Apoi verifică:
 - dacă `/api/backend/readiness` răspunde rapid;
 - dacă pachetele CeCoins încă pornesc corect checkout-ul;
 - dacă alternativele pentru `Buldak`, `Ursus`, `Hell Ice Coffee`, `iaurt Zuzu`, `mușchi file` sunt în familii corecte.
-

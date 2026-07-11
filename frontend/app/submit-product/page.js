@@ -14,6 +14,8 @@ function SubmitProductPageContent() {
   const suggestedName = searchParams.get("name") || "";
   const suggestedStore = searchParams.get("store") || "Lidl";
   const suggestedBarcode = searchParams.get("barcode") || "";
+  const suggestedSource = searchParams.get("source") || "";
+  const suggestedBarcodeConfirmed = searchParams.get("barcode_confirmed") === "1";
 
   const [user, setUser] = useState(null);
   const [submissions, setSubmissions] = useState([]);
@@ -195,7 +197,7 @@ function SubmitProductPageContent() {
         throw new Error(data.error || "Nu s-a putut trimite produsul.");
       }
 
-      setMessage("Produsul a fost trimis ca propunere. După verificare și aprobare, primești o scanare bonus.");
+      setMessage("Produsul a fost trimis la verificare. După aprobare primești o scanare bonus și poți revendica 10 CeCoins din misiunea de catalog.");
 
       setForm({
         productName: "",
@@ -351,19 +353,46 @@ function SubmitProductPageContent() {
           </p>
 
           <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
-            Produsele acceptate primesc o scanare bonus. Verificăm propunerile
-            înainte să ajungă în catalog, ca recomandările să rămână curate.
+            Produsele acceptate primesc o scanare bonus, iar misiunea de catalog
+            îți aduce 10 CeCoins după aprobare. Verificăm propunerile înainte să
+            ajungă în catalog, ca recomandările să rămână curate.
           </div>
 
-          {(suggestedName || suggestedStore) && (
+          {(suggestedName || suggestedStore || suggestedBarcode) && (
             <div className="mt-6 rounded-3xl border border-yellow-300/20 bg-yellow-300/10 p-5">
               <h2 className="text-xl font-bold text-yellow-300">
-                Produs venit din scanare
+                {suggestedSource === "barcode_not_found"
+                  ? "Produs negăsit în catalog"
+                  : "Produs venit din scanare"}
               </h2>
               <p className="mt-2 text-sm text-gray-300">
-                Formularul a fost completat automat cu produsul căutat în pagina
-                de scanare. Verifică datele și completează restul informațiilor.
+                Formularul a fost completat cu datele disponibile din scanare.
+                Verifică informațiile și completează restul câmpurilor.
               </p>
+
+              {suggestedBarcode && (
+                <div className={`mt-4 rounded-2xl border p-4 ${
+                  suggestedBarcodeConfirmed
+                    ? "border-cyan-300/25 bg-cyan-300/10"
+                    : "border-yellow-300/25 bg-black/20"
+                }`}>
+                  <p className={`text-sm font-bold ${
+                    suggestedBarcodeConfirmed ? "text-cyan-100" : "text-yellow-100"
+                  }`}>
+                    {suggestedBarcodeConfirmed
+                      ? "Cod de bare confirmat în scanner"
+                      : "Verifică încă o dată codul de bare"}
+                  </p>
+                  <code className="mt-2 block rounded-xl border border-white/10 bg-black/35 px-4 py-3 text-center font-mono text-xl font-black tracking-[0.16em] text-white">
+                    {suggestedBarcode}
+                  </code>
+                  <p className="mt-3 text-sm leading-6 text-gray-300">
+                    {suggestedBarcodeConfirmed
+                      ? "Continuă cu pozele produsului și eticheta nutrițională."
+                      : "Compară cifrele cu cele tipărite sub codul de pe ambalaj. Dacă nu sunt corecte, modifică valoarea în câmpul Cod de bare."}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
