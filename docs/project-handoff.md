@@ -58,14 +58,22 @@ Utilizator
 - Stripe Checkout, Stripe Customer Portal și webhook pentru planuri.
 - CeCoins, misiuni, recompense și pachete Bronze / Gold / Diamond.
 - Pagină publică `Catalog România` cu statistici live despre catalog, lipsuri pe magazine și contribuții comunitare.
-- Admin cu monitorizare, căutare utilizatori după email și stare sistem.
+- Admin cu monitorizare, căutare utilizatori după email, stare sistem și rezolvare rapidă pentru alternative raportate.
 - Raportare alternative greșite.
 - Emailuri tranzacționale prin Brevo.
 - Privacy, Terms, Support și documente de go-live.
 
 ## Schimbări recente importante
 
-Ultimul pachet de lucru a curățat dashboard-ul și a adăugat onboarding mobil:
+Ultimul pachet de lucru a îmbunătățit admin-ul pentru calitatea recomandărilor:
+
+- Backend: `POST /admin/alternative-reports/<event_id>/resolve`
+- Frontend: `frontend/app/admin/page.js`
+- Admin-ul afișează alternativele raportate direct în zona de semnale, cu produs scanat, alternativă, utilizator, magazin și dată.
+- Administratorul poate rula auto-fix pe raportare sau poate aplica manual categoria corectă; produsul primește scor/tag/reason recalculat.
+- Raportarea salvează `adminReview` în metadata și eveniment separat `alternative_report_resolved`.
+
+Pachetul anterior a curățat dashboard-ul și a adăugat onboarding mobil:
 
 - Frontend: `frontend/app/dashboard/page.js`
 - Frontend: `frontend/app/onboarding/page.js`

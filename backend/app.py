@@ -3432,6 +3432,7 @@ ADMIN_ENDPOINTS = {
     "export_admin_search_misses",
     "export_admin_alternative_reports",
     "export_admin_payment_events",
+    "resolve_admin_alternative_report",
     "recategorize_admin_catalog",
     "delete_admin_product",
     "admin_update_user_plan",
@@ -8068,6 +8069,123 @@ def recategorize_admin_catalog():
             else f"Am găsit {result['changed']} produse care pot fi recategorizate."
         ),
         "catalog": get_catalog_quality_snapshot(),
+    })
+
+
+@app.route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"])
+def resolve_admin_alternative_report(event_id):
+    event = UsageEvent.query.filter_by(
+        id=event_id,
+        event_type="alternative_report",
+    ).first()
+
+    if not event:
+        return jsonify({"error": "Raportarea nu exista."}), 404
+
+    data = request.get_json(silent=True) or {}
+    metadata = parse_usage_metadata(event)
+    alternative_product = metadata.get("alternativeProduct")
+
+    if not isinstance(alternative_product, dict) or not alternative_product.get("name"):
+        return jsonify({"error": "Raportarea nu contine alternativa valida."}), 400
+
+    manual_category = str(data.get("category") or "").strip()
+    method = "manual" if manual_category else "auto"
+
+    if manual_category:
+        product = materialize_reported_alternative_product(alternative_product)
+
+        if not product:
+            return jsonify({"error": "Produsul raportat nu a putut fi gasit sau creat."}), 400
+
+        old_category = product.category
+        product.category = manual_category[:100]
+        product.score = calculate_product_score(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        product.tag = generate_product_tag(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        product.reason = generate_product_reason(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        db.session.add(product)
+        fix_result = {
+            "fixed": normalize_search_text(old_category) != normalize_search_text(product.category),
+            "product": product,
+            "oldCategory": old_category,
+            "newCategory": product.category,
+            "family": get_product_recommendation_family(product_to_dict(product)),
+        }
+    else:
+        fix_result = auto_fix_reported_alternative_category(alternative_product)
+
+    if not fix_result or not fix_result.get("product"):
+        return jsonify({"error": "Nu am putut rezolva raportarea automat."}), 400
+
+    product = fix_result["product"]
+    new_category = str(fix_result.get("newCategory") or product.category or "").strip()
+    old_category = str(fix_result.get("oldCategory") or "").strip()
+    fixed_product = product_to_dict(product)
+
+    metadata["alternativeProduct"] = {
+        **alternative_product,
+        "id": product.id,
+        "category": new_category,
+        "family": fix_result.get("family") or get_product_recommendation_family(fixed_product),
+        "source": alternative_product.get("source") or product.store,
+    }
+    metadata["adminReview"] = {
+        "reviewedAt": admin_iso(datetime.utcnow()),
+        "reviewedBy": g.current_user.email,
+        "method": method,
+        "fixed": bool(fix_result.get("fixed")),
+        "productId": product.id,
+        "oldCategory": old_category,
+        "newCategory": new_category,
+    }
+    event.metadata_json = json.dumps(metadata, ensure_ascii=False)
+
+    record_user_event(
+        g.current_user.id,
+        "alternative_report_resolved",
+        "admin",
+        {
+            "reportId": event.id,
+            "productId": product.id,
+            "method": method,
+            "fixed": bool(fix_result.get("fixed")),
+            "oldCategory": old_category,
+            "newCategory": new_category,
+        },
+        commit=False,
+    )
+    db.session.commit()
+
+    return jsonify({
+        "message": (
+            f"Raportarea a fost rezolvata: {old_category or 'fara categorie'} -> {new_category}."
+            if fix_result.get("fixed")
+            else f"Raportarea a fost verificata. Categoria ramane {new_category or 'neschimbata'}."
+        ),
+        "fixed": bool(fix_result.get("fixed")),
+        "product": fixed_product,
+        "event": usage_event_to_admin_dict(event),
     })
 
 

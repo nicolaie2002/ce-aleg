@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   Trash2,
   Users,
+  Wrench,
   XCircle,
 } from "lucide-react";
 import { API_URL } from "../config";
@@ -127,6 +128,8 @@ export default function AdminPage() {
   const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
   const [catalogBusy, setCatalogBusy] = useState("");
   const [catalogPreview, setCatalogPreview] = useState(null);
+  const [reportFixBusyId, setReportFixBusyId] = useState(null);
+  const [reportCategoryEdits, setReportCategoryEdits] = useState({});
 
   async function loadAdmin() {
     setIsLoading(true);
@@ -263,6 +266,36 @@ export default function AdminPage() {
     }
   }
 
+  async function resolveAlternativeReport(eventId, category = "") {
+    setReportFixBusyId(eventId);
+    setMessage(category ? "Aplic categoria pentru alternativa raportată..." : "Verific alternativa raportată...");
+
+    try {
+      const response = await fetch(`${API_URL}/admin/alternative-reports/${eventId}/resolve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(category ? { category } : {}),
+      });
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Raportarea nu a putut fi rezolvată.");
+      }
+
+      setMessage(data.message || "Raportarea a fost rezolvată.");
+      setReportCategoryEdits((current) => {
+        const next = { ...current };
+        delete next[eventId];
+        return next;
+      });
+      await loadAdmin();
+    } catch (error) {
+      setMessage(error.message || "Raportarea nu a putut fi rezolvată.");
+    } finally {
+      setReportFixBusyId(null);
+    }
+  }
+
   const readiness = monitoring?.backend;
   const readinessTone = readiness?.ready
     ? "default"
@@ -270,6 +303,7 @@ export default function AdminPage() {
       ? "danger"
       : "warning";
   const scanIssues = monitoring?.scanIssues || {};
+  const reportedAlternativeReports = scanIssues.reportedAlternatives || [];
   const payments = monitoring?.payments || {};
   const email = monitoring?.email || {};
   const catalog = monitoring?.catalog || {};
@@ -462,6 +496,99 @@ export default function AdminPage() {
               {!(scanIssues.recent || []).length && (
                 <EmptyState>Nu există semnale recente de scanare sau alternative slabe.</EmptyState>
               )}
+            </div>
+
+            <div className="mt-6 border-t border-white/10 pt-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-yellow-100">
+                    <Wrench size={16} /> Alternative raportate
+                  </p>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Repară rapid categoria unei alternative nepotrivite.
+                  </p>
+                </div>
+                <EventPill tone={reportedAlternativeReports.length ? "warning" : "default"}>
+                  {compactNumber(reportedAlternativeReports.length)} rapoarte
+                </EventPill>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {reportedAlternativeReports.map((event) => {
+                  const metadata = event.metadata || {};
+                  const scannedProduct = metadata.scannedProduct || {};
+                  const alternativeProduct = metadata.alternativeProduct || {};
+                  const review = metadata.adminReview || metadata.autoFix || null;
+                  const categoryValue =
+                    reportCategoryEdits[event.id] ?? alternativeProduct.category ?? "";
+
+                  return (
+                    <article key={event.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-black text-white">
+                              {alternativeProduct.name || "Alternativă fără nume"}
+                            </p>
+                            {review && (
+                              <EventPill tone={review.fixed ? "default" : "warning"}>
+                                {review.fixed ? "rezolvat" : "verificat"}
+                              </EventPill>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm leading-6 text-gray-400">
+                            Pentru: {scannedProduct.name || scannedProduct.barcode || "-"} · {event.userEmail} · {formatDate(event.createdAt)}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-500">
+                            Magazin: {metadata.store || "-"} · Cerință: {metadata.request || "-"}
+                          </p>
+                        </div>
+
+                        <div className="flex w-full flex-col gap-2 xl:w-[27rem]">
+                          <label className="text-xs font-black uppercase text-gray-400" htmlFor={`alternative-category-${event.id}`}>
+                            Categoria corectă
+                          </label>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <input
+                              id={`alternative-category-${event.id}`}
+                              value={categoryValue}
+                              onChange={(inputEvent) =>
+                                setReportCategoryEdits((current) => ({
+                                  ...current,
+                                  [event.id]: inputEvent.target.value,
+                                }))
+                              }
+                              className="min-h-11 min-w-0 flex-1 rounded-lg border border-white/10 bg-black/30 px-3 text-sm font-semibold text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
+                              placeholder="ex: Iaurturi, Bere, Mezeluri"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => resolveAlternativeReport(event.id)}
+                              disabled={reportFixBusyId === event.id}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
+                            >
+                              <RefreshCw size={15} className={reportFixBusyId === event.id ? "animate-spin" : ""} />
+                              Auto
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => resolveAlternativeReport(event.id, categoryValue.trim())}
+                              disabled={reportFixBusyId === event.id || !categoryValue.trim()}
+                              className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-3 py-2 text-sm font-black text-black hover:bg-white disabled:opacity-60"
+                            >
+                              <CheckCircle2 size={15} />
+                              Aplică
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+                {!reportedAlternativeReports.length && (
+                  <EmptyState>Nu există alternative raportate în intervalul selectat.</EmptyState>
+                )}
+              </div>
             </div>
           </div>
 
