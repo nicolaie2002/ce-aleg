@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Flag, Heart, Loader2, Search, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Flag, Heart, Loader2, Search, ShoppingCart, Shuffle } from "lucide-react";
 import { API_URL } from "../config";
 import { getImageUrl } from "../utils/getImageUrl";
 import { trackEvent } from "../utils/analytics";
@@ -21,7 +21,8 @@ const criteriaLabels = {
   lactose_free: "fără lactoză",
   natural: "ingrediente mai curate",
   caffeine: "mai multă cafeină",
-  value: "best value",
+  different_flavor: "altă aromă",
+  value: "raport calitate-preț mai bun",
 };
 
 const goalCriteriaMap = {
@@ -93,13 +94,192 @@ function normalizeCategory(category) {
 
 function getProductFamily(product) {
   const text = productSearchText(product);
-  const hasAny = (tokens) => tokens.some((token) => text.includes(token));
+  const hasAny = (tokens) => tokens.some((token) => text.includes(normalizeText(token)));
   const labelText = normalizeText(
     [product.name, product.brand, product.category, product.store, product.tag, product.nutriScore]
       .filter(Boolean)
       .join(" ")
   );
-  const labelHasAny = (tokens) => tokens.some((token) => labelText.includes(token));
+  const labelHasAny = (tokens) => tokens.some((token) => labelText.includes(normalizeText(token)));
+
+  if (hasAny(["buldak", "samyang", "shin ramyun", "ramen", "instant noodles", "taitei instant", "tăiței instant", "cup noodles", "noodles cup", "tăiței la pahar", "taitei la pahar"])) {
+    if (hasAny(["cup noodles", "noodles cup", "tăiței la pahar", "taitei la pahar"])) {
+      return "cup_noodles";
+    }
+
+    return "ramen_noodles";
+  }
+
+  if (hasAny(["ice coffee", "iced coffee", "cafea", "coffee", "cappuccino", "capuccino", "latte", "mocha", "espresso", "cold brew", "frappe"])) {
+    return "coffee_drink";
+  }
+
+  const priorityRules = [
+    ["sparkling_water", ["apă minerală", "apa minerala", "apă carbogazoasă", "apa carbogazoasa", "sparkling water", "mineral water"]],
+    ["still_water", ["apă plată", "apa plata", "still water", "spring water"]],
+    ["flavoured_water", ["apă aromată", "apa aromata", "flavoured water", "flavored water", "vitamin water"]],
+    ["zero_energy_drink", ["red bull zero", "redbull zero", "monster zero", "monster ultra", "hell zero", "energy zero", "zero sugar energy", "energizant zero"]],
+    ["energy_shot", ["energy shot", "shot energizant"]],
+    ["cola_zero", ["cola zero", "coke zero", "coca cola zero", "coca-cola zero", "pepsi max", "pepsi zero"]],
+    ["cola_regular", ["coca cola", "coca-cola", "cocacola", "pepsi", "cola original"]],
+    ["orange_soda", ["fanta", "mirinda", "orange soda", "băutură portocale", "bautura portocale"]],
+    ["lemon_lime_soda", ["sprite", "7up", "seven up", "lemon lime", "băutură lămâie", "bautura lamaie"]],
+    ["tonic_soda", ["schweppes", "tonic", "bitter lemon"]],
+    ["lemonade", ["limonadă", "limonada", "lemonade"]],
+    ["iced_tea", ["ice tea", "iced tea", "ceai rece", "fuzetea", "lipton"]],
+    ["kombucha", ["kombucha"]],
+    ["cocoa_drink", ["cacao băutură", "cacao bautura", "hot chocolate", "ciocolată caldă", "ciocolata calda", "choco drink"]],
+    ["drinkable_yogurt", ["iaurt de băut", "iaurt de baut", "drinkable yogurt", "yogurt drink", "actimel"]],
+    ["protein_yogurt", ["iaurt proteic", "protein yogurt", "skyr proteic", "high protein yogurt"]],
+    ["greek_yogurt", ["iaurt grecesc", "greek yogurt"]],
+    ["sour_cream", ["smântână", "smantana", "sour cream"]],
+    ["whipped_cream", ["frișcă", "frisca", "whipping cream", "hulala", "spray cream"]],
+    ["cheese_spread", ["cremă de brânză", "crema de branza", "cream cheese", "tartinabil"]],
+    ["processed_cheese", ["brânză topită", "branza topita", "processed cheese"]],
+    ["hard_cheese", ["cașcaval", "cascaval", "cheddar", "gouda", "emmental", "parmesan"]],
+    ["soft_cheese", ["mozzarella", "brie", "camembert", "mascarpone"]],
+    ["feta_telemea", ["telemea", "feta"]],
+    ["milk_chocolate", ["ciocolată cu lapte", "ciocolata cu lapte", "milk chocolate"]],
+    ["dark_chocolate", ["ciocolată neagră", "ciocolata neagra", "dark chocolate", "amăruie", "amaruie"]],
+    ["white_chocolate", ["ciocolată albă", "ciocolata alba", "white chocolate"]],
+    ["filled_chocolate", ["ciocolată umplută", "ciocolata umpluta", "filled chocolate", "praline"]],
+    ["wafers", ["napolitană", "napolitana", "wafer", "wafers"]],
+    ["cookies", ["cookies", "biscuiți", "biscuiti", "biscuit"]],
+    ["croissant", ["croissant"]],
+    ["sweet_bakery", ["gogoașă", "gogoasa", "brioche", "cozonac", "chec", "muffin", "brownie"]],
+    ["cereal_bar", ["baton cereale", "baton cu cereale", "cereal bar"]],
+    ["protein_bar", ["baton proteic", "protein bar"]],
+    ["potato_chips", ["chips cartofi", "cartofi chips", "potato chips", "lays", "lay's", "pringles"]],
+    ["tortilla_chips", ["tortilla chips", "nachos", "doritos"]],
+    ["puffs", ["pufuleți", "pufuleti", "porumb expandat", "snack porumb"]],
+    ["pretzels", ["covrigei", "pretzels", "sticks", "sărățele", "saratele"]],
+    ["roasted_nuts", ["arahide prăjite", "arahide prajite", "alune prăjite", "alune prajite", "migdale", "caju", "fistic"]],
+    ["dried_fruit", ["fructe uscate", "stafide", "curmale", "prune uscate", "dried fruit"]],
+    ["tomato_sauce", ["sos de roșii", "sos de rosii", "tomato sauce", "passata", "bulion"]],
+    ["hot_sauce", ["sos iute", "hot sauce", "chili sauce", "sriracha", "tabasco"]],
+    ["soy_sauce", ["sos de soia", "soy sauce"]],
+    ["salad_dressing", ["dressing", "salad dressing", "vinegret"]],
+    ["pesto_sauce", ["pesto"]],
+    ["pasta_sauce", ["sos paste", "sos pentru paste", "pasta sauce", "bolognese", "carbonara"]],
+    ["olive_oil", ["ulei de măsline", "ulei de masline", "olive oil"]],
+    ["sunflower_oil", ["ulei de floarea soarelui", "sunflower oil"]],
+    ["tomato_canned", ["conservă roșii", "conserva rosii", "canned tomatoes", "roșii cuburi", "rosii cuburi"]],
+    ["corn_canned", ["conservă porumb", "conserva porumb", "canned corn", "porumb dulce"]],
+    ["bean_canned", ["conservă fasole", "conserva fasole", "canned beans"]],
+    ["tuna_canned", ["conservă ton", "conserva ton", "canned tuna", "ton conservă", "ton conserva"]],
+    ["pate", ["pate", "pateu"]],
+    ["olives", ["măsline", "masline", "olives"]],
+    ["pickled_cucumbers", ["castraveți murați", "castraveti murati", "pickled cucumbers"]],
+    ["spaghetti_pasta", ["spaghetti", "spaghete"]],
+    ["short_pasta", ["penne", "fusilli", "farfalle", "macaroni", "macaroane"]],
+    ["basmati_rice", ["basmati"]],
+    ["round_rice", ["orez bob rotund", "round rice", "risotto"]],
+    ["wheat_flour", ["făină albă", "faina alba", "wheat flour", "făină grâu", "faina grau"]],
+    ["cornmeal", ["mălai", "malai", "cornmeal"]],
+    ["cocoa_powder", ["cacao pudră", "cacao pudra", "cocoa powder"]],
+    ["yeast_baking", ["drojdie", "yeast", "praf de copt", "baking powder"]],
+    ["salami", ["salam", "salami"]],
+    ["ham", ["mușchi file", "muschi file", "șuncă", "sunca", "ham", "jambon", "prosciutto"]],
+    ["sausages", ["cârnați", "carnati", "sausage", "cremvurști", "crenvursti"]],
+    ["chicken_meat", ["pui", "chicken"]],
+    ["pork_meat", ["porc", "pork"]],
+    ["beef_meat", ["vită", "vita", "beef"]],
+    ["turkey_meat", ["curcan", "turkey"]],
+    ["minced_meat", ["carne tocată", "carne tocata", "minced meat"]],
+    ["smoked_fish", ["pește afumat", "peste afumat", "smoked fish", "somon afumat"]],
+    ["frozen_fries", ["cartofi congelați", "cartofi congelati", "frozen fries"]],
+    ["frozen_pizza", ["pizza congelată", "pizza congelata", "frozen pizza"]],
+    ["ready_pasta", ["paste gata", "ready pasta", "pasta salad"]],
+    ["ready_salad", ["salată gata", "salata gata", "ready salad"]],
+    ["hummus", ["hummus", "humus"]],
+    ["baby_puree_fruit", ["piure fructe bebeluși", "piure fructe bebelusi", "baby fruit puree"]],
+    ["baby_puree_vegetable", ["piure legume bebeluși", "piure legume bebelusi", "baby vegetable puree"]],
+  ];
+  priorityRules.push(
+    ["apple_juice", ["suc de mere", "apple juice"]],
+    ["orange_juice", ["suc de portocale", "orange juice"]],
+    ["multivitamin_juice", ["multivitamin", "multi vitamin", "suc multifruct", "suc tropical"]],
+    ["smoothie", ["smoothie"]],
+    ["nectar", ["nectar"]],
+    ["isotonic_drink", ["isotonic", "izotonic", "gatorade", "powerade", "sport drink", "sports drink"]],
+    ["alcohol_free_beer", ["bere fără alcool", "bere fara alcool", "non alcoholic beer", "alcohol free beer", "0.0 beer", "0,0 beer"]],
+    ["radler_beer", ["radler"]],
+    ["lager_beer", ["lager", "pilsner", "pils", "bere blondă", "bere blonda"]],
+    ["wheat_beer", ["bere nefiltrată", "bere nefiltrata", "weissbier", "weizen", "wheat beer"]],
+    ["dark_beer", ["bere brună", "bere bruna", "dark beer", "stout", "porter"]],
+    ["uht_milk", ["lapte uht", "uht milk"]],
+    ["lactose_free_milk", ["lapte fără lactoză", "lapte fara lactoza", "lactose free milk"]],
+    ["oat_milk", ["băutură ovăz", "bautura ovaz", "lapte ovăz", "lapte ovaz", "oat drink", "oat milk"]],
+    ["almond_milk", ["băutură migdale", "bautura migdale", "lapte migdale", "almond drink", "almond milk"]],
+    ["soy_milk", ["băutură soia", "bautura soia", "lapte soia", "soy drink", "soy milk"]],
+    ["kefir", ["kefir", "chefir", "sana", "lapte bătut", "lapte batut"]],
+    ["protein_pudding", ["budincă proteică", "budinca proteica", "protein pudding"]],
+    ["pudding", ["budincă", "budinca", "pudding", "danette"]],
+    ["rice_pudding", ["orez cu lapte", "rice pudding"]],
+    ["custard_dessert", ["cremă desert", "crema desert", "custard"]],
+    ["ice_cream_bar", ["înghețată baton", "inghetata baton", "ice cream bar", "magnum"]],
+    ["ice_cream_cone", ["înghețată cornet", "inghetata cornet", "ice cream cone", "cornet"]],
+    ["ice_cream_cup", ["înghețată cupă", "inghetata cupa", "ice cream cup", "gelatelli"]],
+    ["sorbet", ["sorbet"]],
+    ["cornflakes", ["corn flakes", "fulgi de porumb"]],
+    ["muesli", ["muesli", "musli"]],
+    ["granola", ["granola"]],
+    ["oats", ["ovăz", "ovaz", "oat flakes", "fulgi de ovăz", "fulgi de ovaz"]],
+    ["rice_cakes", ["rondele orez", "rice cakes", "puffed rice cakes"]],
+    ["sunflower_seeds", ["semințe floarea soarelui", "seminte floarea soarelui", "sunflower seeds"]],
+    ["pumpkin_seeds", ["semințe dovleac", "seminte dovleac", "pumpkin seeds"]],
+    ["trail_mix", ["mix fructe uscate", "trail mix", "student mix"]],
+    ["bbq_sauce", ["sos barbeque", "sos barbecue", "bbq sauce"]],
+    ["garlic_sauce", ["sos usturoi", "garlic sauce"]],
+    ["salsa_sauce", ["salsa", "chunky salsa"]],
+    ["sweet_chili_sauce", ["sweet chili", "sos chili dulce"]],
+    ["dijon_mustard", ["dijon"]],
+    ["light_mayonnaise", ["maioneză light", "maioneza light", "light mayonnaise"]],
+    ["salt", ["sare", "salt"]],
+    ["pepper", ["piper", "pepper"]],
+    ["paprika", ["boia", "paprika"]],
+    ["spice_mix", ["mix condimente", "amestec condimente", "seasoning mix", "condimente pentru"]],
+    ["stock_cube", ["cub supă", "cub supa", "stock cube", "bouillon"]],
+    ["toast_bread", ["pâine toast", "paine toast", "toast bread"]],
+    ["sliced_bread", ["pâine feliată", "paine feliata", "sliced bread"]],
+    ["wholegrain_bread", ["pâine integrală", "paine integrala", "wholegrain bread", "whole wheat bread"]],
+    ["buns", ["chifle", "burger buns", "hot dog buns"]],
+    ["tortilla_wrap", ["tortilla wrap", "lipie", "wrap"]],
+    ["cup_noodles", ["cup noodles", "noodles cup", "tăiței la pahar", "taitei la pahar"]],
+    ["ramen_noodles", ["ramen", "buldak", "samyang", "shin ramyun"]],
+    ["whey_protein", ["whey protein", "proteină zer", "proteina zer", "protein powder", "pudră proteică", "pudra proteica"]],
+    ["canned_sardines", ["sardine", "sardines"]],
+    ["canned_mackerel", ["macrou conservă", "macrou conserva", "canned mackerel"]],
+    ["canned_peas", ["mazăre conservă", "mazare conserva", "canned peas"]],
+    ["canned_chickpeas", ["năut conservă", "naut conserva", "canned chickpeas"]],
+    ["canned_lentils", ["linte conservă", "linte conserva", "canned lentils"]],
+    ["vegetable_spread", ["pastă vegetală", "pasta vegetala", "vegetable spread", "zacuscă", "zacusca"]],
+    ["jam", ["gem", "dulceață", "dulceata", "marmeladă", "marmelada"]],
+    ["honey", ["miere", "honey"]],
+    ["frozen_fruit", ["fructe congelate", "frozen fruit"]],
+    ["frozen_vegetable_mix", ["mix legume congelate", "amestec legume congelate", "frozen vegetable mix"]],
+    ["frozen_dessert", ["desert congelat", "frozen dessert"]],
+    ["baby_biscuits", ["biscuiți bebeluși", "biscuiti bebelusi", "baby biscuits"]],
+    ["baby_snack", ["snack bebeluși", "snack bebelusi", "baby snack"]]
+  );
+
+  for (const [family, tokens] of priorityRules) {
+    const labelOnlyFamilies = new Set([
+      "sparkling_water",
+      "still_water",
+      "olive_oil",
+      "sunflower_oil",
+      "wheat_flour",
+      "cornmeal",
+      "cocoa_powder",
+      "yeast_baking",
+    ]);
+    const source = labelOnlyFamilies.has(family) ? labelText : text;
+
+    if (tokens.some((token) => source.includes(normalizeText(token)))) {
+      return family;
+    }
+  }
 
   if (hasAny(["buldak", "samyang", "noodle", "noodles", "ramen", "taitei"])) return "instant_noodles";
   if (hasAny(["bere", "beer", "ursus", "ciuc", "bergenbier", "heineken", "lager", "pilsner"])) return "beer";
@@ -259,6 +439,168 @@ const familyCompatibility = {
   baby_puree: ["baby_puree", "baby_food"],
   instant_noodles: ["instant_noodles"],
 };
+
+Object.assign(familyCompatibility, {
+  still_water: ["still_water", "water"],
+  sparkling_water: ["sparkling_water", "water"],
+  lemonade: ["lemonade", "fruit_juice", "carbonated_soft_drink"],
+  iced_tea: ["iced_tea", "tea_drink"],
+  kombucha: ["kombucha", "tea_drink"],
+  orange_soda: ["orange_soda", "carbonated_soft_drink"],
+  lemon_lime_soda: ["lemon_lime_soda", "carbonated_soft_drink"],
+  tonic_soda: ["tonic_soda", "carbonated_soft_drink"],
+  cola_zero: ["cola_zero", "cola", "cola_regular", "zero_energy_drink"],
+  cola_regular: ["cola_regular", "cola", "cola_zero"],
+  zero_energy_drink: ["zero_energy_drink", "energy_drink", "energy_shot", "caffeinated_beverage", "cola_zero"],
+  energy_shot: ["energy_shot", "zero_energy_drink", "energy_drink", "caffeinated_beverage"],
+  cocoa_drink: ["cocoa_drink", "coffee_drink", "milk"],
+  drinkable_yogurt: ["drinkable_yogurt", "fruit_yogurt", "plain_yogurt", "kefir", "plant_yogurt"],
+  protein_yogurt: ["protein_yogurt", "greek_yogurt", "plain_yogurt", "fruit_yogurt", "plant_yogurt"],
+  greek_yogurt: ["greek_yogurt", "plain_yogurt", "protein_yogurt", "fruit_yogurt"],
+  sour_cream: ["sour_cream", "cream"],
+  whipped_cream: ["whipped_cream", "cream"],
+  cheese_spread: ["cheese_spread", "processed_cheese", "cheese"],
+  processed_cheese: ["processed_cheese", "cheese_spread", "cheese"],
+  hard_cheese: ["hard_cheese", "cheese"],
+  soft_cheese: ["soft_cheese", "cheese"],
+  feta_telemea: ["feta_telemea", "cheese"],
+  milk_chocolate: ["milk_chocolate", "filled_chocolate", "chocolate"],
+  dark_chocolate: ["dark_chocolate", "chocolate"],
+  white_chocolate: ["white_chocolate", "filled_chocolate", "chocolate"],
+  filled_chocolate: ["filled_chocolate", "milk_chocolate", "white_chocolate", "chocolate"],
+  wafers: ["wafers", "biscuits_wafers", "cookies"],
+  cookies: ["cookies", "biscuits_wafers", "wafers"],
+  croissant: ["croissant", "sweet_bakery", "bakery_pastry"],
+  sweet_bakery: ["sweet_bakery", "croissant", "cakes", "bakery_pastry"],
+  cereal_bar: ["cereal_bar", "protein_bar", "breakfast_cereal"],
+  protein_bar: ["protein_bar", "cereal_bar", "protein"],
+  potato_chips: ["potato_chips", "chips"],
+  tortilla_chips: ["tortilla_chips", "chips"],
+  puffs: ["puffs", "salty_snack"],
+  pretzels: ["pretzels", "crackers", "salty_snack"],
+  roasted_nuts: ["roasted_nuts", "nuts"],
+  dried_fruit: ["dried_fruit", "nuts"],
+  tomato_sauce: ["tomato_sauce", "pasta_sauce", "sauce"],
+  hot_sauce: ["hot_sauce", "sauce"],
+  soy_sauce: ["soy_sauce", "sauce"],
+  salad_dressing: ["salad_dressing", "sauce"],
+  pesto_sauce: ["pesto_sauce", "pasta_sauce", "sauce"],
+  pasta_sauce: ["pasta_sauce", "tomato_sauce", "pesto_sauce", "sauce"],
+  olive_oil: ["olive_oil", "oil"],
+  sunflower_oil: ["sunflower_oil", "oil"],
+  spaghetti_pasta: ["spaghetti_pasta", "short_pasta", "pasta"],
+  short_pasta: ["short_pasta", "spaghetti_pasta", "pasta"],
+  basmati_rice: ["basmati_rice", "rice"],
+  round_rice: ["round_rice", "rice"],
+  wheat_flour: ["wheat_flour", "flour_baking"],
+  cornmeal: ["cornmeal", "flour_baking"],
+  cocoa_powder: ["cocoa_powder", "flour_baking"],
+  yeast_baking: ["yeast_baking", "flour_baking"],
+  salami: ["salami", "processed_meat"],
+  ham: ["ham", "processed_meat"],
+  sausages: ["sausages", "processed_meat"],
+  chicken_meat: ["chicken_meat", "fresh_meat"],
+  pork_meat: ["pork_meat", "fresh_meat"],
+  beef_meat: ["beef_meat", "fresh_meat"],
+  turkey_meat: ["turkey_meat", "fresh_meat"],
+  minced_meat: ["minced_meat", "fresh_meat"],
+  smoked_fish: ["smoked_fish", "fish"],
+  frozen_fries: ["frozen_fries", "frozen"],
+  frozen_pizza: ["frozen_pizza", "pizza", "frozen"],
+  frozen_meal: ["frozen_meal", "ready_meal", "frozen"],
+  ready_pasta: ["ready_pasta", "ready_meal", "pasta"],
+  ready_salad: ["ready_salad", "sandwich_salad", "ready_meal"],
+  hummus: ["hummus", "ready_meal", "plant_based"],
+  tomato_canned: ["tomato_canned", "canned_vegetables"],
+  corn_canned: ["corn_canned", "canned_vegetables"],
+  bean_canned: ["bean_canned", "canned_vegetables", "legumes"],
+  tuna_canned: ["tuna_canned", "canned_fish"],
+  pate: ["pate", "canned_meat"],
+  olives: ["olives", "pickles_olives"],
+  pickled_cucumbers: ["pickled_cucumbers", "pickles_olives"],
+  baby_puree_fruit: ["baby_puree_fruit", "baby_puree", "baby_food"],
+  baby_puree_vegetable: ["baby_puree_vegetable", "baby_puree", "baby_food"],
+  apple_juice: ["apple_juice", "fruit_juice", "nectar", "smoothie", "multivitamin_juice"],
+  orange_juice: ["orange_juice", "fruit_juice", "nectar", "smoothie", "multivitamin_juice"],
+  multivitamin_juice: ["multivitamin_juice", "fruit_juice", "apple_juice", "orange_juice", "nectar", "smoothie"],
+  smoothie: ["smoothie", "fruit_juice", "nectar", "apple_juice", "orange_juice", "multivitamin_juice"],
+  nectar: ["nectar", "fruit_juice", "apple_juice", "orange_juice", "multivitamin_juice", "smoothie"],
+  isotonic_drink: ["isotonic_drink", "sports_drink", "energy_drink", "zero_energy_drink"],
+  alcohol_free_beer: ["alcohol_free_beer", "beer", "radler_beer", "lager_beer"],
+  radler_beer: ["radler_beer", "beer", "alcohol_free_beer", "lager_beer"],
+  lager_beer: ["lager_beer", "beer", "radler_beer", "alcohol_free_beer", "wheat_beer", "dark_beer"],
+  wheat_beer: ["wheat_beer", "beer", "lager_beer", "dark_beer"],
+  dark_beer: ["dark_beer", "beer", "lager_beer", "wheat_beer"],
+  uht_milk: ["uht_milk", "milk", "lactose_free_milk"],
+  lactose_free_milk: ["lactose_free_milk", "milk", "uht_milk", "plant_milk"],
+  oat_milk: ["oat_milk", "plant_milk", "almond_milk", "soy_milk"],
+  almond_milk: ["almond_milk", "plant_milk", "oat_milk", "soy_milk"],
+  soy_milk: ["soy_milk", "plant_milk", "oat_milk", "almond_milk"],
+  protein_pudding: ["protein_pudding", "pudding", "dairy_dessert", "protein_yogurt"],
+  pudding: ["pudding", "protein_pudding", "rice_pudding", "custard_dessert", "dairy_dessert"],
+  rice_pudding: ["rice_pudding", "pudding", "custard_dessert", "dairy_dessert"],
+  custard_dessert: ["custard_dessert", "pudding", "rice_pudding", "dairy_dessert"],
+  ice_cream_bar: ["ice_cream_bar", "ice_cream_cone", "ice_cream_cup", "sorbet", "ice_cream"],
+  ice_cream_cone: ["ice_cream_cone", "ice_cream_bar", "ice_cream_cup", "sorbet", "ice_cream"],
+  ice_cream_cup: ["ice_cream_cup", "ice_cream_bar", "ice_cream_cone", "sorbet", "ice_cream"],
+  sorbet: ["sorbet", "ice_cream", "ice_cream_bar", "ice_cream_cone", "ice_cream_cup"],
+  cornflakes: ["cornflakes", "breakfast_cereal", "muesli", "granola"],
+  muesli: ["muesli", "breakfast_cereal", "granola", "oats", "cornflakes"],
+  granola: ["granola", "breakfast_cereal", "muesli", "oats", "cereal_bar"],
+  oats: ["oats", "oats_granola", "muesli", "granola"],
+  rice_cakes: ["rice_cakes", "salty_snack", "crackers"],
+  sunflower_seeds: ["sunflower_seeds", "pumpkin_seeds", "roasted_nuts", "nuts"],
+  pumpkin_seeds: ["pumpkin_seeds", "sunflower_seeds", "roasted_nuts", "nuts"],
+  trail_mix: ["trail_mix", "nuts", "roasted_nuts", "dried_fruit"],
+  bbq_sauce: ["bbq_sauce", "sauce", "hot_sauce", "tomato_sauce"],
+  garlic_sauce: ["garlic_sauce", "sauce", "mayonnaise", "salad_dressing"],
+  salsa_sauce: ["salsa_sauce", "sauce", "tomato_sauce", "hot_sauce"],
+  sweet_chili_sauce: ["sweet_chili_sauce", "sauce", "hot_sauce"],
+  dijon_mustard: ["dijon_mustard", "mustard", "sauce"],
+  light_mayonnaise: ["light_mayonnaise", "mayonnaise", "sauce", "salad_dressing"],
+  salt: ["salt", "spices"],
+  pepper: ["pepper", "spices"],
+  paprika: ["paprika", "spices", "spice_mix"],
+  spice_mix: ["spice_mix", "spices", "paprika", "stock_cube"],
+  stock_cube: ["stock_cube", "spice_mix", "spices"],
+  toast_bread: ["toast_bread", "sliced_bread", "wholegrain_bread", "bread"],
+  sliced_bread: ["sliced_bread", "toast_bread", "wholegrain_bread", "bread"],
+  wholegrain_bread: ["wholegrain_bread", "sliced_bread", "toast_bread", "bread"],
+  buns: ["buns", "bread", "toast_bread", "sliced_bread"],
+  tortilla_wrap: ["tortilla_wrap", "bread", "bakery_pastry"],
+  cup_noodles: ["cup_noodles", "ramen_noodles", "instant_noodles"],
+  ramen_noodles: ["ramen_noodles", "cup_noodles", "instant_noodles"],
+  whey_protein: ["whey_protein", "protein", "protein_bar"],
+  canned_sardines: ["canned_sardines", "canned_fish", "tuna_canned", "canned_mackerel", "fish"],
+  canned_mackerel: ["canned_mackerel", "canned_fish", "tuna_canned", "canned_sardines", "fish"],
+  canned_peas: ["canned_peas", "canned_vegetables", "canned_chickpeas", "canned_lentils", "legumes"],
+  canned_chickpeas: ["canned_chickpeas", "canned_vegetables", "canned_peas", "canned_lentils", "legumes"],
+  canned_lentils: ["canned_lentils", "canned_vegetables", "canned_peas", "canned_chickpeas", "legumes"],
+  vegetable_spread: ["vegetable_spread", "spread", "hummus", "plant_based"],
+  jam: ["jam", "jam_honey", "honey", "spread"],
+  honey: ["honey", "jam", "jam_honey", "spread"],
+  frozen_fruit: ["frozen_fruit", "frozen"],
+  frozen_vegetable_mix: ["frozen_vegetable_mix", "frozen_vegetable", "frozen"],
+  frozen_dessert: ["frozen_dessert", "ice_cream", "sorbet", "frozen"],
+  baby_biscuits: ["baby_biscuits", "baby_snack", "baby_food"],
+  baby_snack: ["baby_snack", "baby_biscuits", "baby_food"],
+});
+
+familyCompatibility.fruit_juice = [
+  ...new Set([...(familyCompatibility.fruit_juice || []), "apple_juice", "orange_juice", "multivitamin_juice", "smoothie", "nectar"]),
+];
+familyCompatibility.sports_drink = [...new Set([...(familyCompatibility.sports_drink || []), "isotonic_drink", "zero_energy_drink"])];
+familyCompatibility.beer = [...new Set([...(familyCompatibility.beer || []), "alcohol_free_beer", "radler_beer", "lager_beer", "wheat_beer", "dark_beer"])];
+familyCompatibility.milk = [...new Set([...(familyCompatibility.milk || []), "uht_milk", "lactose_free_milk", "oat_milk", "almond_milk", "soy_milk"])];
+familyCompatibility.plant_milk = [...new Set([...(familyCompatibility.plant_milk || []), "oat_milk", "almond_milk", "soy_milk", "lactose_free_milk"])];
+familyCompatibility.dairy_dessert = [...new Set([...(familyCompatibility.dairy_dessert || []), "pudding", "protein_pudding", "rice_pudding", "custard_dessert"])];
+familyCompatibility.ice_cream = [...new Set([...(familyCompatibility.ice_cream || []), "ice_cream_bar", "ice_cream_cone", "ice_cream_cup", "sorbet", "frozen_dessert"])];
+familyCompatibility.breakfast_cereal = [...new Set([...(familyCompatibility.breakfast_cereal || []), "cornflakes", "muesli", "granola", "oats"])];
+familyCompatibility.sauce = [...new Set([...(familyCompatibility.sauce || []), "bbq_sauce", "garlic_sauce", "salsa_sauce", "sweet_chili_sauce", "dijon_mustard", "light_mayonnaise"])];
+familyCompatibility.bread = [...new Set([...(familyCompatibility.bread || []), "toast_bread", "sliced_bread", "wholegrain_bread", "buns", "tortilla_wrap"])];
+familyCompatibility.instant_noodles = [...new Set([...(familyCompatibility.instant_noodles || []), "cup_noodles", "ramen_noodles"])];
+familyCompatibility.spread = [...new Set([...(familyCompatibility.spread || []), "vegetable_spread", "jam", "honey"])];
+familyCompatibility.frozen = [...new Set([...(familyCompatibility.frozen || []), "frozen_fruit", "frozen_vegetable_mix", "frozen_dessert"])];
 
 function areCompatibleFamilies(scannedProduct, candidate) {
   if (!scannedProduct) return true;
@@ -467,6 +809,17 @@ function inferCriteriaFromRequest(requestText) {
     inferred.push("value");
   }
 
+  if (
+    text.includes("alta aroma") ||
+    text.includes("alt gust") ||
+    text.includes("gust diferit") ||
+    text.includes("aroma diferita") ||
+    text.includes("alt sortiment") ||
+    text.includes("alta varianta")
+  ) {
+    inferred.push("different_flavor");
+  }
+
   return inferred;
 }
 
@@ -553,6 +906,52 @@ function productIngredientText(product) {
       .filter(Boolean)
       .join(" ")
   );
+}
+
+const flavorKeywords = {
+  vanilla: ["vanilie", "vanilla"],
+  chocolate: ["ciocolată", "ciocolata", "chocolate", "cacao", "cocoa"],
+  strawberry: ["căpșuni", "capsuni", "strawberry"],
+  raspberry: ["zmeură", "zmeura", "raspberry"],
+  blueberry: ["afine", "blueberry"],
+  peach: ["piersică", "piersica", "peach"],
+  apricot: ["caise", "apricot"],
+  cherry: ["cireșe", "cirese", "vișine", "visine", "cherry"],
+  forest_fruit: ["fructe de pădure", "fructe de padure", "berries", "forest fruits"],
+  banana: ["banane", "banana"],
+  apple: ["măr", "mar", "mere", "apple"],
+  orange: ["portocale", "portocală", "portocala", "orange"],
+  lemon: ["lămâie", "lamaie", "lemon"],
+  lime: ["lime"],
+  cola: ["cola"],
+  grape: ["struguri", "grape"],
+  mango: ["mango"],
+  pineapple: ["ananas", "pineapple"],
+  coconut: ["cocos", "coconut"],
+  caramel: ["caramel"],
+  hazelnut: ["alune", "hazelnut"],
+  peanut: ["arahide", "peanut"],
+  pistachio: ["fistic", "pistachio"],
+  bbq: ["bbq", "barbecue"],
+  cheese: ["brânză", "branza", "cheese"],
+  onion: ["ceapă", "ceapa", "onion"],
+  paprika: ["paprika", "boia"],
+  spicy: ["picant", "iute", "spicy", "hot"],
+  salted: ["sărat", "sarat", "salted"],
+  natural: ["natural", "plain", "simplu", "original", "classic", "clasic"],
+  zero: ["zero", "fără zahăr", "fara zahar", "no sugar"],
+};
+
+function extractProductFlavor(product) {
+  const haystack = productSearchText(product);
+
+  for (const [flavor, tokens] of Object.entries(flavorKeywords)) {
+    if (tokens.some((token) => haystack.includes(normalizeText(token)))) {
+      return flavor;
+    }
+  }
+
+  return "";
 }
 
 function splitAvoidIngredients(value) {
@@ -664,7 +1063,7 @@ function getNormalizedPreferenceScore(products, product, field, preferHigher) {
   return preferHigher ? normalized : 1 - normalized;
 }
 
-function calculateAlternativeScore(products, product, criteriaList) {
+function calculateAlternativeScore(products, product, criteriaList, scannedProduct = null) {
   let score = Number(product.recommendationScore ?? product.score) || 0;
 
   if (product.image) score += 1;
@@ -703,6 +1102,17 @@ function calculateAlternativeScore(products, product, criteriaList) {
 
   if (criteriaList.includes("value")) {
     score += (Number(product.score) || 0) * 1.5;
+  }
+
+  if (criteriaList.includes("different_flavor") && scannedProduct) {
+    const scannedFlavor = extractProductFlavor(scannedProduct);
+    const candidateFlavor = extractProductFlavor(product);
+
+    if (scannedFlavor && candidateFlavor && scannedFlavor !== candidateFlavor) {
+      score += 14;
+    } else if (scannedFlavor && candidateFlavor && scannedFlavor === candidateFlavor) {
+      score -= 10;
+    }
   }
 
   return score;
@@ -867,10 +1277,25 @@ function filterProductsByCriteria(
     }
   }
 
+  if (criteriaList.includes("different_flavor") && scannedProduct) {
+    const scannedFlavor = extractProductFlavor(scannedProduct);
+
+    if (scannedFlavor) {
+      const differentFlavorProducts = filteredProducts.filter((product) => {
+        const candidateFlavor = extractProductFlavor(product);
+        return candidateFlavor && candidateFlavor !== scannedFlavor;
+      });
+
+      if (differentFlavorProducts.length >= 2) {
+        filteredProducts = differentFlavorProducts;
+      }
+    }
+  }
+
   filteredProducts = filteredProducts.sort(
     (a, b) =>
-      calculateAlternativeScore(filteredProducts, b, criteriaList) -
-      calculateAlternativeScore(filteredProducts, a, criteriaList)
+      calculateAlternativeScore(filteredProducts, b, criteriaList, scannedProduct) -
+      calculateAlternativeScore(filteredProducts, a, criteriaList, scannedProduct)
   );
 
   return dedupeProductList(filteredProducts, scannedProduct).slice(0, 18);
@@ -895,6 +1320,7 @@ function AlternativesPageContent() {
   const [recommendationSource, setRecommendationSource] = useState("local");
   const [billing, setBilling] = useState(null);
   const [alternativeSearch, setAlternativeSearch] = useState("");
+  const [differentFlavorOnly, setDifferentFlavorOnly] = useState(false);
   const [showMoreAlternatives, setShowMoreAlternatives] = useState(false);
   const [profilePreferences, setProfilePreferences] = useState(null);
 
@@ -924,9 +1350,6 @@ function AlternativesPageContent() {
     ])
   );
 
-  const selectedCriteria = finalCriteriaIds.map(
-    (item) => criteriaLabels[item] || item
-  );
   const selectedAllergyLabels = Array.isArray(profilePreferences?.allergies)
     ? profilePreferences.allergies
         .map((item) => allergyLabels[item] || item)
@@ -943,10 +1366,14 @@ function AlternativesPageContent() {
     isPaidPlan && alternativeSearch.trim() && !searchWarning
       ? inferCriteriaFromRequest(alternativeSearch)
       : [];
+  const manualCriteriaIds = differentFlavorOnly ? ["different_flavor"] : [];
   const combinedCriteriaIds = Array.from(
-    new Set([...finalCriteriaIds, ...searchCriteriaIds])
+    new Set([...finalCriteriaIds, ...searchCriteriaIds, ...manualCriteriaIds])
   );
   const combinedCriteriaKey = combinedCriteriaIds.join(",");
+  const displayCriteria = combinedCriteriaIds.map(
+    (item) => criteriaLabels[item] || item
+  );
 
   async function loadProducts(
     currentScannedProduct,
@@ -1100,18 +1527,28 @@ function AlternativesPageContent() {
 
     const timer = window.setTimeout(() => {
       if (alternativeSearch.trim()) {
-        setLookupNotice("Actualizam alternativele dupa cererea ta...");
-        void loadProducts(scannedProduct, combinedCriteriaIds, alternativeSearch, profilePreferences);
+        setLookupNotice("Actualizăm alternativele după cererea ta...");
+        void loadProducts(
+          scannedProduct,
+          combinedCriteriaIds,
+          [alternativeSearch, differentFlavorOnly ? "altă aromă" : ""].filter(Boolean).join(" "),
+          profilePreferences
+        );
       } else {
         setLookupNotice("");
-        void loadProducts(scannedProduct, finalCriteriaIds, preferenceRequest, profilePreferences);
+        void loadProducts(
+          scannedProduct,
+          combinedCriteriaIds,
+          [preferenceRequest, differentFlavorOnly ? "altă aromă" : ""].filter(Boolean).join(" "),
+          profilePreferences
+        );
       }
     }, 450);
 
     return () => window.clearTimeout(timer);
     // Backend-ul trebuie apelat din nou cand textul Pro schimba criteriile.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alternativeSearch, searchWarning, scannedProduct, isPaidPlan, combinedCriteriaKey]);
+  }, [alternativeSearch, searchWarning, scannedProduct, isPaidPlan, combinedCriteriaKey, differentFlavorOnly]);
 
   const rankedProducts = filterProductsByCriteria(
     products,
@@ -1274,7 +1711,7 @@ function AlternativesPageContent() {
           product,
           scannedProduct,
           store: storeName,
-          request: alternativeSearch || preferenceRequest || selectedCriteria.join(", "),
+          request: alternativeSearch || preferenceRequest || displayCriteria.join(", "),
           reason: "wrong_recommendation",
         }),
       });
@@ -1404,14 +1841,14 @@ function AlternativesPageContent() {
             </div>
           </div>
 
-          {(selectedCriteria.length > 0 || selectedAllergyLabels.length > 0 || selectedAvoidIngredients.length > 0 || customRequest) && (
+          {(displayCriteria.length > 0 || selectedAllergyLabels.length > 0 || selectedAvoidIngredients.length > 0 || customRequest) && (
             <div className="mt-6 rounded-3xl border border-emerald-400/20 bg-emerald-400/10 p-5">
               <h2 className="font-bold text-emerald-300">Criterii folosite</h2>
 
-              {selectedCriteria.length > 0 && (
+              {displayCriteria.length > 0 && (
                 <>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedCriteria.map((criteria) => (
+                    {displayCriteria.map((criteria) => (
                       <span
                         key={criteria}
                         className="rounded-full bg-emerald-400 px-3 py-1 text-sm font-semibold text-black"
@@ -1507,6 +1944,23 @@ function AlternativesPageContent() {
                   placeholder="Ex: fără zahăr, mai ieftin, mai multă proteină"
                   className="w-full rounded-2xl border border-white/10 bg-black/35 px-4 py-4 text-white outline-none transition placeholder:text-gray-500 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/25"
                 />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDifferentFlavorOnly((value) => !value);
+                      setShowMoreAlternatives(false);
+                    }}
+                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-black transition ${
+                      differentFlavorOnly
+                        ? "border-cyan-300/50 bg-cyan-300/20 text-cyan-100"
+                        : "border-white/10 bg-black/25 text-gray-300 hover:border-cyan-300/35 hover:text-cyan-100"
+                    }`}
+                  >
+                    <Shuffle size={16} />
+                    Altă aromă
+                  </button>
+                </div>
                 {searchWarning && (
                   <p className="mt-3 rounded-xl border border-yellow-300/25 bg-yellow-300/10 px-4 py-3 text-sm text-yellow-100">
                     {searchWarning}
@@ -1710,7 +2164,7 @@ function AlternativesPageContent() {
                   onClick={() => setShowMoreAlternatives((value) => !value)}
                   className="rounded-2xl border border-emerald-300/30 bg-emerald-400/10 px-6 py-3 font-black text-emerald-200 transition hover:-translate-y-0.5 hover:bg-emerald-400/20"
                 >
-                  {showMoreAlternatives ? "Arata mai putine" : "Afiseaza mai multe"}
+                  {showMoreAlternatives ? "Arată mai puține" : "Afișează mai multe"}
                 </button>
               )}
 
