@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   Barcode,
   Crown,
+  Database,
   Gift,
   LayoutDashboard,
   Radio,
@@ -38,6 +39,12 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
       icon: Barcode,
     },
     {
+      href: "/catalog-romania",
+      label: pick("Catalog", "Catalog"),
+      desktopLabel: pick("Catalog", "Catalog"),
+      icon: Database,
+    },
+    {
       href: "/missions",
       label: pick("Misiuni", "Missions"),
       desktopLabel: pick("Misiuni", "Missions"),
@@ -56,7 +63,9 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
       icon: ShoppingCart,
     },
   ];
-  const mobileNavigation = desktopNavigation.filter(({ href }) => href !== "/live-assistant");
+  const mobileNavigation = desktopNavigation.filter(
+    ({ href }) => !["/live-assistant", "/catalog-romania"].includes(href)
+  );
 
   function isActive(href) {
     return pathname === href || (href !== "/dashboard" && pathname.startsWith(`${href}/`));

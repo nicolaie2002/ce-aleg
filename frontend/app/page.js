@@ -13,6 +13,7 @@ import {
   CircleCheck,
   CircleX,
   Crown,
+  Database,
   ScanLine,
   Search,
   ShieldCheck,
@@ -187,6 +188,13 @@ export default function Home() {
             </Link>
 
             <div className="flex flex-wrap items-center justify-end gap-2">
+              <Link
+                href="/catalog-romania"
+                className="inline-flex items-center gap-2 rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-3 py-2 text-sm font-black text-cyan-100 hover:bg-cyan-300/20"
+              >
+                <Database size={16} />
+                {pick("Catalog", "Catalog")}
+              </Link>
               <Link
                 href="/pricing"
                 className="inline-flex items-center gap-2 rounded-lg border border-yellow-300/35 bg-yellow-300/10 px-3 py-2 text-sm font-black text-yellow-200 hover:bg-yellow-300/20"

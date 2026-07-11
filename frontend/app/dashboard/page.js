@@ -11,6 +11,7 @@ import {
   Clock3,
   Coins,
   Copy,
+  Database,
   Eye,
   EyeOff,
   Gift,
@@ -95,6 +96,7 @@ export default function DashboardPage() {
   const actions = [
     { href: "/barcode-scan", title: pick("Scanează codul", "Scan barcode"), description: pick("Identifică rapid produsul cu telefonul și vezi verdictul.", "Identify the product quickly with your phone and see the verdict."), icon: Barcode, tone: "emerald" },
     { href: "/store", title: pick("Caută produs", "Search products"), description: pick("Găsește produse în catalog după nume și magazin.", "Find products in the catalog by name and store."), icon: ScanLine, tone: "cyan" },
+    { href: "/catalog-romania", title: pick("Catalog România", "Romania catalog"), description: pick("Vezi acoperirea catalogului și unde lipsesc produse.", "See catalog coverage and where products are missing."), icon: Database, tone: "emerald" },
     { href: "/cart", title: pick("Coșul meu", "My cart"), description: pick("Produse grupate pentru următoarea cumpărătură.", "Products grouped for your next shopping trip."), icon: ShoppingCart, tone: "amber" },
     { href: "/missions", title: pick("Misiuni", "Missions"), description: pick("Câștigă CeCoins și ajută catalogul României să crească.", "Earn CeCoins and help the Romania catalog grow."), icon: Gift, tone: "amber" },
     { href: "/preferences", title: pick("Preferințe", "Preferences"), description: pick("Setează cum alegi alternativele.", "Set how alternatives should be chosen."), icon: SlidersHorizontal, tone: "violet" },

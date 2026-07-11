@@ -2,6 +2,7 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://www.cealeg.shop")
 
 const publicRoutes = [
   "",
+  "/catalog-romania",
   "/pricing",
   "/login",
   "/register",

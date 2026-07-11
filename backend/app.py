@@ -65,6 +65,8 @@ AI_STATUS_CACHE = {"created_at": 0, "data": None}
 AI_STATUS_CACHE_TTL = 30
 LEADERBOARD_CACHE = {}
 LEADERBOARD_CACHE_TTL = int(os.environ.get("LEADERBOARD_CACHE_TTL", "60"))
+PUBLIC_CATALOG_STATS_CACHE = {"expires_at": 0, "data": None}
+PUBLIC_CATALOG_STATS_CACHE_TTL = int(os.environ.get("PUBLIC_CATALOG_STATS_CACHE_TTL", "300"))
 RECOMMENDATION_FAMILY_CACHE = {}
 PRODUCT_RECOMMENDATION_TEXT_CACHE = {}
 RECOMMENDATION_DERIVED_CACHE_MAX_ITEMS = int(os.environ.get("RECOMMENDATION_DERIVED_CACHE_MAX_ITEMS", "6000"))
@@ -7402,6 +7404,153 @@ def get_catalog_quality_snapshot():
         "nutritionCoverage": round((with_nutrition / total) * 100, 1) if total else 0,
         "uncategorizedRate": round((uncategorized / total) * 100, 1) if total else 0,
     }
+
+
+def public_catalog_stats_cache_is_fresh():
+    return (
+        PUBLIC_CATALOG_STATS_CACHE.get("data") is not None
+        and PUBLIC_CATALOG_STATS_CACHE.get("expires_at", 0) > time.time()
+    )
+
+
+def public_contributor_name(name, rank):
+    clean_name = str(name or "").strip()
+
+    if not clean_name or "@" in clean_name:
+        return f"Contribuitor #{rank}"
+
+    first_name = clean_name.split()[0].strip()
+    return first_name[:32] or f"Contribuitor #{rank}"
+
+
+def build_public_catalog_romania_stats():
+    now = datetime.utcnow()
+    since = now - timedelta(days=30)
+    quality = get_catalog_quality_snapshot()
+
+    category_rows = (
+        db.session.query(
+            Product.category.label("category"),
+            func.count(Product.id).label("count"),
+        )
+        .filter(Product.category.isnot(None), Product.category != "")
+        .group_by(Product.category)
+        .order_by(func.count(Product.id).desc())
+        .limit(8)
+        .all()
+    )
+    store_rows = (
+        db.session.query(
+            Product.store.label("store"),
+            func.count(Product.id).label("count"),
+        )
+        .filter(Product.store.isnot(None), Product.store != "")
+        .group_by(Product.store)
+        .order_by(func.count(Product.id).desc())
+        .limit(8)
+        .all()
+    )
+    missing_store_rows = (
+        db.session.query(
+            SearchEvent.store.label("store"),
+            func.count(SearchEvent.id).label("count"),
+            func.max(SearchEvent.created_at).label("last_seen"),
+        )
+        .filter(SearchEvent.created_at >= since, SearchEvent.result_count == 0)
+        .group_by(SearchEvent.store)
+        .order_by(func.count(SearchEvent.id).desc())
+        .limit(6)
+        .all()
+    )
+    contributor_rows = (
+        db.session.query(
+            User.name.label("name"),
+            func.count(ProductSubmission.id).label("count"),
+        )
+        .join(User, User.id == ProductSubmission.user_id)
+        .filter(ProductSubmission.status == "approved")
+        .group_by(User.id, User.name)
+        .order_by(func.count(ProductSubmission.id).desc())
+        .limit(6)
+        .all()
+    )
+    recent_submissions = (
+        ProductSubmission.query.filter(ProductSubmission.status == "approved")
+        .order_by(ProductSubmission.created_at.desc())
+        .limit(6)
+        .all()
+    )
+    last_approved_submission_at = (
+        db.session.query(func.max(ProductSubmission.created_at))
+        .filter(ProductSubmission.status == "approved")
+        .scalar()
+    )
+
+    return {
+        **quality,
+        "approvedSubmissions": ProductSubmission.query.filter_by(status="approved").count(),
+        "pendingSubmissions": ProductSubmission.query.filter(
+            ProductSubmission.status != "approved"
+        ).count(),
+        "contributors": int(
+            db.session.query(func.count(func.distinct(ProductSubmission.user_id)))
+            .filter(ProductSubmission.status == "approved")
+            .scalar()
+            or 0
+        ),
+        "searchesLast30Days": SearchEvent.query.filter(SearchEvent.created_at >= since).count(),
+        "missingProductsLast30Days": SearchEvent.query.filter(
+            SearchEvent.created_at >= since,
+            SearchEvent.result_count == 0,
+        ).count(),
+        "lastApprovedSubmissionAt": admin_iso(last_approved_submission_at),
+        "generatedAt": admin_iso(now),
+        "categories": [
+            {"name": row.category or "Altele", "count": int(row.count or 0)}
+            for row in category_rows
+        ],
+        "stores": [
+            {"name": row.store or "Fără magazin ales", "count": int(row.count or 0)}
+            for row in store_rows
+        ],
+        "missingByStore": [
+            {
+                "name": row.store or "Fără magazin ales",
+                "count": int(row.count or 0),
+                "lastSeen": admin_iso(row.last_seen),
+            }
+            for row in missing_store_rows
+        ],
+        "topContributors": [
+            {
+                "rank": index + 1,
+                "name": public_contributor_name(row.name, index + 1),
+                "approvedSubmissions": int(row.count or 0),
+            }
+            for index, row in enumerate(contributor_rows)
+        ],
+        "recentCommunityProducts": [
+            {
+                "name": item.product_name,
+                "brand": item.brand,
+                "store": item.store,
+                "category": item.category,
+                "createdAt": admin_iso(item.created_at),
+            }
+            for item in recent_submissions
+        ],
+    }
+
+
+@app.route("/catalog/romania/stats", methods=["GET"])
+def get_public_catalog_romania_stats():
+    if public_catalog_stats_cache_is_fresh():
+        return jsonify(PUBLIC_CATALOG_STATS_CACHE["data"])
+
+    data = build_public_catalog_romania_stats()
+    PUBLIC_CATALOG_STATS_CACHE["data"] = data
+    PUBLIC_CATALOG_STATS_CACHE["expires_at"] = time.time() + PUBLIC_CATALOG_STATS_CACHE_TTL
+    return jsonify(data)
 
 
 def recategorize_catalog_products(
