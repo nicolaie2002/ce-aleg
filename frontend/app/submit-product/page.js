@@ -3,10 +3,47 @@
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, ScanLine } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, Coins, FileText, ScanLine, Sparkles } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+
+const CATALOG_REWARD_COINS = 10;
+
+function CaptureField({ id, title, description, file, icon: Icon, onChange }) {
+  return (
+    <label
+      htmlFor={id}
+      className="block rounded-2xl border border-white/10 bg-black/25 p-4 transition hover:border-cyan-300/40 hover:bg-white/[0.055]"
+    >
+      <span className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-200 text-black">
+          <Icon size={19} />
+        </span>
+        <span className="min-w-0">
+          <span className="block font-black text-white">{title}</span>
+          <span className="mt-1 block text-sm leading-6 text-gray-400">{description}</span>
+          <span className={`mt-3 inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1 text-xs font-black ${
+            file
+              ? "border-emerald-300/35 bg-emerald-300/10 text-emerald-100"
+              : "border-white/10 bg-white/[0.04] text-gray-300"
+          }`}>
+            {file ? <CheckCircle2 size={14} /> : <Camera size={14} />}
+            <span className="truncate">{file ? file.name : "Alege sau fă poză"}</span>
+          </span>
+        </span>
+      </span>
+      <input
+        id={id}
+        type="file"
+        accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+        capture="environment"
+        onChange={(event) => onChange(event.target.files?.[0] || null)}
+        className="sr-only"
+      />
+    </label>
+  );
+}
 
 function SubmitProductPageContent() {
   const searchParams = useSearchParams();
@@ -354,7 +391,7 @@ function SubmitProductPageContent() {
 
           <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
             Produsele acceptate primesc o scanare bonus, iar misiunea de catalog
-            îți aduce 10 CeCoins după aprobare. Verificăm propunerile înainte să
+            îți aduce {CATALOG_REWARD_COINS} CeCoins după aprobare. Verificăm propunerile înainte să
             ajungă în catalog, ca recomandările să rămână curate.
           </div>
 
@@ -397,25 +434,60 @@ function SubmitProductPageContent() {
           )}
 
           <div className="mt-6 rounded-3xl border border-yellow-300/20 bg-yellow-300/10 p-5">
-            <h2 className="text-xl font-bold text-yellow-300">
-              Completare asistată
+            <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
+              <Sparkles size={16} />
+              Flow rapid pe telefon
+            </p>
+            <h2 className="mt-2 text-xl font-bold text-yellow-300">
+              Poze, OCR, trimitere.
             </h2>
 
-            <p className="mt-2 text-sm text-gray-300">
-              Completează automat câmpurile care pot fi recunoscute. Verifică
-              informațiile înainte de trimitere.
-            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {[
+                ["1", suggestedBarcode ? "Cod verificat" : "Cod opțional", suggestedBarcode || "Completează dacă îl ai"],
+                ["2", "Față produs", frontImage ? "Poză adăugată" : "Fă o poză clară"],
+                ["3", "Tabel nutrițional", nutritionImage ? "Poză adăugată" : "Fă poză etichetei"],
+              ].map(([step, title, detail]) => (
+                <div key={step} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white text-sm font-black text-black">
+                    {step}
+                  </span>
+                  <p className="mt-3 font-black text-white">{title}</p>
+                  <p className="mt-1 text-sm text-gray-400">{detail}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <CaptureField
+                id="front-image-capture"
+                title="Poză față produs"
+                description="Ambalajul frontal ajută la nume, brand și imagine."
+                file={frontImage}
+                icon={Camera}
+                onChange={setFrontImage}
+              />
+              <CaptureField
+                id="nutrition-image-capture"
+                title="Poză tabel nutrițional"
+                description="Eticheta ajută la calorii, zahăr, proteină și grăsimi."
+                file={nutritionImage}
+                icon={FileText}
+                onChange={setNutritionImage}
+              />
+            </div>
 
             <button
               type="button"
               onClick={handleAiExtract}
               disabled={isExtracting}
-              className={`mt-4 rounded-2xl px-5 py-3 font-semibold ${
+              className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold sm:w-auto ${
                 isExtracting
                   ? "cursor-not-allowed bg-white/10 text-gray-400"
                   : "border border-yellow-300/30 text-yellow-300 hover:bg-yellow-300/10"
               }`}
             >
+              <Sparkles size={17} />
               {isExtracting ? "Se extrag datele..." : "Extrage automat din poze"}
             </button>
 
@@ -608,32 +680,6 @@ function SubmitProductPageContent() {
               />
             </div>
 
-            <div>
-              <label className="text-sm font-semibold text-gray-300">
-                Poză față produs
-              </label>
-              <input
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                capture="environment"
-                onChange={(e) => setFrontImage(e.target.files[0])}
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-semibold text-gray-300">
-                Poză etichetă nutrițională
-              </label>
-              <input
-                type="file"
-                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
-                capture="environment"
-                onChange={(e) => setNutritionImage(e.target.files[0])}
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white"
-              />
-            </div>
-
             <div className="md:col-span-2">
               <label className="text-sm font-semibold text-gray-300">
                 Ingrediente / observații
@@ -654,7 +700,9 @@ function SubmitProductPageContent() {
                   : "bg-emerald-400 text-black hover:bg-emerald-300"
               }`}
             >
-              {isSubmitting ? "Se trimite produsul..." : "Trimite produsul"}
+              {isSubmitting
+                ? "Se trimite produsul..."
+                : `Trimite la verificare · ${CATALOG_REWARD_COINS} CeCoins după aprobare`}
             </button>
           </form>
         </div>

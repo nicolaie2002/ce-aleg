@@ -65,7 +65,14 @@ Utilizator
 
 ## Schimbări recente importante
 
-Ultimul pachet de lucru a adăugat streak-uri pentru retenție în misiuni:
+Ultimul pachet de lucru a făcut flow-ul de contribuție mai clar pe mobil:
+
+- Frontend: `frontend/app/submit-product/page.js`
+- Pe `/submit-product`, pozele pentru fața produsului și tabelul nutrițional sunt acum sus, înainte de OCR și înaintea câmpurilor lungi.
+- Flow-ul afișează pașii rapizi: cod verificat, poză față produs, poză tabel nutrițional.
+- Butonul final folosește textul `Trimite la verificare` și amintește recompensa de 10 CeCoins după aprobare.
+
+Pachetul anterior a adăugat streak-uri pentru retenție în misiuni:
 
 - Backend: `backend/app.py`
 - Frontend: `frontend/app/missions/page.js`
