@@ -25,6 +25,7 @@ if (-not (Test-Path $BackendDir)) {
 
 $venvPython = Join-Path $BackendDir "venv\Scripts\python.exe"
 $python = if (Test-Path $venvPython) { $venvPython } else { "python" }
+$env:PYTHONIOENCODING = "utf-8"
 
 $importArgs = @(
     "import_openfoodfacts_export.py",

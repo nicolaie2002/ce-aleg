@@ -20,6 +20,17 @@ def build_parser():
         help="Inspect all products, not only uncategorized/Other products.",
     )
     parser.add_argument(
+        "--min-id",
+        type=int,
+        default=None,
+        help="Start inspecting products from this catalog ID.",
+    )
+    parser.add_argument(
+        "--category",
+        default=None,
+        help="Inspect only products whose current category matches this value.",
+    )
+    parser.add_argument(
         "--apply",
         action="store_true",
         help="Persist category, score, tag and reason updates.",
@@ -35,6 +46,8 @@ def main():
             limit=args.limit,
             apply_changes=args.apply,
             include_all=args.include_all,
+            min_id=args.min_id,
+            category=args.category,
         )
 
     print(json.dumps(result, ensure_ascii=False, indent=2))
