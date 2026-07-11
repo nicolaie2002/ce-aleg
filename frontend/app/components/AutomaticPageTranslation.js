@@ -54,6 +54,7 @@ const manuallyLocalizedPages = new Set([
   "/dashboard",
   "/live-assistant",
   "/login",
+  "/onboarding",
   "/pricing",
   "/privacy",
   "/register",

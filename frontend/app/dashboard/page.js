@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
-  Award,
   ArrowLeft,
   ArrowRight,
   Barcode,
@@ -85,11 +84,6 @@ export default function DashboardPage() {
   const [gamification, setGamification] = useState(null);
   const [isGamificationLoading, setIsGamificationLoading] = useState(false);
   const [gamificationError, setGamificationError] = useState("");
-  const [claimMessage, setClaimMessage] = useState("");
-  const [claimingMissionId, setClaimingMissionId] = useState("");
-  const [claimedMissionId, setClaimedMissionId] = useState("");
-  const [leaderboardMode, setLeaderboardMode] = useState("weekly");
-  const [redeemingItemId, setRedeemingItemId] = useState("");
   const [buyingPackId, setBuyingPackId] = useState("");
   const [shopMessage, setShopMessage] = useState("");
 
@@ -331,68 +325,6 @@ export default function DashboardPage() {
     setTimeout(() => setInviteCopyNotice(""), 2200);
   }
 
-  async function claimMission(missionId) {
-    if (!missionId || claimingMissionId) return;
-
-    setClaimingMissionId(missionId);
-    setClaimMessage("");
-
-    try {
-      const response = await fetch(`${API_URL}/gamification/claim`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ missionId }),
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.error || "Recompensa nu a putut fi revendicată.");
-      }
-
-      setGamification(data.summary);
-      if (user?.id) {
-        await loadDashboardData(user.id, getActiveProfile());
-      }
-      setClaimedMissionId(missionId);
-      setClaimMessage(data.message || "Recompensă revendicată.");
-      setTimeout(() => setClaimedMissionId(""), 2200);
-    } catch (error) {
-      setClaimMessage(error.message);
-    } finally {
-      setClaimingMissionId("");
-    }
-  }
-
-  async function redeemShopItem(itemId) {
-    if (!itemId || redeemingItemId) return;
-
-    setRedeemingItemId(itemId);
-    setShopMessage("");
-
-    try {
-      const response = await fetch(`${API_URL}/gamification/redeem`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ itemId }),
-      });
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(data.error || "Recompensa nu a putut fi activată.");
-      }
-
-      setGamification(data.summary);
-      setShopMessage(data.message || "Recompensa a fost activată.");
-      if (user?.id) {
-        await loadDashboardData(user.id, getActiveProfile());
-      }
-    } catch (error) {
-      setShopMessage(error.message);
-    } finally {
-      setRedeemingItemId("");
-    }
-  }
-
   async function buyCoinPack(packId) {
     if (!packId || buyingPackId) return;
 
@@ -482,39 +414,19 @@ export default function DashboardPage() {
   const coinBalance = gamification?.coins ?? 0;
   const dailyClaimedCoins = gamification?.dailyClaimedCoins ?? 0;
   const dailyCoinLimit = gamification?.dailyCoinLimit ?? 40;
-  const leaderboardData = gamification?.leaderboard || {};
-  const selectedLeaderboard = leaderboardMode === "weekly"
-    ? leaderboardData.weekly
-    : leaderboardData.allTime;
-  const leaderboard = selectedLeaderboard?.top || leaderboardData.top || [];
-  const currentLeaderboardRow = selectedLeaderboard?.currentUser || leaderboardData.currentUser;
-  const fallbackShopItems = [
-    {
-      id: "bonus_scan_1",
-      title: pick("1 scanare bonus", "1 bonus scan"),
-      description: pick("Adaugă o scanare extra peste limita lunară.", "Add one extra scan over the monthly limit."),
-      cost: 80,
-    },
-    {
-      id: "bonus_scan_5",
-      title: pick("5 scanări bonus", "5 bonus scans"),
-      description: pick("Un pachet util pentru cumpărături mai lungi.", "A useful pack for longer shopping trips."),
-      cost: 350,
-    },
-    {
-      id: "unlimited_day_1",
-      title: pick("1 zi de scanări nelimitate", "1 day of unlimited scans"),
-      description: pick("Activează acces nelimitat pentru toate scanările din următoarele 24 de ore.", "Activate unlimited access for every scan in the next 24 hours."),
-      cost: 400,
-    },
-    {
-      id: "unlimited_month_1",
-      title: pick("1 lună de scanări nelimitate", "1 month of unlimited scans"),
-      description: pick("Activează scanări nelimitate pentru 30 de zile.", "Activate unlimited scans for 30 days."),
-      cost: 1050,
-    },
-  ];
-  const shopItems = gamification?.shopItems?.length ? gamification.shopItems : fallbackShopItems;
+  const readyMissionCount = missions.filter((mission) => {
+    const progress = Math.round(Number(mission.progress || 0));
+    const isAutomatic = mission.seriesId === "invite" || mission.automatic;
+    const isClaimed = Boolean(mission.claimed || mission.claimedToday);
+    return !isAutomatic && !isClaimed && (mission.claimable || progress >= 100);
+  }).length;
+  const nextMission = missions.find((mission) => {
+    const isClaimed = Boolean(mission.claimed || mission.claimedToday);
+    return !isClaimed && mission.seriesId !== "invite" && !mission.automatic;
+  }) || missions[0];
+  const nextMissionProgress = nextMission
+    ? Math.min(100, Math.max(0, Math.round(Number(nextMission.progress || 0))))
+    : 0;
   const fallbackCoinPacks = [
     {
       id: "bronze",
@@ -545,35 +457,6 @@ export default function DashboardPage() {
     },
   ];
   const coinPacks = gamification?.coinPacks?.length ? gamification.coinPacks : fallbackCoinPacks;
-  const missionCopy = {
-    scan_3: {
-      title: pick("Scanează 3 produse", "Scan 3 products"),
-      description: pick("Compară produse noi și construiește istoricul zilei.", "Compare new products and build today's history."),
-    },
-    cart_2: {
-      title: pick("Pune 2 produse în coș", "Add 2 products to cart"),
-      description: pick("Construiește lista pentru următoarea cumpărătură.", "Build the list for your next shopping trip."),
-    },
-    favorite_1: {
-      title: pick("Salvează 1 favorit", "Save 1 favorite"),
-      description: pick("Păstrează un produs sau o alternativă la care vrei să revii.", "Save a product or alternative you want to revisit."),
-    },
-    catalog_1: {
-      title: pick("Adaugă 1 produs aprobat", "Add 1 approved product"),
-      description: pick("Trimite un produs lipsă; primești recompensa după aprobare.", "Submit a missing product; the reward is added after approval."),
-    },
-    invite_1: {
-      title: pick("Invită prieteni", "Invite friends"),
-      description: pick("Primești automat 100 CeCoins pentru fiecare prieten care confirmă contul cu codul tău.", "You automatically get 100 CeCoins for every friend who verifies an account with your code."),
-    },
-  };
-  const missionIcons = {
-    scan: ScanLine,
-    cart: ShoppingCart,
-    favorite: Heart,
-    catalog: ListPlus,
-    invite: Gift,
-  };
   const walletCards = [
     {
       label: pick("Plan", "Plan"),
@@ -609,69 +492,6 @@ export default function DashboardPage() {
       actionLabel: pick("Cumpără CeCoins", "Buy CeCoins"),
     },
   ];
-  const rewardShopPanel = (
-    <div className="mt-5 rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
-            <Image src="/brand/CeCoin.png" alt="" width={28} height={28} className="rounded-full object-cover" />
-            {pick("Recompense cu CeCoins", "CeCoins rewards")}
-          </p>
-          <p className="mt-1 text-xs leading-5 text-gray-400">
-            {pick(
-              "Folosește punctele strânse pentru scanări bonus sau acces nelimitat temporar.",
-              "Use earned points for bonus scans or temporary unlimited access."
-            )}
-          </p>
-        </div>
-        <span className="w-fit rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
-          {coinBalance} CC
-        </span>
-      </div>
-
-      {shopMessage && (
-        <p className="mt-4 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-3 py-2 text-xs font-bold text-cyan-100">
-          {shopMessage}
-        </p>
-      )}
-
-      <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-        {shopItems.map((item) => {
-          const canAfford = coinBalance >= item.cost;
-
-          return (
-            <div key={item.id} className="rounded-lg border border-white/10 bg-black/20 p-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-white">{item.title}</p>
-                  <p className="mt-1 text-xs leading-5 text-gray-400">{item.description}</p>
-                </div>
-                <span className="shrink-0 rounded-full bg-yellow-200 px-2 py-1 text-xs font-black text-black">
-                  {item.cost} CC
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => redeemShopItem(item.id)}
-                disabled={!canAfford || redeemingItemId === item.id}
-                className={`mt-3 w-full rounded-lg px-3 py-2 text-xs font-black transition ${
-                  canAfford
-                    ? "bg-white text-black hover:bg-yellow-100"
-                    : "cursor-not-allowed border border-white/10 text-gray-500"
-                }`}
-              >
-                {redeemingItemId === item.id
-                  ? pick("Se activează...", "Activating...")
-                  : canAfford
-                    ? pick("Activează", "Redeem")
-                    : pick("Strânge mai multe", "Earn more")}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
   const coinPackPurchasePanel = coinPacks.length > 0 ? (
     <div id="cumpara-cecoins" className="rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5 scroll-mt-24">
       <div className="flex items-center justify-between gap-3">
@@ -880,8 +700,8 @@ export default function DashboardPage() {
                     </h2>
                     <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">
                       {pick(
-                        "Finalizează misiuni, revendică bonusuri și urcă în clasament. CeCoins îți arată activitatea și pot debloca scanări bonus.",
-                        "Complete missions, claim rewards and climb the leaderboard. CeCoins show your activity and can unlock bonus scans."
+                        "Vezi rapid soldul și progresul. Pentru revendicare, clasament și detalii intră în pagina Misiuni.",
+                        "See your balance and progress at a glance. Claiming, leaderboard and details live on the Missions page."
                       )}
                     </p>
                   </div>
@@ -921,181 +741,57 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {claimMessage && (
-                  <p
-                    role="status"
-                    className="mt-4 rounded-lg border border-cyan-300/30 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-100"
-                  >
-                    {claimMessage}
-                  </p>
-                )}
-
-                {missions.length > 0 ? (
-                  <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-                    {missions.map((mission) => {
-                    const MissionIcon = missionIcons[mission.icon] || Award;
-                    const isAutomaticInvite = mission.seriesId === "invite" || mission.automatic;
-                    const rewardParts = isAutomaticInvite
-                      ? [
-                          mission.reward?.coins
-                            ? `${mission.reward.coins} CeCoins / ${pick("prieten confirmat", "verified friend")}`
-                            : "",
-                        ].filter(Boolean)
-                      : [
-                          mission.reward?.coins ? `${mission.reward.coins} CeCoins` : "",
-                          mission.reward?.bonusScans ? `+${mission.reward.bonusScans} ${pick("scanări bonus", "bonus scans")}` : "",
-                          mission.reward?.bonusDays ? `+${mission.reward.bonusDays} ${pick("zi nelimitată", "unlimited day")}` : "",
-                        ].filter(Boolean);
-                    const isJustClaimed = claimedMissionId === mission.id;
-                    const copy = missionCopy[mission.id] || {};
-                    const missionProgress = Math.round(Number(mission.progress || 0));
-                    const missionIsClaimed = Boolean(mission.claimed || mission.claimedToday);
-                    const missionIsComplete = Boolean(mission.completed || missionProgress >= 100);
-                    const missionIsClaimable = Boolean(
-                      !isAutomaticInvite && !missionIsClaimed && (mission.claimable || missionIsComplete)
-                    );
-
-                    return (
-                      <div
-                        key={mission.id}
-                        className={`rounded-xl border p-4 transition ${
-                          missionIsClaimable
-                            ? "border-cyan-300/35 bg-cyan-300/10"
-                            : mission.claimedToday
-                              ? "border-violet-300/20 bg-violet-300/[0.055]"
-                            : "border-white/10 bg-white/[0.035]"
-                        } ${isJustClaimed ? "scale-[1.01] animate-pulse shadow-[0_0_35px_rgba(103,232,249,.18)]" : ""}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <p className={`flex items-center gap-2 text-sm font-black ${missionIsClaimable ? "text-cyan-100" : "text-gray-300"}`}>
-                            <MissionIcon size={16} />
-                            {copy.title || mission.title || mission.label}
-                          </p>
-                          {missionIsClaimable ? (
-                            <span className="rounded-full bg-cyan-200 px-2 py-1 text-[11px] font-black text-black">
-                              {pick("Gata", "Ready")}
-                            </span>
-                          ) : (mission.claimed || mission.claimedToday) ? (
-                            <span className="rounded-full bg-violet-200 px-2 py-1 text-[11px] font-black text-black">
-                              {mission.claimedToday ? pick("Revendicat azi", "Claimed today") : pick("Activat", "Active")}
-                            </span>
-                          ) : null}
-                        </div>
-                        <p className="mt-2 text-xs leading-5 text-gray-400">
-                          {copy.description || mission.description || mission.detail}
-                        </p>
-                        <div className="mt-4">
-                          <div className="flex items-center justify-between text-xs font-bold text-gray-400">
-                            <span>{mission.current}/{mission.target}</span>
-                            <span>{missionProgress}%</span>
-                          </div>
-                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
-                            <div className="h-full rounded-full bg-violet-200 transition-all" style={{ width: `${Math.min(100, Math.max(0, missionProgress))}%` }} />
-                          </div>
-                        </div>
-                        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <p className="text-xs font-black text-yellow-100">
-                            {rewardParts.join(" · ") || pick("Recompensă", "Reward")}
-                          </p>
-                          <button
-                            type="button"
-                            onClick={() => claimMission(mission.id)}
-                            disabled={isAutomaticInvite || !missionIsClaimable || claimingMissionId === mission.id}
-                            className={`rounded-lg px-3 py-2 text-xs font-black transition ${
-                              missionIsClaimable
-                                ? "bg-white text-black hover:bg-cyan-100"
-                                : "cursor-not-allowed border border-white/10 text-gray-500"
-                            }`}
-                          >
-                            {isAutomaticInvite
-                              ? pick("Automat", "Automatic")
-                              : mission.claimedToday
-                              ? pick("Mâine", "Tomorrow")
-                              : mission.claimed
-                              ? pick("Revendicat", "Claimed")
-                              : claimingMissionId === mission.id
-                                ? pick("Se activează...", "Activating...")
-                                : missionIsClaimable
-                                  ? pick("Revendică", "Claim")
-                                  : pick("În progres", "In progress")}
-                          </button>
-                        </div>
-                        {isJustClaimed && (
-                          <p className="mt-3 rounded-lg bg-cyan-300/10 px-3 py-2 text-xs font-black text-cyan-100">
-                            {pick("Recompensa a fost activată.", "Reward activated.")}
-                          </p>
-                        )}
-                      </div>
-                    );
-                    })}
-                  </div>
-                ) : !isGamificationLoading && !gamificationError ? (
-                  <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.035] p-5 text-sm text-gray-300">
-                    {pick(
-                      "Misiunile apar aici după prima sincronizare a contului.",
-                      "Missions appear here after the first account sync."
-                    )}
-                  </div>
-                ) : null}
-
-                {rewardShopPanel}
-              </div>
-
-              <div className="space-y-4">
-                <div className="rounded-2xl border border-white/10 bg-black/25 p-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
-                      <Trophy size={17} />
-                      {pick("Clasament", "Leaderboard")}
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-gray-400">
+                      {pick("Gata", "Ready")}
                     </p>
-                    {currentLeaderboardRow && (
-                      <span className="rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
-                        #{currentLeaderboardRow.rank}
-                      </span>
-                    )}
+                    <p className="mt-2 text-3xl font-black text-cyan-100">{readyMissionCount}</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-400">
+                      {pick("misiuni de revendicat în pagina dedicată", "missions to claim on the dedicated page")}
+                    </p>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 rounded-lg border border-white/10 bg-black/25 p-1">
-                    {[
-                      ["weekly", pick("Săptămânal", "Weekly")],
-                      ["allTime", pick("All-time", "All-time")],
-                    ].map(([mode, label]) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        onClick={() => setLeaderboardMode(mode)}
-                        className={`rounded-md px-3 py-2 text-xs font-black transition ${
-                          leaderboardMode === mode
-                            ? "bg-white text-black"
-                            : "text-gray-400 hover:bg-white/10 hover:text-white"
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-gray-400">
+                      {pick("Revendicate", "Claimed")}
+                    </p>
+                    <p className="mt-2 text-3xl font-black text-violet-100">{claimedRewards}</p>
+                    <p className="mt-1 text-xs leading-5 text-gray-400">
+                      {pick("din misiunile active", "from active missions")}
+                    </p>
                   </div>
-                  <div className="mt-4 space-y-2">
-                    {leaderboard.length ? leaderboard.slice(0, 5).map((row) => (
-                      <div
-                        key={row.userId}
-                        className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
-                          row.isCurrentUser
-                            ? "border-cyan-300/35 bg-cyan-300/10 text-cyan-50"
-                            : "border-white/10 bg-white/[0.035] text-gray-300"
-                        }`}
-                      >
-                        <span className="min-w-0 truncate font-bold">
-                          #{row.rank} {row.name}
-                        </span>
-                        <span className="shrink-0 font-black text-yellow-100">{row.coins} CC</span>
-                      </div>
-                    )) : (
-                      <p className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-sm text-gray-400">
-                        {pick("Clasamentul apare după primele scanări.", "The leaderboard appears after the first scans.")}
-                      </p>
-                    )}
+                  <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+                    <p className="text-xs font-black uppercase tracking-wide text-gray-400">
+                      {pick("Următoarea", "Next")}
+                    </p>
+                    <p className="mt-2 truncate text-sm font-black text-white">
+                      {nextMission?.title || nextMission?.label || pick("Nicio misiune încă", "No mission yet")}
+                    </p>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div className="h-full rounded-full bg-violet-200 transition-all" style={{ width: `${nextMissionProgress}%` }} />
+                    </div>
                   </div>
                 </div>
 
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href="/missions"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-black text-black hover:bg-cyan-100"
+                  >
+                    <Trophy size={18} />
+                    {pick("Deschide misiunile", "Open missions")}
+                  </Link>
+                  <Link
+                    href="/submit-product"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-yellow-300/30 px-5 py-3 text-sm font-black text-yellow-100 hover:bg-yellow-300/10"
+                  >
+                    <ListPlus size={18} />
+                    {pick("Adaugă produs lipsă", "Add missing product")}
+                  </Link>
+                </div>
+              </div>
+
+              <div className="space-y-4">
                 {coinPackPurchasePanel}
               </div>
             </div>

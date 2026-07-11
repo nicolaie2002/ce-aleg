@@ -65,7 +65,15 @@ Utilizator
 
 ## Schimbări recente importante
 
-Ultimul pachet de lucru a adăugat pagina publică `Catalog România`:
+Ultimul pachet de lucru a curățat dashboard-ul și a adăugat onboarding mobil:
+
+- Frontend: `frontend/app/dashboard/page.js`
+- Frontend: `frontend/app/onboarding/page.js`
+- Dashboard-ul nu mai dublează pagina `/missions`; afișează doar sumarul CeCoins/progres și trimite spre pagina dedicată.
+- După confirmarea emailului, utilizatorul nou ajunge în onboarding-ul de 3 pași: magazin, scanare, produs lipsă cu CeCoins.
+- `/onboarding` este neindexat în `robots`, dar public, ca să nu depindă de timing-ul sesiunii imediat după confirmare.
+
+Pachetul anterior a adăugat pagina publică `Catalog România`:
 
 - Frontend: `frontend/app/catalog-romania/page.js`
 - Backend: `GET /catalog/romania/stats`

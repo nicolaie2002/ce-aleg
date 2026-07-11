@@ -49,7 +49,10 @@ function VerifyEmailContent() {
         if (!isMounted) return;
         setStatus("success");
         setMessage(data.message || pick("Email confirmat.", "Email confirmed."));
-        window.setTimeout(() => window.location.assign("/dashboard"), 900);
+        window.setTimeout(() => {
+          const onboardingDone = localStorage.getItem("cealeg_onboarding_completed") === "1";
+          window.location.assign(onboardingDone ? "/dashboard" : "/onboarding");
+        }, 900);
       } catch (error) {
         if (!isMounted) return;
         setStatus("error");
