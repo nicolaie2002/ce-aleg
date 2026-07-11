@@ -11046,6 +11046,16 @@ def label_has_explicit_alcohol_token(product_data):
         str(product_data.get("name") or ""),
         str(product_data.get("brand") or ""),
     ]))
+    alcohol_free_tokens = [
+        "sans alcool",
+        "fara alcool",
+        "fără alcool",
+        "non alcoholic",
+        "non-alcoholic",
+        "alcohol free",
+        "0.0",
+        "0,0",
+    ]
     explicit_alcohol_tokens = [
         "vin blanc",
         "vin rouge",
@@ -11071,6 +11081,12 @@ def label_has_explicit_alcohol_token(product_data):
         "alcool",
         "alcohol",
     ]
+
+    if any(
+        label_has_catalog_token(label_text, token)
+        for token in alcohol_free_tokens
+    ):
+        return False
 
     return any(
         label_has_catalog_token(label_text, token)
@@ -11105,11 +11121,20 @@ def infer_catalog_category_from_label(product_data, use_family_fallback=True):
     if re.search(r"^(huile|ulei|olive oil|sunflower oil)", label_text):
         return "Uleiuri"
 
+    if has(["bere fara alcool", "bere fără alcool", "non alcoholic beer", "non-alcoholic beer", "alcohol free beer", "0.0 beer", "0,0 beer"]):
+        return "Bere fără alcool"
+
+    if has(["sans alcool", "fara alcool", "fără alcool", "non alcoholic", "non-alcoholic", "alcohol free"]):
+        return "Băuturi răcoritoare"
+
     if has(["olives", "masline", "măsline"]) and not re.search(r"^(huile|ulei)", label_text):
         return "Murături și măsline"
 
     label_rules = [
         ("Castraveți murați", ["cornichon", "cornichons", "gherkin", "pickled cucumber", "castraveti murati", "castraveți murați"]),
+        ("Murături și măsline", ["tapenade", "capers", "capres", "câpres", "caperberries"]),
+        ("Conserve de legume", ["canned prepared fine peas", "canned peas", "petits pois", "petit pois", "pois doux", "groszek", "zoldborso", "zöldborsó", "erbsen mit mohrchen", "erbsen mit möhrchen", "kukurica", "goldmais", "mais doux", "maïs doux", "porumb dulce", "ciuperci feliate", "sliced mushrooms", "mushrooms", "champignons", "mexico mix", "mexico mixt", "creatif mexico", "créatif mexico"]),
+        ("Leguminoase", ["kichererbsen", "pois chiches", "chickpeas", "naut", "năut"]),
         ("Paste", ["ravioli", "raviolis", "linguine", "tagliatelle", "coquillettes", "chifferini", "farfalle", "pipe regate", "macaroni", "fusilli", "torti"]),
         ("Cuburi pentru supă", ["bouillon", "stock cube"]),
         ("Supe și ciorbe", ["potagere", "potagère", "potage", "veloute", "velouté", "soupe", "supa"]),
@@ -11154,6 +11179,7 @@ def infer_catalog_category_from_label(product_data, use_family_fallback=True):
         ("Băuturi energizante", ["monster", "red bull", "redbull", "mango loco", "khaotic", "ultra vice", "ultra peachy", "peachy keen", "juneberry", "power king", "colossus", "pipeline punch", "golden eagle", "booster", "absolute zero", "bebida energetica", "bebida energética", "kong strong", "awake koffein", "dragon", "lucozade", "energy drink"]),
         ("Băuturi pentru sport", ["hydrate perform", "hydrate & perform", "hidra iso", "thirst quencher", "gatorade", "powerade"]),
         ("Apă aromată", ["volvic tee", "volvic aro", "volvic essence", "touch of fruit", "vitamin water"]),
+        ("Apă", ["evian", "vittel", "volvic water", "eau volvic", "hepar", "hépar", "perrier", "st amand eau", "eau minerale", "eau minérale", "mineral water", "spring water", "sparkling spring water", "non carbonated natural mineral water"]),
         ("Băuturi răcoritoare", ["sparkling white peach", "sparkling grape", "grape rush", "white peach", "boisson petillante", "boisson pétillante", "fruit punch", "fruity", "wassermelone", "kaktusfrucht"]),
         ("Limonade", ["lemonade", "limonada", "limonadă"]),
         ("Băuturi răcoritoare", ["fiz citron", "juiced berry"]),
@@ -11172,10 +11198,13 @@ def infer_catalog_category_from_label(product_data, use_family_fallback=True):
         ("Piper", ["piper", "poivre", "pepper", "pimienta", "pfeffer"]),
         ("Sare", ["sare de mare", "sea salt", "iodized salt", "iodised salt", "sel de mer"]),
         ("Arome și extracte pentru copt", ["vanilla extract", "extract vanilie", "extrait de vanille", "vanilla aroma", "aroma vainilla"]),
+        ("Arome și extracte pentru copt", ["fleurs d oranger", "fleur d oranger", "orange blossom water"]),
+        ("Unt", ["beurre pasteurise", "beurre pasteurisé", "beurre doux", "beurre bio", "beurre demi sel", "beurre demi-sel", "salted butter", "president salted butter", "unt"]),
+        ("Zahăr și îndulcitori", ["cassonade", "stevia", "edulcorant", "edulcorants", "sweetener", "sweeteners", "sucre", "zahar", "zahăr", "brown sugar"]),
         ("Ceaiuri și infuzii", ["ceai", "tea", "the vert", "the noir", "thé vert", "thé noir", "black tea", "green tea", "earl grey", "tea bags", "infusion", "infuzie", "tisane", "rooibos"]),
         ("Ceaiuri reci", ["ice tea", "iced tea", "ceai rece"]),
         ("Băuturi cu cafea", ["iced coffee", "ice coffee", "cold brew"]),
-        ("Sosuri de roșii", ["sos de rosii", "sos de roșii", "sauce tomate", "sauce aux tomates", "tomato sauce", "tomato paste", "passata", "bulion", "salsa dip"]),
+        ("Sosuri de roșii", ["sos de rosii", "sos de roșii", "sauce tomate", "sauce aux tomates", "tomato sauce", "tomato paste", "passata", "bulion", "salsa dip", "mild tomato"]),
         ("Conserve de roșii", ["tomat crushed", "crushed tomatoes", "star tomat", "tomat sachy", "tomate triturado", "tomates pelees", "tomates pelées", "tomate pelee", "tomate pelée", "tomates pelee", "tomates pelée", "tomatenpuree", "chopped tomatoes", "pulpe de tomates", "puree de tomates", "purée de tomates", "polpa", "paradajky"]),
         ("Leguminoase", ["lentilles", "lentils", "linte", "pois chiches", "pois casses", "pois cassés", "chickpeas", "naut", "năut", "haricots blancs", "haricots rouges", "flageolets", "fasole", "bean", "beans", "dal", "alubia", "garbanzo", "garbazo", "grao de bico", "grão de bico"]),
         ("Salate gata preparate", ["salade", "salata", "salată", "coleslaw"]),
@@ -11193,13 +11222,13 @@ def infer_catalog_category_from_label(product_data, use_family_fallback=True):
         ("Cuscus", ["couscous"]),
         ("Cereale", ["ptites billes", "p'tites billes", "billes miel", "amarante", "epeautre", "épeautre", "quinoa"]),
         ("Hummus", ["hummus", "humus"]),
-        ("Mese gata preparate", ["galette", "galettes"]),
+        ("Mese gata preparate", ["galette", "galettes", "vegetable summer rolls"]),
         ("Pâine", ["flame baked roti", "carrément mie", "carrement mie", "pain maxi", "pane bianco", "pain de mie", "jacquet", "pave aux graines", "pavé aux graines", "gressins", "panini", "bread", "paine", "pâine", "bagheta", "baguette"]),
         ("Granola", ["granola"]),
         ("Biscuiți", ["petit beurre", "madeleine", "madeleines", "boudoirs", "galletas", "biscuits", "cookies", "belvita"]),
         ("Bomboane și jeleuri", ["car en sac", "haribo", "bubblizz", "long fizz", "tirlibibi", "schtroumpfs"]),
         ("Budinci și deserturi cremoase", ["pudding", "budinca", "budincă"]),
-        ("Făină și ingrediente pentru copt", ["agar agar"]),
+        ("Făină și ingrediente pentru copt", ["agar agar", "preparation en poudre pour gateau", "préparation en poudre pour gâteau", "gateau de semoule", "gâteau de semoule", "bigarreaux confits"]),
         ("Patiserie dulce", ["flan patissier", "flan pâtissier", "amandine", "after eight", "wonk", "ecler", "bagel", "bagels", "krafna", "krafne", "donuts", "donut", "muffins", "muffin", "pain chocolat"]),
         ("Napolitane", ["wafer", "wafers", "napolitana", "napolitană"]),
         ("Snacks sărate", ["souffles gout bacon", "soufflés goût bacon"]),
@@ -11214,6 +11243,7 @@ def infer_catalog_category_from_label(product_data, use_family_fallback=True):
         ("Pește și fructe de mare", ["losos", "lososa", "pstrag", "pstrąg", "trout", "anchovy", "anchovies"]),
         ("Carne de pui", ["pui", "poulet", "chicken", "kip", "drumsticks"]),
         ("Carne de porc", ["chorizo", "porc", "pork", "wieprzowa"]),
+        ("Carne", ["agneau", "lamb", "miel"]),
         ("Șuncă și mușchi file", ["sunca", "șuncă", "ham", "jambon", "prosciutto"]),
         ("Ceaiuri și infuzii", ["chicoree", "chicorée", "menta poleo", "hierba luisa", "manzanilla"]),
         ("Ceaiuri reci", ["the limone", "thè limone", "tea limone"]),
@@ -11303,6 +11333,9 @@ def infer_catalog_category(product_data):
         catalog_category_key(current_category) == "bauturi alcoolice"
         and not label_has_explicit_alcohol_token(product_data)
     ):
+        return "Altele"
+
+    if catalog_category_key(current_category) in {"apa", "sare", "zahar si indulcitori"}:
         return "Altele"
 
     if current_category and not is_generic_catalog_category(current_category):
@@ -12327,6 +12360,17 @@ def get_off_alternative_category(product_data):
             str(product_data.get("ingredients") or ""),
         ])
     )
+    label_text = normalize_search_text(
+        " ".join([
+            str(product_data.get("name") or ""),
+            str(product_data.get("brand") or ""),
+            str(product_data.get("category") or ""),
+        ])
+    )
+
+    def label_has_precise(tokens):
+        return any(label_has_catalog_token(label_text, token) for token in tokens)
+
     category_map = {
         "apa plata": "en:spring-waters",
         "apa minerala carbogazoasa": "en:sparkling-waters",
@@ -12519,7 +12563,25 @@ def get_off_alternative_category(product_data):
     if any(word in product_text for word in ["bere", "beer", "ursus", "timisoreana", "timișoreana", "ciuc", "bergenbier", "heineken", "silva", "tuborg", "carlsberg", "peroni", "stella", "corona", "kozel", "lager", "pilsner", "radler"]):
         return "en:beers"
 
-    if any(word in product_text for word in ["alcool", "alcohol", "vin", "wine", "vodka", "whisky", "cidru", "cider", "lichior"]):
+    alcohol_tokens = [
+        "alcool",
+        "alcohol",
+        "vin",
+        "wine",
+        "vodka",
+        "whisky",
+        "rom",
+        "rum",
+        "gin",
+        "cidru",
+        "cider",
+        "lichior",
+        "liqueur",
+        "spirits",
+    ]
+    vinegar_tokens = ["vinegar", "vinaigre", "vinagre", "otet", "oțet"]
+
+    if label_has_precise(alcohol_tokens) and not label_has_precise(vinegar_tokens):
         return "en:alcoholic-beverages"
 
     if any(word in product_text for word in ["buldak", "samyang", "ramen", "noodle", "noodles", "taitei", "nongshim", "yakisoba", "udon"]):
