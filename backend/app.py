@@ -525,6 +525,17 @@ MISSION_SERIES = [
         "daily": True,
     },
     {
+        "seriesId": "streak",
+        "metric": "scanStreakDays",
+        "icon": "streak",
+        "titleTemplate": "{target} zile la rând cu scanări",
+        "description": "Revino la raft mai multe zile la rând și primești un bonus de ritm.",
+        "targets": [3],
+        "coins": 35,
+        "bonusScans": 1,
+        "daily": False,
+    },
+    {
         "seriesId": "invite",
         "metric": "confirmedInvites",
         "icon": "invite",
@@ -2945,6 +2956,82 @@ def parse_usage_metadata(event):
     return data if isinstance(data, dict) else {}
 
 
+def coerce_scan_day(value):
+    if not value:
+        return None
+
+    if hasattr(value, "date"):
+        return value.date()
+
+    try:
+        return datetime.fromisoformat(str(value)[:10]).date()
+    except (TypeError, ValueError):
+        return None
+
+
+def calculate_scan_streak_days(user_id, since=None):
+    scan_dates = set()
+    scan_events_query = UsageEvent.query.filter_by(
+        user_id=user_id,
+        event_type="scan",
+    )
+    history_query = ScanHistory.query.filter_by(user_id=user_id)
+
+    if since:
+        scan_events_query = scan_events_query.filter(UsageEvent.created_at >= since)
+        history_query = history_query.filter(ScanHistory.scanned_at >= since)
+
+    event_day = func.date(UsageEvent.created_at)
+    history_day = func.date(ScanHistory.scanned_at)
+
+    for value in (
+        scan_events_query
+        .with_entities(event_day.label("scan_day"))
+        .distinct()
+        .order_by(event_day.desc())
+        .limit(120)
+        .all()
+    ):
+        scan_day = coerce_scan_day(value.scan_day)
+
+        if scan_day:
+            scan_dates.add(scan_day)
+
+    for value in (
+        history_query
+        .with_entities(history_day.label("scan_day"))
+        .distinct()
+        .order_by(history_day.desc())
+        .limit(120)
+        .all()
+    ):
+        scan_day = coerce_scan_day(value.scan_day)
+
+        if scan_day:
+            scan_dates.add(scan_day)
+
+    if not scan_dates:
+        return 0
+
+    today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
+
+    if today in scan_dates:
+        cursor = today
+    elif yesterday in scan_dates:
+        cursor = yesterday
+    else:
+        return 0
+
+    streak_days = 0
+
+    while cursor in scan_dates:
+        streak_days += 1
+        cursor -= timedelta(days=1)
+
+    return streak_days
+
+
 def get_user_gamification_metrics(user_id, since=None):
     scan_query = UsageEvent.query.filter_by(
         user_id=user_id,
@@ -2988,6 +3075,7 @@ def get_user_gamification_metrics(user_id, since=None):
 
     return {
         "scanCount": max(scan_count, history_count),
+        "scanStreakDays": calculate_scan_streak_days(user_id, since=since),
         "historyCount": history_count,
         "favoritesCount": favorites_count,
         "cartCount": max(int(cart_count or 0), cart_event_count),
@@ -3079,6 +3167,7 @@ def calculate_referral_cecoin_bonus(user_id, metrics=None):
 def calculate_activity_score(metrics):
     return (
         int(metrics["scanCount"]) * 3
+        + int(metrics.get("scanStreakDays", 0)) * 12
         + int(metrics["favoritesCount"]) * 5
         + min(int(metrics["cartCount"]) * 2, 50)
         + int(metrics["approvedSubmissions"]) * 60
@@ -3115,8 +3204,10 @@ def empty_leaderboard(current_user_id=None, metrics=None, coins=0):
                 "cartCount": metrics.get("cartCount", 0),
                 "approvedSubmissions": metrics.get("approvedSubmissions", 0),
                 "confirmedInvites": metrics.get("confirmedInvites", 0),
+                "scanStreakDays": metrics.get("scanStreakDays", 0),
             }),
             "scanCount": metrics.get("scanCount", 0),
+            "scanStreakDays": metrics.get("scanStreakDays", 0),
             "approvedSubmissions": metrics.get("approvedSubmissions", 0),
             "isCurrentUser": True,
         },
@@ -3137,6 +3228,9 @@ def build_mission_title(series_id, target):
 
     if series_id == "catalog":
         return "Adaugă 1 produs aprobat" if target == 1 else f"Adaugă {target} produse aprobate"
+
+    if series_id == "streak":
+        return f"{target} zile la rând cu scanări"
 
     if series_id == "invite":
         return "Invită prieteni"
@@ -3207,6 +3301,7 @@ def build_mission_statuses(user_id, metrics=None):
             ),
             series_missions[-1],
         )
+        mission_claimed = not is_daily and mission["id"] in claimed_ids
         previous_target = max(
             [
                 mission_target_from_source(claimed_id)
@@ -3220,6 +3315,10 @@ def build_mission_statuses(user_id, metrics=None):
             raw_current = 0 if claimed_today else int(daily_metrics.get(mission["metric"], 0) or 0)
             display_target = int(mission["target"])
             display_current = min(raw_current, display_target)
+        elif mission_claimed:
+            display_target = int(mission["target"])
+            raw_current = display_target
+            display_current = display_target
         else:
             cumulative_current = int(all_time_metrics.get(mission["metric"], 0) or 0)
             display_target = max(1, int(mission["target"]) - previous_target)
@@ -3245,9 +3344,9 @@ def build_mission_statuses(user_id, metrics=None):
             "target": display_target,
             "progress": min(100, round((display_current / display_target) * 100)) if display_target else 100,
             "completed": completed,
-            "claimed": False,
+            "claimed": mission_claimed,
             "claimedToday": claimed_today,
-            "claimable": completed,
+            "claimable": completed and not mission_claimed,
             "daily": is_daily,
             "availableAt": (
                 next_day_start.isoformat() + "Z"
@@ -3291,6 +3390,7 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
                 "coins": coins,
                 "score": score,
                 "scanCount": metrics["scanCount"],
+                "scanStreakDays": metrics.get("scanStreakDays", 0),
                 "approvedSubmissions": metrics["approvedSubmissions"],
             })
 

@@ -33,6 +33,7 @@ const MISSION_ICONS = {
   cart: ShoppingCart,
   favorite: Heart,
   catalog: ListPlus,
+  streak: Clock3,
   invite: Gift,
 };
 
@@ -47,6 +48,7 @@ function getMissionHref(mission) {
   if (seriesId === "cart") return "/store";
   if (seriesId === "favorite") return "/favorites";
   if (seriesId === "catalog") return "/submit-product";
+  if (seriesId === "streak") return "/barcode-scan";
   if (seriesId === "invite") return "/dashboard";
 
   return "/dashboard";
@@ -161,6 +163,7 @@ export default function MissionsPage() {
   const claimedMissions = summary?.claimedMissions || 0;
   const totalMissions = summary?.totalMissions || missions.length || 1;
   const coinBalance = summary?.coins || 0;
+  const streakDays = summary?.metrics?.scanStreakDays || 0;
   const progress = clampProgress((completedMissions / Math.max(totalMissions, 1)) * 100);
   const resetAt = formatMissionReset(summary?.missionsResetAt);
   const weeklyLeaderboard = summary?.leaderboard?.weekly?.top || [];
@@ -244,6 +247,17 @@ export default function MissionsPage() {
               <p className="mt-3 text-xs font-bold text-gray-400">
                 {claimedMissions} {pick("revendicate", "claimed")}
                 {resetAt ? ` · ${pick("reset la", "resets at")} ${resetAt}` : ""}
+              </p>
+            </div>
+
+            <div className="col-span-2 rounded-2xl border border-violet-300/20 bg-violet-300/[0.055] p-4 md:p-5 lg:col-span-1">
+              <div className="flex items-center justify-between gap-3 text-sm font-black text-violet-100">
+                <span>{pick("Streak scanări", "Scan streak")}</span>
+                <Clock3 size={18} />
+              </div>
+              <p className="mt-3 text-3xl font-black text-white md:text-4xl">{streakDays}</p>
+              <p className="mt-1 text-xs font-bold text-gray-400">
+                {pick("zile la rând active", "active days in a row")}
               </p>
             </div>
           </div>

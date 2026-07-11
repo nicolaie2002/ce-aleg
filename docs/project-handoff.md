@@ -65,7 +65,15 @@ Utilizator
 
 ## Schimbări recente importante
 
-Ultimul pachet de lucru a îmbunătățit admin-ul pentru calitatea recomandărilor:
+Ultimul pachet de lucru a adăugat streak-uri pentru retenție în misiuni:
+
+- Backend: `backend/app.py`
+- Frontend: `frontend/app/missions/page.js`
+- Misiunea nouă `streak_3` se calculează din zile consecutive cu scanări reale sau istoric de scanare.
+- Recompensa este 35 CeCoins + 1 scanare bonus, revendicabilă o singură dată pentru prag.
+- Pagina `/missions` afișează streak-ul ca indicator rapid, util mai ales pe mobil.
+
+Pachetul anterior a îmbunătățit admin-ul pentru calitatea recomandărilor:
 
 - Backend: `POST /admin/alternative-reports/<event_id>/resolve`
 - Frontend: `frontend/app/admin/page.js`
