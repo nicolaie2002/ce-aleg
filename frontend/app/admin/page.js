@@ -240,15 +240,33 @@ export default function AdminPage() {
     }
   }
 
-  async function recategorizeCatalog(apply = false) {
+  async function recategorizeCatalog(apply = false, nextBatch = false) {
+    const minId = nextBatch ? catalogPreview?.nextMinId : catalogPreview?.minId;
+    const params = new URLSearchParams({
+      limit: "500",
+      apply: apply ? "true" : "false",
+    });
+
+    if (minId) {
+      params.set("min_id", String(minId));
+    }
+
     setCatalogBusy(apply ? "apply" : "preview");
-    setMessage(apply ? "Actualizez categoriile produselor..." : "Caut produse care pot fi recategorizate...");
+    setMessage(
+      apply
+        ? "Actualizez categoriile produselor..."
+        : nextBatch
+          ? "Caut următorul batch de produse..."
+          : "Caut produse care pot fi recategorizate..."
+    );
 
     try {
-      const response = await fetch(`${API_URL}/admin/catalog/recategorize?limit=500&apply=${apply ? "true" : "false"}`, {
+      const response = await fetch(`${API_URL}/admin/catalog/recategorize?${params.toString()}`, {
         method: apply ? "POST" : "GET",
         headers: { "Content-Type": "application/json" },
-        body: apply ? JSON.stringify({ apply: true, limit: 500 }) : undefined,
+        body: apply
+          ? JSON.stringify({ apply: true, limit: 500, minId: minId || undefined })
+          : undefined,
       });
       const data = await readApiJson(response);
 
@@ -668,6 +686,15 @@ export default function AdminPage() {
                 <CheckCircle2 size={16} />
                 {catalogBusy === "apply" ? "Aplic..." : "Aplică recategorizarea"}
               </button>
+              <button
+                type="button"
+                onClick={() => recategorizeCatalog(false, true)}
+                disabled={Boolean(catalogBusy) || !catalogPreview?.nextMinId}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-50"
+              >
+                <RefreshCw size={16} />
+                Urmatorul batch
+              </button>
             </div>
           </div>
 
@@ -709,6 +736,11 @@ export default function AdminPage() {
                 <EventPill tone={catalogPreview.changed ? "warning" : "default"}>
                   {compactNumber(catalogPreview.changed)} schimbări din {compactNumber(catalogPreview.scanned)} verificate
                 </EventPill>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-gray-500">
+                <span>ID start {catalogPreview.minId || 1}</span>
+                <span>Ultimul ID {catalogPreview.lastScannedId || "-"}</span>
+                <span>{catalogPreview.hasMore ? "Mai exista batch-uri" : "Batch final"}</span>
               </div>
               <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 {(catalogPreview.changes || []).slice(0, 8).map((item) => (

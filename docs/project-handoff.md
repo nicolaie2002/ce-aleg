@@ -2,6 +2,14 @@
 
 Ultima actualizare: 2026-07-12
 
+Pachetul curent a imbunatatit recategorizarea catalogului din admin:
+
+- Backend: `backend/app.py`
+- Frontend: `frontend/app/admin/page.js`
+- Endpoint-ul `GET/POST /admin/catalog/recategorize` intoarce acum `lastScannedId`, `nextMinId` si `hasMore`.
+- Pagina admin poate continua cu "Urmatorul batch", astfel incat produsele `Altele` care nu pot fi reparate automat nu mai blocheaza verificarea restului de catalog.
+- Recategorizarea ramane limitata la 500 de produse per batch, pentru a evita request-uri lungi pe Render.
+
 ## Pe scurt
 
 Ce aleg? este o aplicație web publică pentru scanarea produselor alimentare, afișarea unui verdict orientativ și recomandarea de alternative mai potrivite după categorie, preferințe și criterii precum zahăr mai puțin, proteină mai multă, preț mai bun sau altă aromă.

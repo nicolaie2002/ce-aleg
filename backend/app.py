@@ -7682,6 +7682,19 @@ def recategorize_catalog_products(
         query = query.filter(uncategorized_product_filter())
 
     products = query.limit(safe_limit).all()
+    last_scanned_id = products[-1].id if products else None
+    next_min_id = None
+    has_more = False
+
+    if last_scanned_id:
+        has_more = bool(
+            query.filter(Product.id > last_scanned_id)
+            .with_entities(Product.id)
+            .first()
+        )
+        if has_more:
+            next_min_id = last_scanned_id + 1
+
     changes = []
 
     for product in products:
@@ -7744,6 +7757,9 @@ def recategorize_catalog_products(
         "changed": len(changes),
         "applied": bool(apply_changes),
         "minId": safe_min_id,
+        "lastScannedId": last_scanned_id,
+        "nextMinId": next_min_id,
+        "hasMore": has_more,
         "category": category_filter or None,
         "changes": changes[:120],
     }
