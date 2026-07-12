@@ -130,6 +130,8 @@ export default function AdminPage() {
   const [catalogPreview, setCatalogPreview] = useState(null);
   const [reportFixBusyId, setReportFixBusyId] = useState(null);
   const [reportCategoryEdits, setReportCategoryEdits] = useState({});
+  const [missionDigestBusy, setMissionDigestBusy] = useState("");
+  const [missionDigestPreview, setMissionDigestPreview] = useState(null);
 
   async function loadAdmin() {
     setIsLoading(true);
@@ -237,6 +239,35 @@ export default function AdminPage() {
       setMessage("Emailul de test nu a putut fi trimis.");
     } finally {
       setEmailBusy(false);
+    }
+  }
+
+  async function runMissionDigest(apply = false) {
+    setMissionDigestBusy(apply ? "send" : "preview");
+    setMessage(apply ? "Trimit emailurile pentru misiuni..." : "Caut misiuni aproape gata...");
+
+    try {
+      const response = await fetch(
+        `${API_URL}/admin/missions/digest?limit=150&apply=${apply ? "true" : "false"}`,
+        {
+          method: apply ? "POST" : "GET",
+          headers: { "Content-Type": "application/json" },
+          body: apply ? JSON.stringify({ apply: true, limit: 150 }) : undefined,
+        }
+      );
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Digest-ul de misiuni nu a putut fi procesat.");
+      }
+
+      setMissionDigestPreview(data);
+      setMessage(data.message || "Digest-ul de misiuni a fost verificat.");
+      await loadAdmin();
+    } catch (error) {
+      setMessage(error.message || "Digest-ul de misiuni nu a putut fi procesat.");
+    } finally {
+      setMissionDigestBusy("");
     }
   }
 
@@ -795,6 +826,73 @@ export default function AdminPage() {
                   <Mail size={17} /> {emailBusy ? "Se trimite..." : "Testează email"}
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                <Bell size={16} /> Misiuni aproape gata
+              </p>
+              <h3 className="mt-2 text-xl font-black text-white">Digest saptamanal controlat</h3>
+              <p className="mt-2 text-sm leading-6 text-gray-400">
+                Gaseste utilizatori cu misiuni peste 60% progres si trimite un email scurt
+                catre pagina /missions. Fiecare cont este protejat de cooldown de 6 zile.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => runMissionDigest(false)}
+                  disabled={Boolean(missionDigestBusy)}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
+                >
+                  <Search size={16} />
+                  {missionDigestBusy === "preview" ? "Caut..." : "Preview digest"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => runMissionDigest(true)}
+                  disabled={Boolean(missionDigestBusy) || !missionDigestPreview?.eligible || !email.configured}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-4 py-3 text-sm font-black text-black hover:bg-white disabled:opacity-50"
+                >
+                  <Mail size={16} />
+                  {missionDigestBusy === "send" ? "Trimit..." : "Trimite digest"}
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/20 p-4">
+              <div className="flex flex-wrap gap-2">
+                <EventPill tone={email.configured ? "default" : "danger"}>
+                  {email.configured ? "email activ" : "email oprit"}
+                </EventPill>
+                <EventPill tone="default">
+                  {compactNumber(email.missionDigests)} trimise in fereastra
+                </EventPill>
+              </div>
+              {missionDigestPreview ? (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm font-bold text-gray-300">
+                    {compactNumber(missionDigestPreview.eligible)} eligibili din {compactNumber(missionDigestPreview.scanned)} verificati.
+                    {missionDigestPreview.applied ? ` Trimise: ${compactNumber(missionDigestPreview.sent)}.` : ""}
+                  </p>
+                  {(missionDigestPreview.recipients || []).slice(0, 4).map((recipient) => (
+                    <article key={recipient.userId} className="rounded-lg border border-white/10 bg-white/[0.035] p-3">
+                      <p className="font-bold text-white">{recipient.name || recipient.email}</p>
+                      <p className="mt-1 text-sm text-gray-400">
+                        {recipient.topMission} · {recipient.topProgress}% progres
+                      </p>
+                    </article>
+                  ))}
+                  {!(missionDigestPreview.recipients || []).length && (
+                    <p className="text-sm text-gray-400">Nu exista destinatari eligibili in batch-ul verificat.</p>
+                  )}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm leading-6 text-gray-400">
+                  Ruleaza preview inainte de trimitere. Butonul de trimitere ramane blocat pana exista destinatari eligibili.
+                </p>
+              )}
             </div>
           </div>
         </section>

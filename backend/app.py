@@ -3367,6 +3367,211 @@ def count_completed_catalog_missions(user_id, metrics=None):
     )
 
 
+MISSION_DIGEST_EVENT_TYPE = "mission_digest_email"
+MISSION_DIGEST_COOLDOWN_DAYS = 6
+
+
+def get_mission_action_href(series_id):
+    if series_id in {"scan", "streak"}:
+        return "/barcode-scan"
+
+    if series_id == "catalog":
+        return "/submit-product"
+
+    if series_id == "cart":
+        return "/cart"
+
+    if series_id == "favorite":
+        return "/favorites"
+
+    return "/missions"
+
+
+def format_mission_reward(reward):
+    reward = reward or {}
+    parts = []
+
+    if int(reward.get("coins") or 0) > 0:
+        parts.append(f"{int(reward.get('coins') or 0)} CeCoins")
+
+    if int(reward.get("bonusScans") or 0) > 0:
+        parts.append(f"{int(reward.get('bonusScans') or 0)} scanari bonus")
+
+    if int(reward.get("bonusDays") or 0) > 0:
+        parts.append(f"{int(reward.get('bonusDays') or 0)} zile bonus")
+
+    return " + ".join(parts) or "recompensa"
+
+
+def build_mission_nudge_items(user, limit=3, min_progress=60):
+    if not user:
+        return []
+
+    safe_limit = max(1, min(int(limit or 3), 5))
+    safe_progress = max(1, min(int(min_progress or 60), 95))
+    metrics = get_user_gamification_metrics(user.id)
+    missions = build_mission_statuses(user.id, metrics)
+    nudges = []
+
+    for mission in missions:
+        if mission.get("automatic") or mission.get("daily"):
+            continue
+
+        if mission.get("claimed") or mission.get("claimedToday") or mission.get("claimable"):
+            continue
+
+        target = int(mission.get("target") or 0)
+        current = int(mission.get("current") or 0)
+        progress = int(mission.get("progress") or 0)
+        remaining = max(0, target - current)
+
+        if target <= 0 or remaining <= 0 or progress < safe_progress:
+            continue
+
+        reward_text = format_mission_reward(mission.get("reward"))
+        nudges.append({
+            "id": mission.get("id"),
+            "seriesId": mission.get("seriesId"),
+            "title": mission.get("title"),
+            "current": current,
+            "target": target,
+            "remaining": remaining,
+            "progress": progress,
+            "reward": mission.get("reward") or {},
+            "rewardText": reward_text,
+            "href": get_mission_action_href(mission.get("seriesId")),
+        })
+
+    nudges.sort(
+        key=lambda item: (
+            item["progress"],
+            int((item.get("reward") or {}).get("coins") or 0),
+            -item["remaining"],
+        ),
+        reverse=True,
+    )
+    return nudges[:safe_limit]
+
+
+def mission_digest_was_recently_sent(user_id, cooldown_days=MISSION_DIGEST_COOLDOWN_DAYS):
+    since = datetime.utcnow() - timedelta(days=max(1, int(cooldown_days or 1)))
+    return bool(
+        UsageEvent.query.filter(
+            UsageEvent.user_id == user_id,
+            UsageEvent.event_type == MISSION_DIGEST_EVENT_TYPE,
+            UsageEvent.created_at >= since,
+        ).first()
+    )
+
+
+def send_mission_digest_email(user, nudges):
+    if not user or not nudges:
+        return False
+
+    details = [
+        (
+            f"{item['title']}: mai ai {item['remaining']} pana la tinta. "
+            f"Recompensa: {item['rewardText']}."
+        )
+        for item in nudges
+    ]
+    text_body = "\n".join([
+        "Ai misiuni aproape gata in Ce aleg?.",
+        "",
+        *details,
+        "",
+        f"Deschide misiunile: {FRONTEND_PUBLIC_URL}/missions",
+    ])
+    html_body = render_brand_email(
+        "Misiuni aproape gata",
+        "Ai recompense aproape de deblocat.",
+        "Mai ai cativa pasi pana la urmatoarele CeCoins. Intra in pagina de misiuni si finalizeaza ce este aproape gata.",
+        "Deschide misiunile",
+        f"{FRONTEND_PUBLIC_URL}/missions",
+        details,
+    )
+
+    return send_transactional_email(
+        user.email,
+        "Ai misiuni aproape gata in Ce aleg?",
+        text_body,
+        html_body,
+    )
+
+
+def build_mission_digest_batch(limit=100, apply_changes=False):
+    safe_limit = max(1, min(int(limit or 100), 500))
+    users = (
+        User.query
+        .filter(User.email.isnot(None), User.email != "")
+        .order_by(User.id.asc())
+        .limit(safe_limit)
+        .all()
+    )
+    recipients = []
+    skipped_recent = 0
+    skipped_unverified = 0
+    sent = 0
+    failed = 0
+
+    for user in users:
+        if not is_valid_email_address(user.email):
+            continue
+
+        if not bool(getattr(user, "email_verified", True)):
+            skipped_unverified += 1
+            continue
+
+        if mission_digest_was_recently_sent(user.id):
+            skipped_recent += 1
+            continue
+
+        nudges = build_mission_nudge_items(user)
+
+        if not nudges:
+            continue
+
+        recipients.append({
+            "userId": user.id,
+            "email": user.email,
+            "name": user.name,
+            "missions": nudges,
+            "topMission": nudges[0]["title"],
+            "topProgress": nudges[0]["progress"],
+        })
+
+        if apply_changes:
+            if send_mission_digest_email(user, nudges):
+                sent += 1
+                record_user_event(
+                    user.id,
+                    MISSION_DIGEST_EVENT_TYPE,
+                    "admin",
+                    {
+                        "missionIds": [item["id"] for item in nudges],
+                        "topProgress": nudges[0]["progress"],
+                        "sentAt": datetime.utcnow().isoformat() + "Z",
+                    },
+                    commit=False,
+                )
+            else:
+                failed += 1
+
+    if apply_changes and (sent or failed):
+        db.session.commit()
+
+    return {
+        "scanned": len(users),
+        "eligible": len(recipients),
+        "sent": sent,
+        "failed": failed,
+        "skippedRecent": skipped_recent,
+        "skippedUnverified": skipped_unverified,
+        "applied": bool(apply_changes),
+        "recipients": recipients[:25],
+    }
+
+
 def build_user_leaderboard(current_user_id=None, limit=10, since=None):
     safe_limit = max(1, min(limit, 25))
     since_key = since.isoformat() if since else "all_time"
@@ -3534,6 +3739,7 @@ ADMIN_ENDPOINTS = {
     "export_admin_payment_events",
     "resolve_admin_alternative_report",
     "recategorize_admin_catalog",
+    "send_admin_mission_digest",
     "delete_admin_product",
     "admin_update_user_plan",
     "get_readiness",
@@ -7922,6 +8128,10 @@ def get_admin_monitoring():
                 UsageEvent.event_type == "email_test",
                 UsageEvent.created_at >= since,
             ).count(),
+            "missionDigests": UsageEvent.query.filter(
+                UsageEvent.event_type == MISSION_DIGEST_EVENT_TYPE,
+                UsageEvent.created_at >= since,
+            ).count(),
             "recentTests": [usage_event_to_admin_dict(event) for event in email_test_events],
         },
         "catalog": {
@@ -8185,6 +8395,37 @@ def recategorize_admin_catalog():
             else f"Am găsit {result['changed']} produse care pot fi recategorizate."
         ),
         "catalog": get_catalog_quality_snapshot(),
+    })
+
+
+@app.route("/admin/missions/digest", methods=["GET", "POST"])
+def send_admin_mission_digest():
+    data = request.get_json(silent=True) or {}
+    limit = request.args.get("limit", data.get("limit", 100), type=int)
+    apply_changes = request.method == "POST" and str(
+        request.args.get("apply", data.get("apply", "false"))
+    ).lower() in {"1", "true", "yes", "on"}
+
+    if apply_changes and not is_email_configured():
+        return jsonify({
+            "error": "Emailul nu este configurat. Seteaza providerul inainte de trimitere.",
+            "emailConfigured": False,
+        }), 400
+
+    result = build_mission_digest_batch(
+        limit=limit,
+        apply_changes=apply_changes,
+    )
+
+    return jsonify({
+        **result,
+        "emailConfigured": is_email_configured(),
+        "cooldownDays": MISSION_DIGEST_COOLDOWN_DAYS,
+        "message": (
+            f"Am trimis {result['sent']} emailuri cu misiuni aproape gata."
+            if apply_changes
+            else f"Am gasit {result['eligible']} utilizatori cu misiuni aproape gata."
+        ),
     })
 
 

@@ -2,6 +2,14 @@
 
 Ultima actualizare: 2026-07-12
 
+Pachetul curent a adaugat digest admin pentru misiuni aproape gata:
+
+- Backend: `GET/POST /admin/missions/digest`
+- Frontend: `frontend/app/admin/page.js`
+- Admin-ul poate rula preview pentru utilizatorii cu misiuni peste 60% progres si poate trimite email branded catre `/missions`.
+- Fiecare user are cooldown de 6 zile prin evenimentul `mission_digest_email`, ca sa nu primeasca spam.
+- Smoke test-ul verifica acum si ca endpoint-ul digest este blocat fara autentificare.
+
 Pachetul curent a imbunatatit recategorizarea catalogului din admin:
 
 - Backend: `backend/app.py`

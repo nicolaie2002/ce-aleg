@@ -174,6 +174,7 @@ Test-Status "Unauthenticated billing is blocked" "$BackendUrl/billing/status" @(
 Test-Header "Sensitive responses disable cache" "$BackendUrl/auth/me" "Cache-Control" "no-store" @(401)
 Test-CrossSiteMutationBlocked "$BackendUrl/auth/password-strength"
 Invoke-Json "Unauthenticated email test is blocked" "POST" "$BackendUrl/admin/email-test" @{} $null @(401) | Out-Null
+Invoke-Json "Unauthenticated mission digest is blocked" "POST" "$BackendUrl/admin/missions/digest" @{} $null @(401) | Out-Null
 Invoke-Json "Unauthenticated delete request is blocked" "POST" "$BackendUrl/account/delete/request" @{} $null @(401) | Out-Null
 Invoke-Json "Invalid account delete token is rejected" "POST" "$BackendUrl/account/delete/confirm" @{ token = "invalid-token" } $null @(400) | Out-Null
 
