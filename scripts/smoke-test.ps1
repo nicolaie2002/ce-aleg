@@ -145,9 +145,53 @@ function Invoke-Json {
         return $null
     } catch {
         $status = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
-        Add-Result $Name ($Expected -contains $status) "HTTP $status $(Get-ErrorBody $_)"
+        $body = Get-ErrorBody $_
+        $passed = $Expected -contains $status
+        Add-Result $Name $passed "HTTP $status $body"
+
+        if ($passed -and $body) {
+            try {
+                return $body | ConvertFrom-Json
+            } catch {
+                return $null
+            }
+        }
+
         return $null
     }
+}
+
+function Get-QueryParameter {
+    param(
+        [string]$Url,
+        [string]$Name
+    )
+
+    if (-not $Url -or -not $Name) {
+        return ""
+    }
+
+    try {
+        $uri = [System.Uri]$Url
+    } catch {
+        return ""
+    }
+
+    $query = $uri.Query.TrimStart("?")
+
+    if (-not $query) {
+        return ""
+    }
+
+    foreach ($part in $query.Split("&")) {
+        $pieces = $part.Split("=", 2)
+
+        if ($pieces.Count -eq 2 -and $pieces[0] -eq $Name) {
+            return [System.Uri]::UnescapeDataString($pieces[1])
+        }
+    }
+
+    return ""
 }
 
 Write-Host "Smoke test frontend: $FrontendUrl"
@@ -171,6 +215,7 @@ Test-Status "Frontend terms" "$FrontendUrl/terms"
 Test-Status "Frontend scan page" "$FrontendUrl/barcode-scan"
 Test-Status "Frontend live assistant page" "$FrontendUrl/live-assistant"
 Test-Status "Frontend cron route is secret-only" "$FrontendUrl/api/cron/maintenance" @(401)
+Test-Status "Frontend warmup cron route is secret-only" "$FrontendUrl/api/cron/warmup" @(401)
 Test-Status "Unauthenticated billing is blocked" "$BackendUrl/billing/status" @(401)
 Test-Header "Sensitive responses disable cache" "$BackendUrl/auth/me" "Cache-Control" "no-store" @(401)
 Test-CrossSiteMutationBlocked "$BackendUrl/auth/password-strength"
@@ -200,20 +245,44 @@ if (-not $SkipAuthWrites) {
         Add-Result "Register returned user" $true "userId=$($registered.user.id)"
     }
 
-    $me = Invoke-Json "Authenticated /auth/me" "GET" "$BackendUrl/auth/me" $null $session
-    if ($me -and $me.user) {
-        Add-Result "Auth cookie works" $true "email=$($me.user.email)"
+    $devVerificationLink = if ($registered -and $registered.emailStatus) { $registered.emailStatus.devVerificationLink } else { "" }
+    $verificationToken = Get-QueryParameter $devVerificationLink "token"
+    $registeredEmailVerified = $registered -and $registered.user -and [bool]$registered.user.emailVerified
+
+    if ($verificationToken) {
+        Invoke-Json "Verify smoke user email" "POST" "$BackendUrl/auth/verify-email" @{ token = $verificationToken } $session | Out-Null
+        $registeredEmailVerified = $true
     }
 
-    Invoke-Json "Billing status with auth" "GET" "$BackendUrl/billing/status" $null $session | Out-Null
-    Invoke-Json "Forgot password generic response" "POST" "$BackendUrl/forgot-password" @{ email = $testEmail } | Out-Null
+    if ($registeredEmailVerified) {
+        $me = Invoke-Json "Authenticated /auth/me" "GET" "$BackendUrl/auth/me" $null $session
+        if ($me -and $me.user) {
+            Add-Result "Auth cookie works" $true "email=$($me.user.email)"
+        }
 
-    $loginSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
-    Invoke-Json "Login smoke user" "POST" "$BackendUrl/login" @{
-        email = $testEmail
-        password = $testPassword
-    } $loginSession | Out-Null
-    Invoke-Json "Login cookie /auth/me" "GET" "$BackendUrl/auth/me" $null $loginSession | Out-Null
+        Invoke-Json "Billing status with auth" "GET" "$BackendUrl/billing/status" $null $session | Out-Null
+        Invoke-Json "Forgot password generic response" "POST" "$BackendUrl/forgot-password" @{ email = $testEmail } | Out-Null
+
+        $loginSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+        Invoke-Json "Login smoke user" "POST" "$BackendUrl/login" @{
+            email = $testEmail
+            password = $testPassword
+        } $loginSession | Out-Null
+        Invoke-Json "Login cookie /auth/me" "GET" "$BackendUrl/auth/me" $null $loginSession | Out-Null
+    } else {
+        Add-Result "Register leaves user pending email verification" ($registered -and $registered.user -and -not [bool]$registered.user.emailVerified) "emailVerified=$($registered.user.emailVerified)"
+        Invoke-Json "Unverified /auth/me is blocked" "GET" "$BackendUrl/auth/me" $null $session @(401) | Out-Null
+        Invoke-Json "Unverified billing is blocked" "GET" "$BackendUrl/billing/status" $null $session @(401) | Out-Null
+        Invoke-Json "Forgot password generic response" "POST" "$BackendUrl/forgot-password" @{ email = $testEmail } | Out-Null
+
+        $loginSession = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+        $loginResult = Invoke-Json "Unverified login is blocked until email confirmation" "POST" "$BackendUrl/login" @{
+            email = $testEmail
+            password = $testPassword
+        } $loginSession @(403)
+        Add-Result "Login returns email_not_verified" ($loginResult -and $loginResult.code -eq "email_not_verified") "code=$($loginResult.code)"
+        Invoke-Json "Unverified login cookie /auth/me is blocked" "GET" "$BackendUrl/auth/me" $null $loginSession @(401) | Out-Null
+    }
 
     if ($IncludeExternal) {
         $barcode = Invoke-Json "Open Food Facts barcode lookup" "GET" "$BackendUrl/barcode/lookup/3017624010701" $null $session @(200, 404, 502)

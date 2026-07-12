@@ -8,6 +8,7 @@ import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
 import { ScrollRevealController } from "./components/ScrollRevealController";
 import { Analytics } from "./components/Analytics";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
+import { BackendWarmup } from "./components/BackendWarmup";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -178,6 +179,7 @@ export default function RootLayout({ children }) {
             <AutomaticPageTranslation />
             <CarbonVaporBackground />
             <ScrollRevealController />
+            <BackendWarmup />
             <Analytics />
             {children}
             <LegalFooter />

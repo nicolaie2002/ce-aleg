@@ -2,6 +2,27 @@
 
 Ultima actualizare: 2026-07-12
 
+Pachetul curent a adaugat warm-up pentru reducerea cold start-ului si a reparat smoke-ul pentru email verification:
+
+- Frontend: `frontend/app/components/BackendWarmup.js`
+- Frontend: `frontend/app/api/cron/warmup/route.js`
+- Config Vercel: `frontend/vercel.json`
+- Script: `scripts/smoke-test.ps1`
+- Layout-ul face un ping oportunist catre `/api/backend/health`, cu cooldown local de 10 minute, ca backend-ul Render sa fie trezit inainte de scanare.
+- Cron-ul Vercel are o ruta separata `/api/cron/warmup`, protejata cu `CRON_SECRET`, programata zilnic pentru compatibilitate cu limita Hobby.
+- Smoke test-ul complet trateaza corect conturile nou create care raman pending pana la confirmarea emailului; in productie, `email_not_verified` este acum rezultat asteptat, nu fail fals.
+
+Pachetul curent a adaugat polish mobil si notificari pentru produse corectate:
+
+- Frontend: `frontend/app/dashboard/page.js`
+- Frontend: `frontend/app/barcode-scan/page.js`
+- Frontend: `frontend/app/scan/page.js`
+- Frontend: `frontend/app/admin/page.js`
+- Backend: `backend/app.py`
+- Dashboard-ul mobil are acum actiuni principale clare pentru scanare/cautare si sumar compact pentru misiuni.
+- Flow-ul `Produs negasit` este prezentat ca `Produs nou in Romania?`, cu confirmarea codului si mesajul de CeCoins.
+- Admin-ul poate bifa anuntarea utilizatorilor cand corecteaza un produs; backend-ul trimite email doar utilizatorilor relevanti, cu cooldown anti-dublare.
+
 Pachetul curent a adaugat editare rapida de produse in admin:
 
 - Backend: `GET /admin/products/search`
