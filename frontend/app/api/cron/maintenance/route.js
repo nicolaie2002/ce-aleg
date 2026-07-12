@@ -2,8 +2,19 @@ export const dynamic = "force-dynamic";
 
 const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5001";
 
+function readSecret(value, name) {
+  let secret = String(value || "").trim().replace(/^['"]|['"]$/g, "");
+  const prefixedName = `${name}=`;
+
+  if (secret.startsWith(prefixedName)) {
+    secret = secret.slice(prefixedName.length).trim().replace(/^['"]|['"]$/g, "");
+  }
+
+  return secret;
+}
+
 export async function GET(request) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = readSecret(process.env.CRON_SECRET, "CRON_SECRET");
   const authHeader = request.headers.get("authorization") || "";
   const url = new URL(request.url);
   const dryRun = url.searchParams.get("dryRun") === "true";
