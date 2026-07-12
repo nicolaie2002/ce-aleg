@@ -259,3 +259,237 @@ export function getCategoriesForStore(store) {
     .map(getSeoCategory)
     .filter(Boolean);
 }
+
+export const SEO_PRODUCTS = [
+  {
+    slug: "iaurt-grecesc-2",
+    name: "Iaurt grecesc 2%",
+    brand: "exemplu catalog",
+    image: "/products/iaurt-grecesc.jpg",
+    categorySlug: "lactate",
+    storeSlugs: ["kaufland", "carrefour", "lidl"],
+    score: "8.7",
+    verdict: "Alegere buna pentru gustari simple, daca ingredientele raman scurte.",
+    intro:
+      "Iaurtul grecesc 2% este un exemplu bun de produs unde merita comparate proteina, zaharul si lista de ingrediente, nu doar ambalajul.",
+    nutrients: ["proteina buna", "zahar redus", "grasimi moderate", "ingrediente simple"],
+    goodFor: ["gustare rapida", "mic dejun", "retete simple"],
+    watchOut: ["variante cu zahar adaugat", "deserturi lactate confundate cu iaurt", "portii mai mari decat par"],
+    alternativeSlugs: ["skyr-simplu", "iaurt-simplu", "iaurt-natural-lidl"],
+  },
+  {
+    slug: "skyr-simplu",
+    name: "Skyr simplu",
+    brand: "exemplu catalog",
+    image: "/products/skyr.jpg",
+    categorySlug: "lactate",
+    storeSlugs: ["lidl", "kaufland", "carrefour"],
+    score: "8.9",
+    verdict: "Profil bun cand vrei proteina mai mare si zahar redus.",
+    intro:
+      "Skyr-ul simplu este cautat des ca alternativa la iaurturi dulci sau deserturi lactate, mai ales cand obiectivul este proteina.",
+    nutrients: ["proteina ridicata", "zahar redus", "grasimi scazute", "fara topping dulce"],
+    goodFor: ["gustari proteice", "mic dejun", "retete cu fructe"],
+    watchOut: ["variante cu arome", "toppinguri dulci", "pret per portie"],
+    alternativeSlugs: ["iaurt-grecesc-2", "iaurt-simplu", "iaurt-proteic-lidl"],
+  },
+  {
+    slug: "iaurt-natural-lidl",
+    name: "Iaurt natural Lidl",
+    brand: "exemplu Lidl",
+    image: "/products/iaurt-natural-lidl.jpg",
+    categorySlug: "lactate",
+    storeSlugs: ["lidl"],
+    score: "7.8",
+    verdict: "O baza buna daca eticheta ramane simpla si zaharul este natural.",
+    intro:
+      "Un iaurt natural de magazin merita verificat rapid, pentru ca produse similare pot avea ingrediente sau valori nutritionale diferite.",
+    nutrients: ["ingrediente simple", "zahar natural", "proteina medie", "pret accesibil"],
+    goodFor: ["familie", "retete", "cumparaturi frecvente"],
+    watchOut: ["iaurturi indulcite", "ambalaje mari greu de comparat", "grasime diferita"],
+    alternativeSlugs: ["iaurt-simplu", "iaurt-grecesc-2", "skyr-simplu"],
+  },
+  {
+    slug: "iaurt-proteic-lidl",
+    name: "Iaurt proteic Lidl",
+    brand: "exemplu Lidl",
+    image: "/products/iaurt-proteic-lidl.jpg",
+    categorySlug: "lactate",
+    storeSlugs: ["lidl"],
+    score: "8.2",
+    verdict: "Interesant pentru proteina, dar merita verificati indulcitorii si aromele.",
+    intro:
+      "Produsele proteice pot fi utile, insa nu toate au aceeasi lista de ingrediente. Scanarea ajuta cand ai multe variante similare.",
+    nutrients: ["proteina ridicata", "zahar controlat", "calorii per portie", "ingrediente de verificat"],
+    goodFor: ["dupa antrenament", "gustare satioasa", "comparatii rapide"],
+    watchOut: ["indulcitori", "arome", "promisiuni de marketing"],
+    alternativeSlugs: ["skyr-simplu", "iaurt-grecesc-2", "iaurt-simplu"],
+  },
+  {
+    slug: "iaurt-simplu",
+    name: "Iaurt simplu",
+    brand: "exemplu catalog",
+    image: "/products/iaurt-simplu.jpg",
+    categorySlug: "lactate",
+    storeSlugs: ["kaufland", "penny", "market-local"],
+    score: "7.9",
+    verdict: "Alegere echilibrata cand lista de ingrediente este clara.",
+    intro:
+      "Iaurtul simplu ramane o categorie buna pentru comparatii, mai ales cand alegi des acelasi produs pentru casa.",
+    nutrients: ["zahar natural", "proteina medie", "grasimi variabile", "ingrediente scurte"],
+    goodFor: ["mic dejun", "retete", "gustari pentru familie"],
+    watchOut: ["variante cu fructe si zahar", "portii mari", "diferente de grasime"],
+    alternativeSlugs: ["iaurt-grecesc-2", "skyr-simplu", "iaurt-natural-lidl"],
+  },
+  {
+    slug: "bautura-ovaz",
+    name: "Bautura de ovaz",
+    brand: "exemplu catalog",
+    image: "/products/lapte-ovaz.jpg",
+    categorySlug: "bauturi",
+    storeSlugs: ["lidl", "carrefour", "mega-image", "kaufland"],
+    score: "6.8",
+    verdict: "Poate fi potrivita, dar zaharul, uleiurile si aditivii merita verificati.",
+    intro:
+      "Bauturile vegetale par asemanatoare, insa pot diferi mult la zahar, uleiuri, sare si adaosuri.",
+    nutrients: ["zahar per 100ml", "uleiuri", "sare", "fortifiere"],
+    goodFor: ["cafea", "mic dejun", "alternative vegetale"],
+    watchOut: ["zahar adaugat", "uleiuri", "lista lunga de aditivi"],
+    alternativeSlugs: ["iaurt-simplu", "skyr-simplu"],
+  },
+  {
+    slug: "baton-proteic",
+    name: "Baton proteic",
+    brand: "exemplu catalog",
+    image: "/products/baton-proteic.jpg",
+    categorySlug: "snacks",
+    storeSlugs: ["carrefour", "mega-image", "lidl"],
+    score: "8.6",
+    verdict: "Alternativa buna cand proteina este reala si zaharul ramane controlat.",
+    intro:
+      "Batoanele proteice sunt utile pentru comparatii SEO, fiindca multe produse promit mult, dar difera la zahar si ingrediente.",
+    nutrients: ["proteina", "zahar", "fibre", "calorii"],
+    goodFor: ["gustare rapida", "dupa sport", "alternative la dulciuri"],
+    watchOut: ["zahar alcool", "calorii ascunse", "pret per baton"],
+    alternativeSlugs: ["baton-ovaz", "skyr-simplu", "iaurt-proteic-lidl"],
+  },
+  {
+    slug: "baton-ovaz",
+    name: "Baton de ovaz dulce",
+    brand: "exemplu catalog",
+    image: "/products/baton-ovaz.jpg",
+    categorySlug: "dulciuri",
+    storeSlugs: ["carrefour", "mega-image", "profi"],
+    score: "3.4",
+    verdict: "Gustare dulce de verificat atent, mai ales pentru zahar si portie.",
+    intro:
+      "Un baton de ovaz poate parea o gustare sanatoasa, dar unele variante au mult zahar pentru o portie mica.",
+    nutrients: ["zahar ridicat", "calorii", "fibre", "ingrediente"],
+    goodFor: ["ocazional", "energie rapida"],
+    watchOut: ["zahar pe portie", "glazuri", "portii mici dar calorice"],
+    alternativeSlugs: ["baton-proteic", "skyr-simplu", "iaurt-grecesc-2"],
+  },
+];
+
+export const SEO_ALTERNATIVE_GUIDES = [
+  {
+    slug: "iaurturi",
+    title: "Alternative la iaurturi dulci",
+    image: "/products/skyr.jpg",
+    intro:
+      "Cand un iaurt pare sanatos, verifica zaharul, proteina si ingredientele. Alternativele bune sunt adesea iaurtul simplu, skyr-ul sau iaurtul grecesc.",
+    categorySlugs: ["lactate"],
+    productSlugs: ["baton-ovaz", "iaurt-grecesc-2", "skyr-simplu", "iaurt-simplu"],
+    checks: ["zahar per 100g", "proteina", "ingrediente scurte", "fara topping dulce"],
+    searchIntent: "pentru oameni care cauta iaurturi mai bune, mai simple sau mai proteice",
+  },
+  {
+    slug: "dulciuri",
+    title: "Alternative la dulciuri foarte zaharoase",
+    image: "/products/baton-ovaz.jpg",
+    intro:
+      "Nu toate gustarile dulci sunt la fel. Unele pot fi inlocuite cu variante mai satioase sau cu zahar mai controlat.",
+    categorySlugs: ["dulciuri", "snacks"],
+    productSlugs: ["baton-ovaz", "baton-proteic", "skyr-simplu"],
+    checks: ["zahar", "calorii per portie", "fibre", "proteina"],
+    searchIntent: "pentru cautari despre dulciuri mai ok si gustari alternative",
+  },
+  {
+    slug: "bauturi",
+    title: "Alternative la bauturi cu zahar",
+    image: "/products/lapte-ovaz.jpg",
+    intro:
+      "Bauturile pot adauga zahar fara sa para o masa. Compara valorile per 100ml si verifica indulcitorii sau ingredientele.",
+    categorySlugs: ["bauturi", "produse-bio"],
+    productSlugs: ["bautura-ovaz", "iaurt-simplu", "skyr-simplu"],
+    checks: ["zahar per 100ml", "indulcitori", "cofeina", "ingrediente"],
+    searchIntent: "pentru oameni care vor bauturi mai simple sau mai usor de comparat",
+  },
+  {
+    slug: "snacks",
+    title: "Alternative la snacks-uri sarate sau dulci",
+    image: "/products/baton-proteic.jpg",
+    intro:
+      "La snacks conteaza mult portia, sarea, zaharul si cat de satios este produsul. Scanarea te ajuta sa compari variante similare.",
+    categorySlugs: ["snacks", "dulciuri"],
+    productSlugs: ["baton-proteic", "baton-ovaz", "iaurt-grecesc-2"],
+    checks: ["sare", "zahar", "proteina", "calorii"],
+    searchIntent: "pentru cautari despre gustari mai bune si alternative la raft",
+  },
+  {
+    slug: "mezeluri",
+    title: "Alternative la mezeluri foarte procesate",
+    image: "/stores/market-local.png",
+    intro:
+      "Mezelurile sunt o categorie unde catalogul are nevoie de contributii reale: procent de carne, sare, aditivi si ingrediente.",
+    categorySlugs: ["mezeluri"],
+    productSlugs: ["iaurt-grecesc-2", "skyr-simplu"],
+    checks: ["procent carne", "sare", "aditivi", "grasimi"],
+    searchIntent: "pentru cautari despre mezeluri mai simple si produse mai putin procesate",
+  },
+  {
+    slug: "cereale-mic-dejun",
+    title: "Alternative la cereale de mic dejun cu mult zahar",
+    image: "/products/iaurt-simplu.jpg",
+    intro:
+      "Cerealele pot parea potrivite pentru mic dejun, dar zaharul si fibrele schimba mult verdictul.",
+    categorySlugs: ["cereale", "lactate"],
+    productSlugs: ["iaurt-simplu", "skyr-simplu", "iaurt-grecesc-2"],
+    checks: ["zahar", "fibre", "proteina", "ingrediente"],
+    searchIntent: "pentru cautari despre mic dejun mai simplu si produse pentru familie",
+  },
+];
+
+export function getSeoProduct(slug) {
+  return SEO_PRODUCTS.find((product) => product.slug === slug) || null;
+}
+
+export function getSeoAlternativeGuide(slug) {
+  return SEO_ALTERNATIVE_GUIDES.find((guide) => guide.slug === slug) || null;
+}
+
+export function getProductsForCategory(categorySlug) {
+  return SEO_PRODUCTS.filter((product) => product.categorySlug === categorySlug);
+}
+
+export function getProductsForStore(storeSlug) {
+  return SEO_PRODUCTS.filter((product) => product.storeSlugs.includes(storeSlug));
+}
+
+export function getProductsForAlternativeGuide(guide) {
+  return (guide.productSlugs || [])
+    .map(getSeoProduct)
+    .filter(Boolean);
+}
+
+export function getCategoriesForAlternativeGuide(guide) {
+  return (guide.categorySlugs || [])
+    .map(getSeoCategory)
+    .filter(Boolean);
+}
+
+export function getAlternativesForProduct(product) {
+  return (product.alternativeSlugs || [])
+    .map(getSeoProduct)
+    .filter(Boolean);
+}

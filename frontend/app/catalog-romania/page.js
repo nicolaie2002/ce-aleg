@@ -14,6 +14,7 @@ import {
   PlusCircle,
   SearchX,
   ShieldCheck,
+  Sparkles,
   Store,
   TrendingUp,
   Users,
@@ -22,7 +23,7 @@ import { AppHeader } from "../components/AppHeader";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { API_URL } from "../config";
-import { SEO_CATEGORIES, SEO_STORES } from "./seo-data";
+import { SEO_ALTERNATIVE_GUIDES, SEO_CATEGORIES, SEO_PRODUCTS, SEO_STORES } from "./seo-data";
 
 const fallbackStats = {
   products: 0,
@@ -326,16 +327,30 @@ export default function CatalogRomaniaPage() {
                 <Database size={17} />
                 {pick("Categorii", "Categories")}
               </Link>
+              <Link
+                href="/catalog-romania/produse"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-4 py-3 text-sm font-black text-white hover:bg-white/[0.08]"
+              >
+                <PackageCheck size={17} />
+                {pick("Produse", "Products")}
+              </Link>
+              <Link
+                href="/catalog-romania/alternative"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-300/35 bg-amber-300/10 px-4 py-3 text-sm font-black text-amber-100 hover:bg-amber-300/20"
+              >
+                <Sparkles size={17} />
+                {pick("Alternative", "Alternatives")}
+              </Link>
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-4 xl:grid-cols-4">
             <div>
               <p className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-emerald-100">
                 {pick("Magazine", "Stores")}
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {SEO_STORES.slice(0, 6).map((store) => (
+              <div className="grid gap-2">
+                {SEO_STORES.slice(0, 4).map((store) => (
                   <Link
                     key={store.slug}
                     href={`/catalog-romania/magazine/${store.slug}`}
@@ -354,8 +369,8 @@ export default function CatalogRomaniaPage() {
               <p className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-cyan-100">
                 {pick("Categorii", "Categories")}
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {SEO_CATEGORIES.slice(0, 6).map((category) => (
+              <div className="grid gap-2">
+                {SEO_CATEGORIES.slice(0, 4).map((category) => (
                   <Link
                     key={category.slug}
                     href={`/catalog-romania/categorii/${category.slug}`}
@@ -364,6 +379,46 @@ export default function CatalogRomaniaPage() {
                     {category.name}
                     <span className="mt-1 block text-xs font-semibold leading-5 text-gray-400">
                       {category.compareSignals.slice(0, 3).join(" / ")}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-white">
+                {pick("Produse", "Products")}
+              </p>
+              <div className="grid gap-2">
+                {SEO_PRODUCTS.slice(0, 4).map((product) => (
+                  <Link
+                    key={product.slug}
+                    href={`/catalog-romania/produse/${product.slug}`}
+                    className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/[0.065]"
+                  >
+                    {product.name}
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-gray-400">
+                      {product.score}/10 / {product.verdict}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-amber-100">
+                {pick("Alternative", "Alternatives")}
+              </p>
+              <div className="grid gap-2">
+                {SEO_ALTERNATIVE_GUIDES.slice(0, 4).map((guide) => (
+                  <Link
+                    key={guide.slug}
+                    href={`/catalog-romania/alternative/${guide.slug}`}
+                    className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:border-amber-300/35 hover:bg-white/[0.065]"
+                  >
+                    {guide.title}
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-gray-400">
+                      {guide.checks.slice(0, 3).join(" / ")}
                     </span>
                   </Link>
                 ))}

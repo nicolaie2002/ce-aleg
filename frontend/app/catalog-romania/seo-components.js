@@ -209,6 +209,69 @@ export function StoreCard({ store }) {
   );
 }
 
+export function ProductCard({ product }) {
+  return (
+    <Link
+      href={`/catalog-romania/produse/${product.slug}`}
+      className="group grid min-h-[15rem] overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:border-cyan-300/40 hover:bg-white/[0.07]"
+    >
+      <div className="relative min-h-36 bg-white">
+        <Image
+          src={product.image}
+          alt={product.name}
+          fill
+          sizes="(min-width: 1024px) 22vw, 90vw"
+          className="object-contain p-5"
+          loading="lazy"
+          unoptimized
+        />
+        <span className="absolute right-3 top-3 rounded-lg bg-black px-3 py-1 text-sm font-black text-white">
+          {product.score}/10
+        </span>
+      </div>
+      <div className="p-4">
+        <p className="text-xs font-black uppercase text-cyan-100">{product.brand}</p>
+        <h3 className="mt-1 text-lg font-black text-white">{product.name}</h3>
+        <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{product.verdict}</p>
+        <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-cyan-100">
+          Vezi pagina produsului
+          <ArrowRight size={16} />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
+export function AlternativeGuideCard({ guide }) {
+  return (
+    <Link
+      href={`/catalog-romania/alternative/${guide.slug}`}
+      className="group grid min-h-[15rem] overflow-hidden rounded-lg border border-white/10 bg-white/[0.04] transition hover:-translate-y-0.5 hover:border-emerald-300/40 hover:bg-white/[0.07]"
+    >
+      <div className="relative min-h-36 bg-white">
+        <Image
+          src={guide.image}
+          alt={guide.title}
+          fill
+          sizes="(min-width: 1024px) 22vw, 90vw"
+          className="object-contain p-5"
+          loading="lazy"
+          unoptimized
+        />
+      </div>
+      <div className="p-4">
+        <p className="text-xs font-black uppercase text-emerald-100">Ghid alternative</p>
+        <h3 className="mt-1 text-lg font-black text-white">{guide.title}</h3>
+        <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{guide.intro}</p>
+        <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-emerald-100">
+          Vezi ghidul
+          <ArrowRight size={16} />
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export function SeoCtaBand() {
   return (
     <section className="grid gap-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 p-5 sm:grid-cols-[1fr_auto] sm:items-center">
