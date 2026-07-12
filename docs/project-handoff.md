@@ -11,6 +11,15 @@ Pachetul curent a adaugat editare rapida de produse in admin:
 - Salvarea cu recalculare aplica taxonomia curenta si regenereaza scorul, eticheta si motivul produsului.
 - Smoke test-ul verifica acum ca search/update pentru admin products sunt blocate fara autentificare.
 
+Pachetul curent a adaugat import targetat Open Food Facts pentru Romania:
+
+- Backend script: `backend/prewarm_openfoodfacts_catalog.py`
+- Wrapper: `scripts/prewarm-romania-focus.ps1`
+- Preset nou: `romania_focus`, cu lactate, mezeluri, bere, dulciuri, conserve, sosuri, produse de baza, congelate si categorii private-label/retail.
+- Implicit ruleaza dry-run. Pentru import real: `.\scripts\prewarm-romania-focus.ps1 -Apply`.
+- Pentru rezultate mai multe, fara filtru strict de tara: `.\scripts\prewarm-romania-focus.ps1 -WorldFallback -Apply`.
+- Pentru lot scurt: `.\scripts\prewarm-romania-focus.ps1 -Categories "en:yogurts,en:cold-cuts" -LimitPerCategory 20 -Apply`.
+
 Pachetul curent a adaugat automatizare cron pentru mentenanta:
 
 - Frontend: `frontend/app/api/cron/maintenance/route.js`
