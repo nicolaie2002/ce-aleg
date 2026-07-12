@@ -216,11 +216,42 @@ export default function DashboardPage() {
   useEffect(() => {
     let isMounted = true;
     let currentUserId = null;
+    let gamificationIdleHandle = null;
+    let gamificationTimeoutHandle = null;
+
+    function cancelScheduledGamificationLoad() {
+      if (gamificationIdleHandle !== null && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(gamificationIdleHandle);
+      }
+      if (gamificationTimeoutHandle !== null) {
+        window.clearTimeout(gamificationTimeoutHandle);
+      }
+
+      gamificationIdleHandle = null;
+      gamificationTimeoutHandle = null;
+    }
+
+    function scheduleGamificationLoad() {
+      if (!isMounted) return;
+      cancelScheduledGamificationLoad();
+
+      const run = () => {
+        gamificationIdleHandle = null;
+        gamificationTimeoutHandle = null;
+        if (isMounted) loadGamificationData();
+      };
+
+      if ("requestIdleCallback" in window) {
+        gamificationIdleHandle = window.requestIdleCallback(run, { timeout: 1800 });
+      } else {
+        gamificationTimeoutHandle = window.setTimeout(run, 350);
+      }
+    }
 
     function handleProfileChange(event) {
       if (!isMounted || !currentUserId) return;
       loadDashboardData(currentUserId, event.detail || getActiveProfile());
-      loadGamificationData();
+      scheduleGamificationLoad();
     }
 
     window.addEventListener("cealeg:profile-change", handleProfileChange);
@@ -264,12 +295,14 @@ export default function DashboardPage() {
         }
       }
 
-      await loadDashboardData(data.user.id, getActiveProfile());
+      const dashboardPromise = loadDashboardData(data.user.id, getActiveProfile());
       const queryParams = new URLSearchParams(window.location.search);
       const cecoinStatus = queryParams.get("cecoins");
       const cecoinSessionId = queryParams.get("session_id");
 
       if (cecoinStatus === "success") {
+        await dashboardPromise;
+
         if (cecoinSessionId) {
           try {
             await syncCecoinCheckout(cecoinSessionId);
@@ -280,6 +313,7 @@ export default function DashboardPage() {
                 "Payment was confirmed, but CeCoins could not be updated automatically."
               )
             );
+            scheduleGamificationLoad();
           }
         } else {
           setShopMessage(
@@ -296,11 +330,14 @@ export default function DashboardPage() {
         window.history.replaceState(null, "", "/dashboard");
       }
 
-      loadGamificationData();
+      if (!(cecoinStatus === "success" && cecoinSessionId)) {
+        dashboardPromise.finally(scheduleGamificationLoad);
+      }
     });
 
     return () => {
       isMounted = false;
+      cancelScheduledGamificationLoad();
       window.removeEventListener("cealeg:profile-change", handleProfileChange);
     };
   }, [loadDashboardData, loadGamificationData, pick, syncCecoinCheckout]);
@@ -414,7 +451,7 @@ export default function DashboardPage() {
     }).format(new Date(value));
   }
 
-  if (!user || isLoading) {
+  if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
         <p className="text-gray-300">{pick("Se încarcă panoul...", "Loading dashboard...")}</p>
@@ -649,6 +686,12 @@ export default function DashboardPage() {
           <InlineNotice message={loadError} tone="warning" className="mt-6" />
 
           <InlineNotice message={emailStatusNotice} tone="info" className="mt-6" />
+
+          {isLoading && !loadError && (
+            <div className="mt-6 rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3 text-sm font-bold text-gray-300">
+              {pick("Actualizez datele contului...", "Refreshing account data...")}
+            </div>
+          )}
 
           {billing?.usage && (
             <div className="ce-usage-banner mt-6 flex flex-col gap-3 rounded-lg border p-5 sm:flex-row sm:items-center sm:justify-between">

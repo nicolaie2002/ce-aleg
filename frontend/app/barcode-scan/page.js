@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Search, SwitchCamera } from "lucide-react";
 import { API_URL } from "../config";
@@ -10,6 +8,8 @@ import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
 import { getActiveProfilePayload } from "../utils/profilePreferences";
 import { trackEvent } from "../utils/analytics";
+
+let barcodeReaderModulePromise = null;
 
 function getImageUrl(path) {
   if (!path) return "";
@@ -25,7 +25,24 @@ function getImageUrl(path) {
   return path;
 }
 
-function createBarcodeReader() {
+async function loadBarcodeReaderModule() {
+  if (!barcodeReaderModulePromise) {
+    barcodeReaderModulePromise = Promise.all([
+      import("@zxing/browser"),
+      import("@zxing/library"),
+    ]).then(([browserModule, libraryModule]) => ({
+      BrowserMultiFormatReader: browserModule.BrowserMultiFormatReader,
+      BarcodeFormat: libraryModule.BarcodeFormat,
+      DecodeHintType: libraryModule.DecodeHintType,
+    }));
+  }
+
+  return barcodeReaderModulePromise;
+}
+
+async function createBarcodeReader() {
+  const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } =
+    await loadBarcodeReaderModule();
   const hints = new Map();
 
   hints.set(DecodeHintType.TRY_HARDER, true);
@@ -37,7 +54,8 @@ function createBarcodeReader() {
   ]);
 
   return new BrowserMultiFormatReader(hints, {
-    delayBetweenScanAttempts: isLowPowerScannerDevice() ? 190 : 110,
+    delayBetweenScanAttempts:
+      isLowPowerScannerDevice() || isCompactScannerViewport() ? 190 : 110,
     delayBetweenScanSuccess: 650,
   });
 }
@@ -117,12 +135,12 @@ function createEnhancedCanvas(sourceCanvas, contrast = 1.7) {
 }
 
 function buildScanAttempts(canvas) {
-  const lowPowerDevice = isLowPowerScannerDevice();
+  const lighterScannerProfile = isLowPowerScannerDevice() || isCompactScannerViewport();
   const wideCenterCrop = createCroppedCanvas(canvas, 0.98, 0.64);
   const narrowCenterCrop = createCroppedCanvas(canvas, 0.96, 0.42);
   const verticalCenterCrop = createCroppedCanvas(canvas, 0.64, 0.96);
 
-  if (lowPowerDevice) {
+  if (lighterScannerProfile) {
     return [
       canvas,
       wideCenterCrop,
@@ -150,7 +168,7 @@ function buildScanAttempts(canvas) {
 function createOcrCanvas(video, angle = 0) {
   const radians = (angle * Math.PI) / 180;
   const swapsDimensions = angle === 90 || angle === 270;
-  const maxWidth = isLowPowerScannerDevice() ? 960 : 1400;
+  const maxWidth = isLowPowerScannerDevice() || isCompactScannerViewport() ? 960 : 1400;
   const scale = Math.min(1, maxWidth / video.videoWidth);
   const frameWidth = Math.round(video.videoWidth * scale);
   const frameHeight = Math.round(video.videoHeight * scale);
@@ -200,6 +218,10 @@ function isLowPowerScannerDevice() {
     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
     (navigator.deviceMemory && navigator.deviceMemory <= 4)
   );
+}
+
+function isCompactScannerViewport() {
+  return typeof window !== "undefined" && window.innerWidth < 768;
 }
 
 export default function BarcodeScanPage() {
@@ -344,10 +366,10 @@ export default function BarcodeScanPage() {
   }
 
   function getFastCameraConstraints(deviceId = selectedDeviceId) {
-    const lowPowerDevice = isLowPowerScannerDevice();
-    const idealWidth = lowPowerDevice ? 1280 : 1920;
-    const idealHeight = lowPowerDevice ? 720 : 1080;
-    const idealFrameRate = lowPowerDevice ? 24 : 30;
+    const lighterCameraProfile = isLowPowerScannerDevice() || isCompactScannerViewport();
+    const idealWidth = lighterCameraProfile ? 1280 : 1920;
+    const idealHeight = lighterCameraProfile ? 720 : 1080;
+    const idealFrameRate = lighterCameraProfile ? 24 : 30;
 
     if (deviceId) {
       return {
@@ -418,7 +440,7 @@ export default function BarcodeScanPage() {
     detectedRef.current = false;
     lastNativeScanAtRef.current = 0;
     barcodeCandidatesRef.current.clear();
-    rotatedBarcodeReaderRef.current = createBarcodeReader();
+    rotatedBarcodeReaderRef.current = null;
     trackEvent("scan_started", {
       mode: scannerMode,
       source: "barcode_scan",
@@ -478,7 +500,8 @@ export default function BarcodeScanPage() {
       startRotatedBarcodeLoop();
       startBarcodeOcrLoop();
       startLiveVisionLoop();
-      const nativeScanInterval = isLowPowerScannerDevice() ? 210 : 130;
+      const nativeScanInterval =
+        isLowPowerScannerDevice() || isCompactScannerViewport() ? 210 : 130;
 
       async function scanFrame() {
         if (!videoRef.current || detectedRef.current) {
@@ -529,7 +552,7 @@ export default function BarcodeScanPage() {
     try {
       setIsScanning(true);
 
-      const codeReader = createBarcodeReader();
+      const codeReader = await createBarcodeReader();
       const deviceIdToUse = deviceId || undefined;
 
       controlsRef.current = await codeReader.decodeFromVideoDevice(
@@ -589,6 +612,8 @@ export default function BarcodeScanPage() {
       controlsRef.current = null;
     }
 
+    rotatedBarcodeReaderRef.current = null;
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -625,7 +650,7 @@ export default function BarcodeScanPage() {
       if (!detectedRef.current && videoRef.current?.srcObject) {
         rotatedBarcodeTimerRef.current = setTimeout(
           scanNextFrame,
-          isLowPowerScannerDevice() ? 620 : 420
+          isLowPowerScannerDevice() || isCompactScannerViewport() ? 720 : 420
         );
       }
     }, 250);
@@ -723,12 +748,10 @@ export default function BarcodeScanPage() {
 
   async function scanRotatedBarcodeFrame() {
     const video = videoRef.current;
-    const reader = rotatedBarcodeReaderRef.current;
 
     if (
       rotatedBarcodeRequestRef.current ||
       detectedRef.current ||
-      !reader ||
       !video ||
       video.readyState < 2 ||
       !video.videoWidth ||
@@ -740,14 +763,22 @@ export default function BarcodeScanPage() {
     rotatedBarcodeRequestRef.current = true;
 
     try {
-      const scanAngles = isLowPowerScannerDevice() ? [0, 90, 270] : [0, 90, 180, 270];
+      let reader = rotatedBarcodeReaderRef.current;
+
+      if (!reader) {
+        reader = await createBarcodeReader();
+        rotatedBarcodeReaderRef.current = reader;
+      }
+
+      const lighterScannerProfile = isLowPowerScannerDevice() || isCompactScannerViewport();
+      const scanAngles = lighterScannerProfile ? [0, 90, 270] : [0, 90, 180, 270];
 
       for (const angle of scanAngles) {
         if (detectedRef.current) return;
 
         const radians = (angle * Math.PI) / 180;
         const swapsDimensions = angle === 90 || angle === 270;
-        const maxWidth = 1080;
+        const maxWidth = lighterScannerProfile ? 900 : 1080;
         const scale = Math.min(1, maxWidth / video.videoWidth);
         const frameWidth = Math.round(video.videoWidth * scale);
         const frameHeight = Math.round(video.videoHeight * scale);
@@ -816,9 +847,12 @@ export default function BarcodeScanPage() {
         ocrEnabledRef.current &&
         videoRef.current?.srcObject
       ) {
-        ocrTimerRef.current = setTimeout(analyzeNextOcrFrame, 3200);
+        ocrTimerRef.current = setTimeout(
+          analyzeNextOcrFrame,
+          isLowPowerScannerDevice() || isCompactScannerViewport() ? 5400 : 3200
+        );
       }
-    }, 5200);
+    }, isLowPowerScannerDevice() || isCompactScannerViewport() ? 9200 : 5200);
   }
 
   async function analyzeBarcodeNumbersWithOcr() {
@@ -839,7 +873,10 @@ export default function BarcodeScanPage() {
 
     try {
       const worker = await getOcrWorker();
-      const angles = isLowPowerScannerDevice() ? [0, 90, 270] : [0, 90, 270, 180];
+      const angles =
+        isLowPowerScannerDevice() || isCompactScannerViewport()
+          ? [0, 90, 270]
+          : [0, 90, 270, 180];
       const angle = angles[ocrPassRef.current % angles.length];
       ocrPassRef.current += 1;
       await worker.setParameters({
