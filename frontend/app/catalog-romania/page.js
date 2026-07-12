@@ -22,6 +22,7 @@ import { AppHeader } from "../components/AppHeader";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { API_URL } from "../config";
+import { SEO_CATEGORIES, SEO_STORES } from "./seo-data";
 
 const fallbackStats = {
   products: 0,
@@ -296,6 +297,80 @@ export default function CatalogRomaniaPage() {
             tone="rose"
           />
         </div>
+
+        <section className="rounded-lg border border-white/10 bg-[#101820]/82 p-5 shadow-xl shadow-black/15">
+          <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <h2 className="text-2xl font-black text-white">
+                {pick("Pagini publice pentru trafic gratuit", "Public pages for free traffic")}
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
+                {pick(
+                  "Le poti distribui in grupuri sau lasa pentru Google: magazine si categorii unde explicam ce se poate scana si cum creste catalogul.",
+                  "Share them in groups or let Google index them: stores and categories that explain what can be scanned and how the catalog grows."
+                )}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/catalog-romania/magazine"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-300/35 bg-emerald-300/10 px-4 py-3 text-sm font-black text-emerald-100 hover:bg-emerald-300/20"
+              >
+                <Store size={17} />
+                {pick("Magazine", "Stores")}
+              </Link>
+              <Link
+                href="/catalog-romania/categorii"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-300/35 bg-cyan-300/10 px-4 py-3 text-sm font-black text-cyan-100 hover:bg-cyan-300/20"
+              >
+                <Database size={17} />
+                {pick("Categorii", "Categories")}
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-emerald-100">
+                {pick("Magazine", "Stores")}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SEO_STORES.slice(0, 6).map((store) => (
+                  <Link
+                    key={store.slug}
+                    href={`/catalog-romania/magazine/${store.slug}`}
+                    className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:border-emerald-300/35 hover:bg-white/[0.065]"
+                  >
+                    {store.name}
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-gray-400">
+                      {store.shopperIntent}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-3 text-sm font-black uppercase tracking-[0.14em] text-cyan-100">
+                {pick("Categorii", "Categories")}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SEO_CATEGORIES.slice(0, 6).map((category) => (
+                  <Link
+                    key={category.slug}
+                    href={`/catalog-romania/categorii/${category.slug}`}
+                    className="rounded-lg border border-white/10 bg-white/[0.035] p-3 text-sm font-black text-white transition hover:-translate-y-0.5 hover:border-cyan-300/35 hover:bg-white/[0.065]"
+                  >
+                    {category.name}
+                    <span className="mt-1 block text-xs font-semibold leading-5 text-gray-400">
+                      {category.compareSignals.slice(0, 3).join(" / ")}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <section className="rounded-lg border border-white/10 bg-[#101820]/82 p-5 shadow-xl shadow-black/15">
