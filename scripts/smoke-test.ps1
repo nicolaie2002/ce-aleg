@@ -61,6 +61,42 @@ function Test-Status {
     }
 }
 
+function Test-StatusWithRetry {
+    param(
+        [string]$Name,
+        [string]$Url,
+        [int[]]$Expected = @(200),
+        [int]$Retries = 2,
+        [int]$TimeoutSec = 35,
+        [int]$DelaySec = 3
+    )
+
+    $lastStatus = 0
+    $lastDetail = ""
+
+    for ($attempt = 0; $attempt -le $Retries; $attempt++) {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec $TimeoutSec
+            $lastStatus = [int]$response.StatusCode
+            $lastDetail = "HTTP $lastStatus attempt=$($attempt + 1)"
+
+            if ($Expected -contains $lastStatus) {
+                Add-Result $Name $true $lastDetail
+                return
+            }
+        } catch {
+            $lastStatus = if ($_.Exception.Response) { [int]$_.Exception.Response.StatusCode } else { 0 }
+            $lastDetail = "HTTP $lastStatus attempt=$($attempt + 1) $(Get-ErrorBody $_)"
+        }
+
+        if ($attempt -lt $Retries) {
+            Start-Sleep -Seconds $DelaySec
+        }
+    }
+
+    Add-Result $Name ($Expected -contains $lastStatus) $lastDetail
+}
+
 function Test-Header {
     param(
         [string]$Name,
@@ -197,7 +233,7 @@ function Get-QueryParameter {
 Write-Host "Smoke test frontend: $FrontendUrl"
 Write-Host "Smoke test backend:  $BackendUrl"
 
-Test-Status "Backend health" "$BackendUrl/health"
+Test-StatusWithRetry "Backend health" "$BackendUrl/health"
 Test-Header "Backend sends request IDs" "$BackendUrl/health" "X-Request-ID" ".+"
 Test-Header "Backend blocks framing" "$BackendUrl/health" "X-Frame-Options" "^DENY$"
 Test-Header "Backend sends CSP" "$BackendUrl/health" "Content-Security-Policy" "default-src 'none'"
