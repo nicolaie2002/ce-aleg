@@ -21,6 +21,8 @@ import { useLocale } from "./LocaleProvider";
 import { API_URL } from "../config";
 import { getActiveProfile } from "../utils/profilePreferences";
 
+const NO_PREFETCH_ROUTES = new Set(["/barcode-scan", "/live-assistant", "/cart", "/store"]);
+
 export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
   const { pick } = useLocale();
   const pathname = usePathname();
@@ -77,6 +79,10 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
     }
 
     return label;
+  }
+
+  function shouldPrefetchRoute(href) {
+    return !NO_PREFETCH_ROUTES.has(href);
   }
 
   useEffect(() => {
@@ -164,7 +170,6 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
                 height={80}
                 className="h-full w-full object-cover"
                 priority
-                unoptimized
               />
             </span>
             <span className="min-w-0">
@@ -183,6 +188,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
               <Link
                 key={href}
                 href={href}
+                prefetch={shouldPrefetchRoute(href)}
                 aria-label={getNavigationLabel(desktopLabel, href)}
                 aria-current={isActive(href) ? "page" : undefined}
                 className={`ce-nav-link inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold ${
@@ -211,6 +217,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
             {actionHref && (
               <Link
                 href={actionHref}
+                prefetch={shouldPrefetchRoute(actionHref)}
                 className="hidden shrink-0 items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100 xl:inline-flex"
               >
                 <ScanLine size={17} />
@@ -229,6 +236,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
           <Link
             key={href}
             href={href}
+            prefetch={shouldPrefetchRoute(href)}
             aria-label={getNavigationLabel(label, href)}
             aria-current={isActive(href) ? "page" : undefined}
             className={`flex min-h-14 flex-col items-center justify-center gap-1 rounded-lg px-1 text-[11px] font-bold ${

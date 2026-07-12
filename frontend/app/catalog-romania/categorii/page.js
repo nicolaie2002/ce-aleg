@@ -54,7 +54,7 @@ export default function CatalogCategoriesPage() {
         eyebrow="Categorii publice"
         title="Categorii de produse pe care merita sa le scanezi."
         description="Fiecare categorie are probleme diferite: zahar la dulciuri, sare la mezeluri, proteina la lactate, ingrediente la produse bio. Paginile acestea sunt facute pentru cautari organice si pentru oameni care vor sa testeze aplicatia fara reclame."
-        image="/products/skyr.jpg"
+        image="/products/skyr.webp"
         imageAlt="Produse scanabile in catalogul Ce aleg?"
       >
         <SeoSection

@@ -228,7 +228,7 @@ export default function MissionsPage() {
             <div className="rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.06] p-4 md:p-5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-black text-yellow-100">CeCoins</p>
-                <Image src="/brand/CeCoin.png" alt="" width={34} height={34} className="rounded-full object-cover" />
+                <Image src="/brand/CeCoin.webp" alt="" width={34} height={34} className="rounded-full object-cover" />
               </div>
               <p className="mt-3 text-3xl font-black text-white md:text-4xl">{coinBalance}</p>
               <p className="mt-1 text-xs font-bold text-gray-400">

@@ -67,8 +67,8 @@ const fallbackCoinPacks = [
     coins: 500,
     priceText: "9,99 lei",
     configured: false,
-    image: "/brand/Bronze.png",
-    icon: "/brand/Bronze_icon.png",
+    image: "/brand/Bronze.webp",
+    icon: "/brand/Bronze_icon.webp",
     descriptionRo: "Pentru cateva scanari bonus si recompense rapide.",
     descriptionEn: "For a few bonus scans and quick rewards.",
   },
@@ -78,8 +78,8 @@ const fallbackCoinPacks = [
     coins: 1200,
     priceText: "19,99 lei",
     configured: false,
-    image: "/brand/Gold.png",
-    icon: "/brand/Gold_icon.png",
+    image: "/brand/Gold.webp",
+    icon: "/brand/Gold_icon.webp",
     descriptionRo: "Mai multe puncte pentru saptamanile cu multe cumparaturi.",
     descriptionEn: "More points for weeks with heavier shopping.",
   },
@@ -89,18 +89,33 @@ const fallbackCoinPacks = [
     coins: 3000,
     priceText: "39,99 lei",
     configured: false,
-    image: "/brand/Diamond.png",
-    icon: "/brand/Diamond_icon.png",
+    image: "/brand/Diamond.webp",
+    icon: "/brand/Diamond_icon.webp",
     descriptionRo: "Cel mai bun pachet pentru scanari bonus si activari dese.",
     descriptionEn: "The best pack for bonus scans and frequent unlocks.",
   },
 ];
 
 const CECOIN_PACK_VISUALS = {
-  bronze: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
-  gold: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
-  diamond: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
+  bronze: { image: "/brand/Bronze.webp", icon: "/brand/Bronze_icon.webp" },
+  gold: { image: "/brand/Gold.webp", icon: "/brand/Gold_icon.webp" },
+  diamond: { image: "/brand/Diamond.webp", icon: "/brand/Diamond_icon.webp" },
 };
+
+const CECOIN_ASSET_REPLACEMENTS = {
+  "/brand/Bronze.png": "/brand/Bronze.webp",
+  "/brand/Gold.png": "/brand/Gold.webp",
+  "/brand/Diamond.png": "/brand/Diamond.webp",
+  "/brand/Bronze_icon.png": "/brand/Bronze_icon.webp",
+  "/brand/Gold_icon.png": "/brand/Gold_icon.webp",
+  "/brand/Diamond_icon.png": "/brand/Diamond_icon.webp",
+  "/brand/CeCoin.png": "/brand/CeCoin.webp",
+};
+
+function normalizeCecoinAsset(src, fallback = "/brand/CeCoin.webp") {
+  if (!src) return fallback;
+  return CECOIN_ASSET_REPLACEMENTS[src] || src;
+}
 
 const featureLabels = {
   "5 scanari pe luna": {
@@ -744,7 +759,7 @@ export default function PricingPage() {
             <div>
               <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
                 <Image
-                  src="/brand/CeCoin.png"
+                  src="/brand/CeCoin.webp"
                   alt=""
                   width={28}
                   height={28}
@@ -784,7 +799,7 @@ export default function PricingPage() {
               >
                 {(() => {
                   const packVisual = CECOIN_PACK_VISUALS[pack.id] || {};
-                  const packImage = pack.image || packVisual.image || "/brand/CeCoin.png";
+                  const packImage = normalizeCecoinAsset(pack.image || packVisual.image);
 
                   return (
                     <>
@@ -801,7 +816,7 @@ export default function PricingPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <Image
-                            src={pack.icon || packVisual.icon || "/brand/CeCoin.png"}
+                            src={normalizeCecoinAsset(pack.icon || packVisual.icon)}
                             alt=""
                             width={42}
                             height={42}

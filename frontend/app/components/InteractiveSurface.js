@@ -8,6 +8,7 @@ export function InteractiveSurface({
   ...props
 }) {
   function updateSurface(event) {
+    if (event.pointerType && event.pointerType !== "mouse") return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     const element = event.currentTarget;
@@ -35,8 +36,8 @@ export function InteractiveSurface({
     <Component
       className={`ce-interactive-surface ${className}`}
       data-ce-ambient={ambient ? "true" : undefined}
-      onPointerMove={updateSurface}
-      onPointerLeave={resetSurface}
+      onPointerMove={ambient ? updateSurface : undefined}
+      onPointerLeave={ambient ? resetSurface : undefined}
       {...props}
     >
       {children}

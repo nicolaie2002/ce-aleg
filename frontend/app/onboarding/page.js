@@ -57,7 +57,7 @@ export default function OnboardingPage() {
         href: "/barcode-scan",
         cta: pick("Încep scanarea", "Start scanning"),
         icon: Barcode,
-        image: "/products/skyr.jpg",
+        image: "/products/skyr.webp",
         accent: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
       },
       {
@@ -70,7 +70,7 @@ export default function OnboardingPage() {
         href: "/submit-product",
         cta: pick("Adaug produs", "Add product"),
         icon: PackagePlus,
-        image: "/brand/CeCoin.png",
+        image: "/brand/CeCoin.webp",
         accent: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
       },
     ],

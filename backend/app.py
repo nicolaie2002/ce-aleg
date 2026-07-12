@@ -588,8 +588,8 @@ CECOIN_PACKS = [
         "priceText": "9,99 lei",
         "priceEnv": "STRIPE_CECOINS_BRONZE_PRICE_ID",
         "legacyPriceEnv": "STRIPE_CECOINS_STARTER_PRICE_ID",
-        "image": "/brand/Bronze.png",
-        "icon": "/brand/Bronze_icon.png",
+        "image": "/brand/Bronze.webp",
+        "icon": "/brand/Bronze_icon.webp",
     },
     {
         "id": "gold",
@@ -598,8 +598,8 @@ CECOIN_PACKS = [
         "priceText": "19,99 lei",
         "priceEnv": "STRIPE_CECOINS_GOLD_PRICE_ID",
         "legacyPriceEnv": "STRIPE_CECOINS_BOOST_PRICE_ID",
-        "image": "/brand/Gold.png",
-        "icon": "/brand/Gold_icon.png",
+        "image": "/brand/Gold.webp",
+        "icon": "/brand/Gold_icon.webp",
     },
     {
         "id": "diamond",
@@ -608,8 +608,8 @@ CECOIN_PACKS = [
         "priceText": "39,99 lei",
         "priceEnv": "STRIPE_CECOINS_DIAMOND_PRICE_ID",
         "legacyPriceEnv": "STRIPE_CECOINS_POWER_PRICE_ID",
-        "image": "/brand/Diamond.png",
-        "icon": "/brand/Diamond_icon.png",
+        "image": "/brand/Diamond.webp",
+        "icon": "/brand/Diamond_icon.webp",
     },
 ]
 
@@ -4277,7 +4277,7 @@ PRODUCTS_DB_SEED = [
         "category": "Lactate",
         "score": 8.9,
         "tag": "Mai multă proteină",
-        "image": "/products/skyr.jpg",
+        "image": "/products/skyr.webp",
         "price": 4.99,
         "price_text": "aprox. 4.99 lei",
         "calories": 65,

@@ -13,7 +13,6 @@ import {
   PackageCheck,
   PlusCircle,
   SearchX,
-  Share2,
   ShieldCheck,
   Sparkles,
   Store,
@@ -341,13 +340,6 @@ export default function CatalogRomaniaPage() {
               >
                 <Sparkles size={17} />
                 {pick("Alternative", "Alternatives")}
-              </Link>
-              <Link
-                href="/promovare-gratis"
-                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.04] px-4 py-3 text-sm font-black text-white hover:bg-white/[0.08]"
-              >
-                <Share2 size={17} />
-                {pick("Promovare", "Promote")}
               </Link>
             </div>
           </div>

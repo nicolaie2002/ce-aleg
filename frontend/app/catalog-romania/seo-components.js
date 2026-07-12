@@ -83,7 +83,6 @@ export function CatalogSeoLayout({ eyebrow, title, description, image, imageAlt,
               sizes="(min-width: 1024px) 38vw, 100vw"
               className="object-contain p-8"
               priority
-              unoptimized
             />
             <div className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-black/45 p-4 backdrop-blur">
               <p className="flex items-center gap-2 text-sm font-black text-cyan-100">
@@ -165,7 +164,6 @@ export function CategoryCard({ category }) {
           sizes="(min-width: 1024px) 22vw, 90vw"
           className="object-contain p-5"
           loading="lazy"
-          unoptimized
         />
       </div>
       <div className="p-4">
@@ -194,7 +192,6 @@ export function StoreCard({ store }) {
           sizes="(min-width: 1024px) 22vw, 90vw"
           className="object-contain p-6"
           loading="lazy"
-          unoptimized
         />
       </div>
       <div className="p-4">
@@ -223,7 +220,6 @@ export function ProductCard({ product }) {
           sizes="(min-width: 1024px) 22vw, 90vw"
           className="object-contain p-5"
           loading="lazy"
-          unoptimized
         />
         <span className="absolute right-3 top-3 rounded-lg bg-black px-3 py-1 text-sm font-black text-white">
           {product.score}/10
@@ -256,7 +252,6 @@ export function AlternativeGuideCard({ guide }) {
           sizes="(min-width: 1024px) 22vw, 90vw"
           className="object-contain p-5"
           loading="lazy"
-          unoptimized
         />
       </div>
       <div className="p-4">

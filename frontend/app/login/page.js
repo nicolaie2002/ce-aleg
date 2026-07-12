@@ -148,7 +148,6 @@ export default function LoginPage() {
                   height={88}
                   className="h-full w-full object-cover"
                   priority
-                  unoptimized
                 />
               </span>
               <span>

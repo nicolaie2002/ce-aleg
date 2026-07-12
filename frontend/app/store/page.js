@@ -118,7 +118,6 @@ export default function StorePage() {
                     height={250}
                     className="ce-store-logo"
                     loading="lazy"
-                    unoptimized
                   />
                 </span>
                 <span className="mt-4 flex flex-1 flex-col items-center justify-center">

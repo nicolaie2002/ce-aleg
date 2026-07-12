@@ -121,7 +121,7 @@ export const SEO_CATEGORIES = [
   {
     slug: "lactate",
     name: "Lactate",
-    image: "/products/skyr.jpg",
+    image: "/products/skyr.webp",
     intro:
       "Iaurturi, lapte, skyr, branzeturi si deserturi lactate pot parea similare la raft, dar difera mult la zahar, proteina si lista de ingrediente.",
     examples: ["iaurt simplu", "skyr", "lapte", "branza proaspata", "desert lactat"],
@@ -281,7 +281,7 @@ export const SEO_PRODUCTS = [
     slug: "skyr-simplu",
     name: "Skyr simplu",
     brand: "exemplu catalog",
-    image: "/products/skyr.jpg",
+    image: "/products/skyr.webp",
     categorySlug: "lactate",
     storeSlugs: ["lidl", "kaufland", "carrefour"],
     score: "8.9",
@@ -395,7 +395,7 @@ export const SEO_ALTERNATIVE_GUIDES = [
   {
     slug: "iaurturi",
     title: "Alternative la iaurturi dulci",
-    image: "/products/skyr.jpg",
+    image: "/products/skyr.webp",
     intro:
       "Cand un iaurt pare sanatos, verifica zaharul, proteina si ingredientele. Alternativele bune sunt adesea iaurtul simplu, skyr-ul sau iaurtul grecesc.",
     categorySlugs: ["lactate"],

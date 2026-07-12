@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -30,7 +31,6 @@ import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
-import { FamilyProfiles } from "../components/FamilyProfiles";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile } from "../utils/profilePreferences";
 import { readApiJson } from "../utils/apiResponse";
@@ -60,10 +60,37 @@ const ACTION_TONES = {
 };
 
 const CECOIN_PACK_VISUALS = {
-  bronze: { image: "/brand/Bronze.png", icon: "/brand/Bronze_icon.png" },
-  gold: { image: "/brand/Gold.png", icon: "/brand/Gold_icon.png" },
-  diamond: { image: "/brand/Diamond.png", icon: "/brand/Diamond_icon.png" },
+  bronze: { image: "/brand/Bronze.webp", icon: "/brand/Bronze_icon.webp" },
+  gold: { image: "/brand/Gold.webp", icon: "/brand/Gold_icon.webp" },
+  diamond: { image: "/brand/Diamond.webp", icon: "/brand/Diamond_icon.webp" },
 };
+
+const FamilyProfiles = dynamic(
+  () => import("../components/FamilyProfiles").then((mod) => mod.FamilyProfiles),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm font-bold text-gray-300">
+        Se incarca profilurile familiei...
+      </div>
+    ),
+  }
+);
+
+const CECOIN_ASSET_REPLACEMENTS = {
+  "/brand/Bronze.png": "/brand/Bronze.webp",
+  "/brand/Gold.png": "/brand/Gold.webp",
+  "/brand/Diamond.png": "/brand/Diamond.webp",
+  "/brand/Bronze_icon.png": "/brand/Bronze_icon.webp",
+  "/brand/Gold_icon.png": "/brand/Gold_icon.webp",
+  "/brand/Diamond_icon.png": "/brand/Diamond_icon.webp",
+  "/brand/CeCoin.png": "/brand/CeCoin.webp",
+};
+
+function normalizeCecoinAsset(src, fallback = "/brand/CeCoin.webp") {
+  if (!src) return fallback;
+  return CECOIN_ASSET_REPLACEMENTS[src] || src;
+}
 
 export default function DashboardPage() {
   const { pick } = useLocale();
@@ -502,7 +529,7 @@ export default function DashboardPage() {
       value: coinBalance,
       detail: pick(`${dailyClaimedCoins}/${dailyCoinLimit} azi`, `${dailyClaimedCoins}/${dailyCoinLimit} today`),
       icon: Coins,
-      image: "/brand/CeCoin.png",
+      image: "/brand/CeCoin.webp",
       tone: "border-emerald-300/25 bg-emerald-300/[0.08] text-emerald-100",
       actionHref: "#cumpara-cecoins",
       actionLabel: pick("Cumpără CeCoins", "Buy CeCoins"),
@@ -512,7 +539,7 @@ export default function DashboardPage() {
     <div id="cumpara-cecoins" className="rounded-2xl border border-yellow-300/20 bg-yellow-300/[0.055] p-5 scroll-mt-24">
       <div className="flex items-center justify-between gap-3">
         <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
-          <Image src="/brand/CeCoin.png" alt="" width={28} height={28} className="rounded-full object-cover" />
+          <Image src="/brand/CeCoin.webp" alt="" width={28} height={28} className="rounded-full object-cover" />
           {pick("Cumpără CeCoins", "Buy CeCoins")}
         </p>
         <span className="rounded-full border border-yellow-300/25 px-3 py-1 text-xs font-black text-yellow-100">
@@ -528,7 +555,7 @@ export default function DashboardPage() {
       <div className="mt-4 space-y-2">
         {coinPacks.map((pack) => {
           const packVisual = CECOIN_PACK_VISUALS[pack.id] || {};
-          const packImage = pack.image || packVisual.image || "/brand/CeCoin.png";
+          const packImage = normalizeCecoinAsset(pack.image || packVisual.image);
 
           return (
             <button
