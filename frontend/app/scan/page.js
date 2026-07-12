@@ -424,10 +424,10 @@ function ScanPageContent() {
               <Search size={16} />
               Identificare prin cod sau nume
             </p>
-            <h1 className="mt-5 max-w-4xl text-4xl font-black leading-tight md:text-6xl">
+            <h1 className="mt-5 max-w-4xl text-3xl font-black leading-tight sm:text-4xl md:text-6xl">
               Găsește produsul corect fără să ghicești.
             </h1>
-            <p className="mt-4 max-w-3xl text-lg leading-8 text-gray-300">
+            <p className="mt-4 max-w-3xl text-base leading-7 text-gray-300 sm:text-lg sm:leading-8">
               Momentan identificarea sigură se face prin cod de bare sau prin
               denumirea scrisă pe ambalaj. Fotografia este opțională și ajută
               doar la citirea locală a textului vizibil.
@@ -491,7 +491,7 @@ function ScanPageContent() {
 
         <InteractiveSurface
           id="product-lookup"
-          className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur"
+          className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur sm:rounded-3xl sm:p-6"
         >
           <div className="mb-6">
             <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
@@ -499,7 +499,7 @@ function ScanPageContent() {
               Căutare asistată
             </p>
 
-            <h2 className="text-3xl font-black md:text-4xl">
+            <h2 className="text-2xl font-black sm:text-3xl md:text-4xl">
               Scrie numele sau alege produsul corect din catalog.
             </h2>
 
@@ -584,7 +584,7 @@ function ScanPageContent() {
                       key={product.barcode || product.id || product.name}
                       type="button"
                       onClick={() => selectSuggestion(product)}
-                      className="grid w-full grid-cols-[auto_1fr_auto] items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-cyan-300/50 hover:bg-white/10"
+                      className="grid w-full grid-cols-[auto_1fr] items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:border-cyan-300/50 hover:bg-white/10 sm:grid-cols-[auto_1fr_auto]"
                     >
                       <ProductImage
                         src={getImageUrl(product.image)}
@@ -602,7 +602,7 @@ function ScanPageContent() {
                         </p>
                       </div>
 
-                      <div className="text-right">
+                      <div className="col-span-2 text-left sm:col-span-1 sm:text-right">
                         <span className="rounded-full bg-emerald-400 px-3 py-1 text-xs font-bold text-black">
                           {product.score === null ||
                           product.score === undefined ||
@@ -631,7 +631,7 @@ function ScanPageContent() {
             </div>
           </div>
 
-          <label className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border-2 border-dashed border-white/20 bg-black/30 p-10 text-center transition hover:border-emerald-400/60 hover:bg-emerald-400/5">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-white/20 bg-black/30 p-6 text-center transition hover:border-emerald-400/60 hover:bg-emerald-400/5 sm:rounded-3xl sm:p-10">
             <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-300/12 text-cyan-100">
               <ImagePlus size={28} />
             </span>

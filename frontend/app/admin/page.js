@@ -343,6 +343,7 @@ export default function AdminPage() {
       vegan: Boolean(product.vegan),
       lactoseFree: Boolean(product.lactoseFree),
       natural: Boolean(product.natural),
+      notifyUsers: true,
     };
   }
 
@@ -1024,6 +1025,20 @@ export default function AdminPage() {
                       </label>
                     ))}
                   </div>
+                  <label className="flex items-start gap-3 rounded-lg border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm font-bold text-cyan-50 md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(productEdit.notifyUsers)}
+                      onChange={(event) => updateProductEdit("notifyUsers", event.target.checked)}
+                      className="mt-1 h-4 w-4 shrink-0 accent-cyan-300"
+                    />
+                    <span>
+                      Anunta utilizatorii care au scanat sau raportat produsul
+                      <span className="mt-1 block text-xs font-semibold leading-5 text-cyan-100/75">
+                        Se trimite doar daca exista o modificare vizibila si fiecare utilizator are cooldown anti-dublare.
+                      </span>
+                    </span>
+                  </label>
                   <div className="flex flex-wrap gap-2 md:col-span-2">
                     <button
                       type="button"

@@ -1345,7 +1345,7 @@ export default function BarcodeScanPage() {
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
-      <section className="ce-shell-md ce-page">
+      <section className="ce-shell-md ce-page pb-24 sm:pb-12">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
@@ -1363,18 +1363,18 @@ export default function BarcodeScanPage() {
           </Link>
         </div>
 
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl">
-          <p className="mb-3 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl sm:rounded-3xl sm:p-6">
+          <p className="mb-3 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-300">
             Scanare cod de bare
           </p>
 
-          <h1 className="text-4xl font-bold md:text-5xl">
-            Scanează codul de bare.
+          <h1 className="text-3xl font-black leading-tight sm:text-4xl md:text-5xl">
+            Scanează codul. Confirmă produsul.
           </h1>
 
-          <p className="mt-4 max-w-2xl text-gray-300">
-            Îndreaptă camera spre codul de bare al produsului. Aplicația îl
-            citește automat și îți arată informațiile disponibile.
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-gray-300 sm:text-base sm:leading-7">
+            Ține codul în chenar câteva clipe. Dacă produsul lipsește, verifici codul citit
+            și îl poți trimite rapid la verificare pentru CeCoins.
           </p>
 
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-4">
@@ -1416,17 +1416,17 @@ export default function BarcodeScanPage() {
             </div>
           </div>
 
-          <div className="relative mt-6 overflow-hidden rounded-3xl border border-white/10 bg-black">
+          <div className="relative mt-6 overflow-hidden rounded-2xl border border-white/10 bg-black sm:rounded-3xl">
             <video
               ref={videoRef}
-              className="h-[360px] w-full object-cover"
+              className="h-[52vh] min-h-[320px] w-full object-cover sm:h-[420px]"
               muted
               playsInline
             />
             {isScanning && (
               <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
-                <div className="h-36 w-full max-w-xl rounded-2xl border-2 border-emerald-300/80 shadow-[0_0_0_999px_rgba(0,0,0,0.28)]">
-                  <p className="mt-40 text-center text-xs font-semibold text-emerald-100">
+                <div className="relative h-32 w-full max-w-xl rounded-2xl border-2 border-emerald-300/80 shadow-[0_0_0_999px_rgba(0,0,0,0.28)] sm:h-36">
+                  <p className="absolute left-0 right-0 top-full mt-3 text-center text-xs font-semibold text-emerald-100">
                     Încadrează barele și cifrele tipărite dedesubt
                   </p>
                 </div>
@@ -1434,7 +1434,7 @@ export default function BarcodeScanPage() {
             )}
           </div>
 
-          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm text-gray-300">
+          <div className="mt-4 rounded-2xl border border-white/10 bg-black/30 p-4 text-sm font-semibold text-gray-200">
             {scanStatus}
             {isOcrAnalyzing && (
               <span className="ml-2 text-emerald-300">Verific imaginea...</span>
@@ -1711,17 +1711,23 @@ export default function BarcodeScanPage() {
             missingBarcodeCandidate ||
             ["openfoodfacts_unavailable", "external_product_not_found", "external_catalog_unavailable"].includes(lookupIssue)
           ) && (
-            <div className="mt-6 rounded-3xl border border-yellow-300/30 bg-yellow-300/10 p-5">
-              <h2 className="text-2xl font-bold text-yellow-300">
+            <div className="mt-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 sm:rounded-3xl sm:p-5">
+              <p className="text-sm font-black uppercase tracking-wide text-yellow-100">
+                Produs nou în România?
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-yellow-300">
                 {lookupIssue === "openfoodfacts_unavailable"
                   ? "Sursa online nu răspunde"
-                  : "Produs negăsit"}
+                  : "Ajută-ne să îl adăugăm."}
               </h2>
 
-              <p className="mt-3 text-gray-300">
+              <p className="mt-3 text-sm leading-6 text-gray-300 sm:text-base sm:leading-7">
                 {lookupIssue === "openfoodfacts_unavailable"
                   ? "Produsul nu este în baza locală, iar verificarea Open Food Facts nu a putut fi făcută acum. Îl poți adăuga manual sau poți încerca din nou."
-                  : "Dacă produsul nu apare în baza locală sau în Open Food Facts, îl poți adăuga ca propunere. Mai întâi confirmă că am citit corect codul de bare."}
+                  : "Dacă produsul nu apare în catalog, îl poți trimite ca propunere. Mai întâi confirmă că am citit corect codul de bare, apoi faci pozele și îl trimiți la verificare."}
+              </p>
+              <p className="mt-3 rounded-xl border border-yellow-300/25 bg-black/25 px-4 py-3 text-sm font-bold text-yellow-50">
+                După aprobare primești CeCoins în cont.
               </p>
 
               {missingBarcodeCandidate ? (
@@ -1729,7 +1735,7 @@ export default function BarcodeScanPage() {
                   <p className="text-sm font-bold text-yellow-100">
                     Cod citit de scanner
                   </p>
-                  <code className="mt-2 block rounded-xl border border-yellow-300/25 bg-black/40 px-4 py-3 text-center font-mono text-2xl font-black tracking-[0.16em] text-white">
+                  <code className="mt-2 block rounded-xl border border-yellow-300/25 bg-black/40 px-3 py-3 text-center font-mono text-xl font-black tracking-[0.12em] text-white sm:px-4 sm:text-2xl sm:tracking-[0.16em]">
                     {missingBarcodeCandidate.barcode}
                   </code>
                   <p className="mt-3 text-sm leading-6 text-gray-300">
@@ -1742,7 +1748,7 @@ export default function BarcodeScanPage() {
                       href={buildSubmitProductLink(true)}
                       className="inline-flex items-center justify-center rounded-2xl bg-yellow-300 px-5 py-3 text-center font-semibold text-black hover:bg-yellow-200"
                     >
-                      Da, codul e bun
+                      Da, codul e corect
                     </Link>
                     <button
                       type="button"
@@ -1763,9 +1769,9 @@ export default function BarcodeScanPage() {
               ) : (
                 <Link
                   href={buildSubmitProductLink(true)}
-                  className="mt-5 inline-block rounded-2xl bg-yellow-300 px-6 py-3 font-semibold text-black hover:bg-yellow-200"
+                  className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-yellow-300 px-6 py-3 text-center font-semibold text-black hover:bg-yellow-200 sm:w-auto"
                 >
-                  Contribuie produsul cu acest cod
+                  Trimite produsul la verificare
                 </Link>
               )}
             </div>

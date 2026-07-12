@@ -100,6 +100,17 @@ export default function DashboardPage() {
     { href: "/submit-product", title: pick("Contribuie produs", "Contribute product"), description: pick("Completează catalogul când un produs lipsește.", "Complete the catalog when a product is missing."), icon: ListPlus, tone: "cyan" },
   ];
 
+  const findAction = (href) => actions.find((action) => action.href === href);
+  const mobilePrimaryActions = ["/barcode-scan", "/store"].map(findAction).filter(Boolean);
+  const mobileSecondaryActions = [
+    "/missions",
+    "/cart",
+    "/submit-product",
+    "/history",
+    "/catalog-romania",
+    "/preferences",
+  ].map(findAction).filter(Boolean);
+
   const loadDashboardData = useCallback(async (userId, profile = null) => {
     try {
       if (!userId) return;
@@ -626,6 +637,62 @@ export default function DashboardPage() {
             </div>
           )}
 
+          <div className="mt-6 space-y-3 md:hidden">
+            <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/[0.08] p-4">
+              <p className="text-xs font-black uppercase tracking-wide text-emerald-100">
+                {pick("La raft", "At the shelf")}
+              </p>
+              <h2 className="mt-2 text-2xl font-black">
+                {pick("Alege rapid produsul potrivit.", "Choose the right product faster.")}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-gray-300">
+                {pick(
+                  "Pe telefon, începe cu scanarea codului sau caută produsul după nume. Restul rămâne la un tap distanță.",
+                  "On mobile, start with barcode scanning or product search. Everything else stays one tap away."
+                )}
+              </p>
+              <div className="mt-4 grid gap-3">
+                {mobilePrimaryActions.map(({ href, title, description, icon: Icon, tone }) => {
+                  const selectedTone = ACTION_TONES[tone] || ACTION_TONES.cyan;
+
+                  return (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`flex items-center gap-3 rounded-xl border p-4 ${selectedTone.card}`}
+                    >
+                      <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${selectedTone.icon}`}>
+                        <Icon size={21} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-base font-black">{title}</span>
+                        <span className={`mt-0.5 block text-xs leading-5 ${selectedTone.description}`}>{description}</span>
+                      </span>
+                      <ArrowRight size={17} className="shrink-0" />
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {mobileSecondaryActions.map(({ href, title, icon: Icon, tone }) => {
+                const selectedTone = ACTION_TONES[tone] || ACTION_TONES.cyan;
+
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className={`flex min-h-24 flex-col justify-between rounded-xl border p-3 ${selectedTone.card}`}
+                  >
+                    <Icon size={20} />
+                    <span className="mt-3 text-sm font-black leading-5">{title}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
               <div className="max-w-3xl">
@@ -686,7 +753,37 @@ export default function DashboardPage() {
             <FamilyProfiles />
           </div>
 
-          <div className="mt-6 rounded-2xl border border-violet-300/20 bg-violet-300/[0.055] p-5">
+          <div className="mt-6 rounded-2xl border border-violet-300/20 bg-violet-300/[0.065] p-4 md:hidden">
+            <p className="inline-flex items-center gap-2 text-sm font-black text-violet-100">
+              <Trophy size={17} />
+              {pick("Misiuni", "Missions")}
+            </p>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <div>
+                <p className="text-2xl font-black">{coinBalance} CeCoins</p>
+                <p className="mt-1 text-xs font-bold text-gray-400">
+                  {readyMissionCount
+                    ? pick(`${readyMissionCount} gata de revendicat`, `${readyMissionCount} ready to claim`)
+                    : pick("Progresul se strânge din scanări și contribuții.", "Progress builds from scans and contributions.")}
+                </p>
+              </div>
+              <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1 text-xs font-black text-cyan-100">
+                {rewardLevel}
+              </span>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full rounded-full bg-violet-200 transition-all" style={{ width: `${rewardProgress}%` }} />
+            </div>
+            <Link
+              href="/missions"
+              className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-black hover:bg-cyan-100"
+            >
+              <Trophy size={17} />
+              {pick("Deschide misiunile", "Open missions")}
+            </Link>
+          </div>
+
+          <div className="mt-6 hidden rounded-2xl border border-violet-300/20 bg-violet-300/[0.055] p-5 md:block">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -811,7 +908,7 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          <div className="mt-9 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mt-9 hidden flex-col gap-2 md:flex md:flex-row md:items-end md:justify-between">
             <div>
               <p className="text-sm font-black text-cyan-200">
                 {pick("Acțiuni rapide", "Quick actions")}
@@ -828,7 +925,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="ce-mobile-snap-row mt-8 flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-2 md:overflow-visible md:pb-0 2xl:grid-cols-4">
+          <div className="mt-8 hidden gap-4 md:grid md:grid-cols-2 2xl:grid-cols-4">
             {actions.map(({ href, title, description, icon: Icon, tone }) => {
               const selectedTone = ACTION_TONES[tone] || ACTION_TONES.cyan;
 
@@ -837,7 +934,7 @@ export default function DashboardPage() {
                   as={Link}
                   key={href}
                   href={href}
-                  className={`group flex min-w-[82vw] snap-start items-center gap-4 rounded-lg border p-5 transition hover:-translate-y-0.5 md:min-w-0 ${selectedTone.card}`}
+                  className={`group flex items-center gap-4 rounded-lg border p-5 transition hover:-translate-y-0.5 ${selectedTone.card}`}
                 >
                   <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-lg ${selectedTone.icon}`}>
                     <Icon size={23} />

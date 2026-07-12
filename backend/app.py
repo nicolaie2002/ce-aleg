@@ -1474,6 +1474,258 @@ def send_alternative_report_fixed_email(user, scanned_product, alternative_produ
     )
 
 
+PRODUCT_CORRECTION_EMAIL_EVENT_TYPE = "product_correction_email"
+
+
+def product_notification_snapshot(product):
+    if not product:
+        return {}
+
+    return {
+        "id": product.id,
+        "name": product.name,
+        "barcode": product.barcode,
+        "store": product.store,
+        "category": product.category,
+        "score": product.score,
+        "tag": product.tag,
+        "reason": product.reason,
+        "ingredients": product.ingredients,
+        "calories": product.calories,
+        "protein": product.protein,
+        "sugar": product.sugar,
+        "fat": product.fat,
+    }
+
+
+def product_update_has_user_visible_change(previous_snapshot, product):
+    current_snapshot = product_notification_snapshot(product)
+
+    for key in [
+        "name",
+        "barcode",
+        "store",
+        "category",
+        "tag",
+        "reason",
+        "ingredients",
+    ]:
+        if normalize_search_text(previous_snapshot.get(key)) != normalize_search_text(current_snapshot.get(key)):
+            return True
+
+    for key in ["score", "calories", "protein", "sugar", "fat"]:
+        previous_value = previous_snapshot.get(key)
+        current_value = current_snapshot.get(key)
+
+        if previous_value is None and current_value is None:
+            continue
+
+        try:
+            if round(float(previous_value or 0), 3) != round(float(current_value or 0), 3):
+                return True
+        except (TypeError, ValueError):
+            if str(previous_value or "") != str(current_value or ""):
+                return True
+
+    return False
+
+
+def product_score_text(score):
+    try:
+        return f"{round(float(score), 1)}/10"
+    except (TypeError, ValueError):
+        return "neconfirmat"
+
+
+def send_product_corrected_email(user, product, previous_snapshot=None):
+    if not user or not product:
+        return False
+
+    catalog_url = f"{FRONTEND_PUBLIC_URL}/catalog-romania"
+    product_name = str(product.name or "produsul urmărit").strip()
+    old_category = str((previous_snapshot or {}).get("category") or "").strip()
+    new_category = str(product.category or "categorie actualizată").strip()
+    details = [
+        f"Produs: {product_name}",
+        f"Categoria actuală: {new_category}",
+        f"Scor actual: {product_score_text(product.score)}",
+        "Îți mulțumim pentru scanări și raportări. Ele ajută catalogul să devină mai precis.",
+    ]
+
+    if old_category and normalize_search_text(old_category) != normalize_search_text(new_category):
+        details.insert(1, f"Categoria veche: {old_category}")
+
+    text_body = (
+        f"Salut, {user.name}!\n\n"
+        "Am corectat un produs cu care ai interacționat în Ce aleg?.\n"
+        f"Produs: {product_name}\n"
+        f"Categoria actuală: {new_category}\n"
+        f"Scor actual: {product_score_text(product.score)}\n\n"
+        f"Vezi Catalog România: {catalog_url}\n"
+    )
+    html_body = render_brand_email(
+        "Produs corectat",
+        "Am actualizat un produs din catalog.",
+        "Un produs pe care l-ai scanat sau raportat a fost verificat de admin. Recomandările viitoare ar trebui să fie mai precise.",
+        "Vezi Catalog România",
+        catalog_url,
+        details,
+    )
+    return send_transactional_email(
+        user.email,
+        "Am corectat un produs în Ce aleg?",
+        text_body,
+        html_body,
+    )
+
+
+def product_matches_notification_candidate(product, candidate):
+    if not product or not isinstance(candidate, dict):
+        return False
+
+    product_barcode = str(product.barcode or "").strip()
+    candidate_barcode = str(candidate.get("barcode") or "").strip()
+
+    if product_barcode and candidate_barcode and product_barcode == candidate_barcode:
+        return True
+
+    product_name = normalize_search_text(product.name)
+    candidate_name = normalize_search_text(candidate.get("name"))
+
+    return bool(product_name and candidate_name and product_name == candidate_name)
+
+
+def user_can_receive_product_notification(user):
+    return bool(
+        user
+        and is_valid_email_address(user.email)
+        and bool(getattr(user, "email_verified", True))
+    )
+
+
+def product_correction_email_recently_sent(user_id, product, cooldown_days=14):
+    if not user_id or not product:
+        return True
+
+    since = datetime.utcnow() - timedelta(days=cooldown_days)
+    product_id = product.id
+    product_barcode = str(product.barcode or "").strip()
+    recent_events = (
+        UsageEvent.query
+        .filter(
+            UsageEvent.user_id == user_id,
+            UsageEvent.event_type == PRODUCT_CORRECTION_EMAIL_EVENT_TYPE,
+            UsageEvent.created_at >= since,
+        )
+        .order_by(UsageEvent.created_at.desc())
+        .limit(25)
+        .all()
+    )
+
+    for event in recent_events:
+        metadata = parse_usage_metadata(event)
+
+        if product_id and metadata.get("productId") == product_id:
+            return True
+
+        if product_barcode and str(metadata.get("barcode") or "").strip() == product_barcode:
+            return True
+
+    return False
+
+
+def collect_product_correction_recipients(product, limit=25):
+    if not product:
+        return []
+
+    recipients = {}
+    since = datetime.utcnow() - timedelta(days=120)
+    report_events = (
+        UsageEvent.query
+        .filter(
+            UsageEvent.event_type == "alternative_report",
+            UsageEvent.created_at >= since,
+        )
+        .order_by(UsageEvent.created_at.desc())
+        .limit(500)
+        .all()
+    )
+
+    for event in report_events:
+        metadata = parse_usage_metadata(event)
+
+        if (
+            product_matches_notification_candidate(product, metadata.get("alternativeProduct"))
+            or product_matches_notification_candidate(product, metadata.get("scannedProduct"))
+        ):
+            user = event.user
+
+            if user_can_receive_product_notification(user):
+                recipients.setdefault(user.id, user)
+
+        if len(recipients) >= limit:
+            break
+
+    normalized_product_name = normalize_search_text(product.name)
+
+    if normalized_product_name and len(recipients) < limit:
+        history_items = (
+            ScanHistory.query
+            .filter(ScanHistory.scanned_at >= since)
+            .order_by(ScanHistory.scanned_at.desc())
+            .limit(500)
+            .all()
+        )
+
+        for item in history_items:
+            if normalize_search_text(item.product_name) != normalized_product_name:
+                continue
+
+            user = item.user
+
+            if user_can_receive_product_notification(user):
+                recipients.setdefault(user.id, user)
+
+            if len(recipients) >= limit:
+                break
+
+    return list(recipients.values())[:limit]
+
+
+def notify_users_about_product_correction(product, previous_snapshot=None, limit=25):
+    if not is_email_configured():
+        return 0
+
+    if not product_update_has_user_visible_change(previous_snapshot or {}, product):
+        return 0
+
+    sent_count = 0
+
+    for user in collect_product_correction_recipients(product, limit=limit):
+        if product_correction_email_recently_sent(user.id, product):
+            continue
+
+        if send_product_corrected_email(user, product, previous_snapshot):
+            record_user_event(
+                user.id,
+                PRODUCT_CORRECTION_EMAIL_EVENT_TYPE,
+                "admin_product_update",
+                {
+                    "productId": product.id,
+                    "barcode": product.barcode,
+                    "category": product.category,
+                    "score": product.score,
+                },
+                commit=False,
+            )
+            sent_count += 1
+
+    if sent_count:
+        db.session.commit()
+
+    return sent_count
+
+
 def plan_display_name(plan):
     normalized = str(plan or "").strip().lower()
     return {
@@ -8423,6 +8675,7 @@ def update_admin_product(product_id):
         return jsonify({"error": "Produsul nu exista."}), 404
 
     data = request.get_json(silent=True) or {}
+    previous_snapshot = product_notification_snapshot(product)
     text_fields = {
         "name": ("Numele produsului", 150, 2),
         "store": ("Magazinul", 100, 2),
@@ -8542,6 +8795,7 @@ def update_admin_product(product_id):
             product.score = score if score is not None else 0
 
     db.session.add(product)
+    notify_users = data.get("notifyUsers") is True
     record_user_event(
         g.current_user.id,
         "admin_product_updated",
@@ -8550,13 +8804,40 @@ def update_admin_product(product_id):
             "productId": product.id,
             "barcode": product.barcode,
             "recalculate": recalculate,
+            "notifyUsers": notify_users,
         },
         commit=False,
     )
     db.session.commit()
 
+    notified_users = 0
+    notification_error = None
+
+    if notify_users:
+        try:
+            notified_users = notify_users_about_product_correction(product, previous_snapshot)
+        except Exception as error:
+            db.session.rollback()
+            notification_error = str(error)
+            app.logger.exception("Product correction notifications could not be sent.")
+
+    message = "Produs actualizat."
+
+    if notified_users:
+        message = f"Produs actualizat. Am anuntat {notified_users} utilizatori."
+    elif notify_users and not is_email_configured():
+        message = "Produs actualizat. Emailul nu este configurat, deci nu am trimis notificari."
+    elif notification_error:
+        message = "Produs actualizat, dar notificarile nu au putut fi trimise."
+
     return jsonify({
-        "message": "Produs actualizat.",
+        "message": message,
+        "notifications": {
+            "requested": notify_users,
+            "sent": notified_users,
+            "emailConfigured": is_email_configured(),
+            "error": notification_error,
+        },
         "product": product_to_dict(product),
     })
 
