@@ -170,11 +170,13 @@ Test-Status "Frontend privacy" "$FrontendUrl/privacy"
 Test-Status "Frontend terms" "$FrontendUrl/terms"
 Test-Status "Frontend scan page" "$FrontendUrl/barcode-scan"
 Test-Status "Frontend live assistant page" "$FrontendUrl/live-assistant"
+Test-Status "Frontend cron route is secret-only" "$FrontendUrl/api/cron/maintenance" @(401)
 Test-Status "Unauthenticated billing is blocked" "$BackendUrl/billing/status" @(401)
 Test-Header "Sensitive responses disable cache" "$BackendUrl/auth/me" "Cache-Control" "no-store" @(401)
 Test-CrossSiteMutationBlocked "$BackendUrl/auth/password-strength"
 Invoke-Json "Unauthenticated email test is blocked" "POST" "$BackendUrl/admin/email-test" @{} $null @(401) | Out-Null
 Invoke-Json "Unauthenticated mission digest is blocked" "POST" "$BackendUrl/admin/missions/digest" @{} $null @(401) | Out-Null
+Invoke-Json "Unauthenticated internal cron is blocked" "POST" "$BackendUrl/internal/cron/maintenance" @{} $null @(401) | Out-Null
 Invoke-Json "Unauthenticated delete request is blocked" "POST" "$BackendUrl/account/delete/request" @{} $null @(401) | Out-Null
 Invoke-Json "Invalid account delete token is rejected" "POST" "$BackendUrl/account/delete/confirm" @{ token = "invalid-token" } $null @(400) | Out-Null
 

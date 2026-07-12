@@ -9,6 +9,7 @@ from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 import base64
 import csv
+import hmac
 import json
 import os
 import time
@@ -398,6 +399,7 @@ EMAIL_SMTP_PASSWORD = read_secret_env("EMAIL_SMTP_PASSWORD")
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Ce aleg?").strip()
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact@cealeg.shop").strip().lower()
+CRON_SECRET = read_secret_env("CRON_SECRET")
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").strip().lower() in {
     "1",
     "true",
@@ -8427,6 +8429,57 @@ def send_admin_mission_digest():
             else f"Am gasit {result['eligible']} utilizatori cu misiuni aproape gata."
         ),
     })
+
+
+def cron_request_is_authorized():
+    if not CRON_SECRET:
+        return False
+
+    supplied = request.headers.get("Authorization", "")
+    expected = f"Bearer {CRON_SECRET}"
+    return hmac.compare_digest(supplied, expected)
+
+
+def get_cron_recategorize_min_id(limit):
+    max_product_id = db.session.query(func.max(Product.id)).scalar() or 1
+    safe_limit = max(1, int(limit or 1))
+    day_number = datetime.utcnow().date().toordinal()
+    return 1 + ((day_number * safe_limit) % max(1, int(max_product_id)))
+
+
+@app.route("/internal/cron/maintenance", methods=["POST"])
+def run_cron_maintenance():
+    if not cron_request_is_authorized():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    recategorize_limit = max(1, min(int(data.get("recategorizeLimit") or 300), 500))
+    digest_limit = max(1, min(int(data.get("digestLimit") or 100), 250))
+    send_digest = str(data.get("sendDigest", "true")).lower() in {"1", "true", "yes", "on"}
+    run_recategorize = str(data.get("recategorize", "true")).lower() in {"1", "true", "yes", "on"}
+    result = {
+        "ok": True,
+        "generatedAt": datetime.utcnow().isoformat() + "Z",
+        "recategorize": None,
+        "missionDigest": None,
+    }
+
+    if run_recategorize:
+        recategorize_min_id = get_cron_recategorize_min_id(recategorize_limit)
+        result["recategorize"] = recategorize_catalog_products(
+            limit=recategorize_limit,
+            apply_changes=True,
+            min_id=recategorize_min_id,
+        )
+
+    if send_digest:
+        result["missionDigest"] = build_mission_digest_batch(
+            limit=digest_limit,
+            apply_changes=is_email_configured(),
+        )
+        result["missionDigest"]["emailConfigured"] = is_email_configured()
+
+    return jsonify(result)
 
 
 @app.route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"])

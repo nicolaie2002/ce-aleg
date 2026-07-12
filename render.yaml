@@ -84,6 +84,8 @@ services:
         value: Ce aleg?
       - key: CONTACT_EMAIL
         value: contact@cealeg.shop
+      - key: CRON_SECRET
+        sync: false
       - key: EMAIL_USE_TLS
         value: "true"
       - key: EMAIL_USE_SSL

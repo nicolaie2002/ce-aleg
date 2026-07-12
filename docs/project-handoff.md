@@ -2,6 +2,15 @@
 
 Ultima actualizare: 2026-07-12
 
+Pachetul curent a adaugat automatizare cron pentru mentenanta:
+
+- Frontend: `frontend/app/api/cron/maintenance/route.js`
+- Config Vercel: `frontend/vercel.json`
+- Backend: `POST /internal/cron/maintenance`
+- Cron-ul Vercel ruleaza zilnic la `04:20 UTC`, verifica `CRON_SECRET`, apoi cheama backend-ul cu acelasi secret.
+- Mentenanta recategorizeaza automat un batch de produse `Altele` dintr-o zona diferita a catalogului in fiecare zi si trimite digest-ul de misiuni aproape gata cu cooldown-ul existent de 6 zile.
+- Pentru activare in productie, aceeasi valoare `CRON_SECRET` trebuie setata in Vercel si Render.
+
 Pachetul curent a adaugat digest admin pentru misiuni aproape gata:
 
 - Backend: `GET/POST /admin/missions/digest`
@@ -252,6 +261,7 @@ Backend Render:
 - `EMAIL_PROVIDER=brevo`
 - `EMAIL_FROM=contact@cealeg.shop`
 - `EMAIL_FROM_NAME=Ce aleg?`
+- `CRON_SECRET`
 - `FRONTEND_PUBLIC_URL=https://www.cealeg.shop`
 - `FRONTEND_ORIGINS=https://www.cealeg.shop,https://ce-aleg.vercel.app`
 - `COOKIE_SECURE=true`
@@ -260,6 +270,7 @@ Frontend Vercel:
 
 - `NEXT_PUBLIC_API_URL`
 - `BACKEND_URL`
+- `CRON_SECRET` cu aceeasi valoare ca in Render
 - `NEXT_PUBLIC_GA_ID` dacă Analytics este activ
 
 ## Comenzi utile
