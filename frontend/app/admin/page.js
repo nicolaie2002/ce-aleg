@@ -11,7 +11,9 @@ import {
   Database,
   Download,
   Mail,
+  Pencil,
   RefreshCw,
+  Save,
   Search,
   SearchX,
   Server,
@@ -128,6 +130,11 @@ export default function AdminPage() {
   const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
   const [catalogBusy, setCatalogBusy] = useState("");
   const [catalogPreview, setCatalogPreview] = useState(null);
+  const [catalogSearchTerm, setCatalogSearchTerm] = useState("");
+  const [catalogSearchBusy, setCatalogSearchBusy] = useState(false);
+  const [catalogResults, setCatalogResults] = useState([]);
+  const [productEdit, setProductEdit] = useState(null);
+  const [productSaveBusy, setProductSaveBusy] = useState(false);
   const [reportFixBusyId, setReportFixBusyId] = useState(null);
   const [reportCategoryEdits, setReportCategoryEdits] = useState({});
   const [missionDigestBusy, setMissionDigestBusy] = useState("");
@@ -312,6 +319,97 @@ export default function AdminPage() {
       setMessage(error.message || "Catalogul nu a putut fi verificat.");
     } finally {
       setCatalogBusy("");
+    }
+  }
+
+  function productToEdit(product) {
+    return {
+      id: product.id,
+      name: product.name || "",
+      store: product.store || "",
+      category: product.category || "",
+      barcode: product.barcode || "",
+      image: product.image || "",
+      price: product.price ?? "",
+      priceText: product.priceText || "",
+      calories: product.calories ?? "",
+      protein: product.protein ?? "",
+      sugar: product.sugar ?? "",
+      fat: product.fat ?? "",
+      score: product.score ?? "",
+      tag: product.tag || "",
+      reason: product.reason || "",
+      ingredients: product.ingredients || "",
+      vegan: Boolean(product.vegan),
+      lactoseFree: Boolean(product.lactoseFree),
+      natural: Boolean(product.natural),
+    };
+  }
+
+  function updateProductEdit(key, value) {
+    setProductEdit((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  async function searchCatalogProducts(event) {
+    event?.preventDefault();
+    setCatalogSearchBusy(true);
+    setMessage("Caut produse in catalog...");
+
+    try {
+      const params = new URLSearchParams({
+        q: catalogSearchTerm.trim(),
+        limit: "20",
+      });
+      const response = await fetch(`${API_URL}/admin/products/search?${params.toString()}`);
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Produsele nu au putut fi cautate.");
+      }
+
+      const items = Array.isArray(data) ? data : [];
+      setCatalogResults(items);
+      setProductEdit(items[0] ? productToEdit(items[0]) : null);
+      setMessage(items.length ? `Am gasit ${items.length} produse.` : "Nu am gasit produse pentru cautarea asta.");
+    } catch (error) {
+      setMessage(error.message || "Produsele nu au putut fi cautate.");
+    } finally {
+      setCatalogSearchBusy(false);
+    }
+  }
+
+  async function saveCatalogProduct(recalculate = true) {
+    if (!productEdit?.id) return;
+
+    setProductSaveBusy(true);
+    setMessage(recalculate ? "Salvez si recalculez produsul..." : "Salvez produsul...");
+
+    try {
+      const response = await fetch(`${API_URL}/admin/products/${productEdit.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...productEdit,
+          recalculate,
+        }),
+      });
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Produsul nu a putut fi salvat.");
+      }
+
+      const updatedProduct = data.product;
+      setProductEdit(productToEdit(updatedProduct));
+      setCatalogResults((current) =>
+        current.map((item) => (item.id === updatedProduct.id ? updatedProduct : item))
+      );
+      setMessage(data.message || "Produs actualizat.");
+      await loadAdmin();
+    } catch (error) {
+      setMessage(error.message || "Produsul nu a putut fi salvat.");
+    } finally {
+      setProductSaveBusy(false);
     }
   }
 
@@ -790,6 +888,168 @@ export default function AdminPage() {
               )}
             </div>
           )}
+
+          <div className="mt-6 border-t border-white/10 pt-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                  <Pencil size={16} /> Editare rapida produs
+                </p>
+                <h3 className="mt-2 text-xl font-black text-white">Corecteaza catalogul fara SQL</h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
+                  Cauta dupa nume, cod de bare, categorie sau magazin. Salveaza cu recalculare ca scorul,
+                  eticheta si motivul sa ramana aliniate cu taxonomia curenta.
+                </p>
+              </div>
+              <form onSubmit={searchCatalogProducts} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
+                <input
+                  value={catalogSearchTerm}
+                  onChange={(event) => setCatalogSearchTerm(event.target.value)}
+                  className="min-h-12 flex-1 rounded-lg border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
+                  placeholder="Nume produs, barcode, categorie..."
+                />
+                <button
+                  type="submit"
+                  disabled={catalogSearchBusy}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
+                >
+                  <Search size={16} />
+                  {catalogSearchBusy ? "Caut..." : "Cauta"}
+                </button>
+              </form>
+            </div>
+
+            <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(260px,0.65fr)_minmax(0,1.35fr)]">
+              <div className="space-y-2">
+                {catalogResults.map((product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => setProductEdit(productToEdit(product))}
+                    className={`w-full rounded-lg border px-3 py-3 text-left transition ${
+                      productEdit?.id === product.id
+                        ? "border-cyan-300/50 bg-cyan-300/10"
+                        : "border-white/10 bg-white/[0.035] hover:bg-white/10"
+                    }`}
+                  >
+                    <span className="block font-bold text-white">{product.name}</span>
+                    <span className="mt-1 block text-xs text-gray-400">
+                      #{product.id} · {product.category || "fara categorie"} · {product.store || "fara magazin"}
+                    </span>
+                    <span className="mt-1 block text-xs text-gray-500">{product.barcode || "fara barcode"}</span>
+                  </button>
+                ))}
+                {!catalogResults.length && (
+                  <EmptyState>Cauta un produs sau lasa campul gol pentru produse cu categoria Altele.</EmptyState>
+                )}
+              </div>
+
+              {productEdit ? (
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-sm font-bold text-gray-300">
+                    Nume
+                    <input
+                      value={productEdit.name}
+                      onChange={(event) => updateProductEdit("name", event.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-white outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="text-sm font-bold text-gray-300">
+                    Barcode
+                    <input
+                      value={productEdit.barcode}
+                      onChange={(event) => updateProductEdit("barcode", event.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-white outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="text-sm font-bold text-gray-300">
+                    Magazin
+                    <input
+                      value={productEdit.store}
+                      onChange={(event) => updateProductEdit("store", event.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-white outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="text-sm font-bold text-gray-300">
+                    Categorie
+                    <input
+                      value={productEdit.category}
+                      onChange={(event) => updateProductEdit("category", event.target.value)}
+                      className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-white outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  {["calories", "protein", "sugar", "fat", "score"].map((field) => (
+                    <label key={field} className="text-sm font-bold text-gray-300">
+                      {field === "calories" ? "Calorii" : field === "protein" ? "Proteina" : field === "sugar" ? "Zahar" : field === "fat" ? "Grasimi" : "Scor"}
+                      <input
+                        value={productEdit[field]}
+                        onChange={(event) => updateProductEdit(field, event.target.value)}
+                        className="mt-1 min-h-11 w-full rounded-lg border border-white/10 bg-black/30 px-3 text-white outline-none focus:border-cyan-300"
+                        inputMode="decimal"
+                      />
+                    </label>
+                  ))}
+                  <label className="text-sm font-bold text-gray-300 md:col-span-2">
+                    Ingrediente
+                    <textarea
+                      value={productEdit.ingredients}
+                      onChange={(event) => updateProductEdit("ingredients", event.target.value)}
+                      rows={3}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <label className="text-sm font-bold text-gray-300 md:col-span-2">
+                    Motiv
+                    <textarea
+                      value={productEdit.reason}
+                      onChange={(event) => updateProductEdit("reason", event.target.value)}
+                      rows={3}
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-white outline-none focus:border-cyan-300"
+                    />
+                  </label>
+                  <div className="flex flex-wrap gap-3 md:col-span-2">
+                    {[
+                      ["vegan", "Vegan"],
+                      ["lactoseFree", "Fara lactoza"],
+                      ["natural", "Natural"],
+                    ].map(([field, label]) => (
+                      <label key={field} className="inline-flex items-center gap-2 text-sm font-bold text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(productEdit[field])}
+                          onChange={(event) => updateProductEdit(field, event.target.checked)}
+                          className="h-4 w-4 accent-cyan-300"
+                        />
+                        {label}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-2 md:col-span-2">
+                    <button
+                      type="button"
+                      onClick={() => saveCatalogProduct(true)}
+                      disabled={productSaveBusy}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-4 py-3 text-sm font-black text-black hover:bg-white disabled:opacity-60"
+                    >
+                      <RefreshCw size={16} />
+                      {productSaveBusy ? "Salvez..." : "Salveaza + recalculeaza"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveCatalogProduct(false)}
+                      disabled={productSaveBusy}
+                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
+                    >
+                      <Save size={16} />
+                      Salveaza manual
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState>Selecteaza un produs pentru editare.</EmptyState>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.045] p-5">

@@ -176,6 +176,8 @@ Test-Header "Sensitive responses disable cache" "$BackendUrl/auth/me" "Cache-Con
 Test-CrossSiteMutationBlocked "$BackendUrl/auth/password-strength"
 Invoke-Json "Unauthenticated email test is blocked" "POST" "$BackendUrl/admin/email-test" @{} $null @(401) | Out-Null
 Invoke-Json "Unauthenticated mission digest is blocked" "POST" "$BackendUrl/admin/missions/digest" @{} $null @(401) | Out-Null
+Test-Status "Unauthenticated admin product search is blocked" "$BackendUrl/admin/products/search" @(401)
+Invoke-Json "Unauthenticated admin product update is blocked" "PATCH" "$BackendUrl/admin/products/1" @{} $null @(401) | Out-Null
 Invoke-Json "Unauthenticated internal cron is blocked" "POST" "$BackendUrl/internal/cron/maintenance" @{} $null @(401) | Out-Null
 Invoke-Json "Unauthenticated delete request is blocked" "POST" "$BackendUrl/account/delete/request" @{} $null @(401) | Out-Null
 Invoke-Json "Invalid account delete token is rejected" "POST" "$BackendUrl/account/delete/confirm" @{ token = "invalid-token" } $null @(400) | Out-Null

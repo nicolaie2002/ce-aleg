@@ -3736,12 +3736,14 @@ ADMIN_ENDPOINTS = {
     "get_admin_overview",
     "get_admin_submissions",
     "get_admin_search_misses",
+    "search_admin_products",
     "export_admin_search_misses",
     "export_admin_alternative_reports",
     "export_admin_payment_events",
     "resolve_admin_alternative_report",
     "recategorize_admin_catalog",
     "send_admin_mission_digest",
+    "update_admin_product",
     "delete_admin_product",
     "admin_update_user_plan",
     "get_readiness",
@@ -8351,6 +8353,212 @@ def get_admin_search_misses():
         }
         for row in rows
     ])
+
+
+def parse_admin_optional_float(data, key, label):
+    if key not in data:
+        return None, None, False
+
+    value = data.get(key)
+
+    if value is None or str(value).strip() == "":
+        return None, None, True
+
+    try:
+        return float(value), None, True
+    except (TypeError, ValueError):
+        return None, f"{label} trebuie sa fie numar valid.", True
+
+
+@app.route("/admin/products/search", methods=["GET"])
+def search_admin_products():
+    query_text = str(request.args.get("q", "") or "").strip()
+    limit = request.args.get("limit", default=20, type=int)
+    safe_limit = max(1, min(limit or 20, 50))
+    products_query = Product.query
+
+    if query_text:
+        like_term = f"%{query_text}%"
+        normalized_query = normalize_search_text(query_text)
+        filters = [
+            Product.name.ilike(like_term),
+            Product.category.ilike(like_term),
+            Product.store.ilike(like_term),
+        ]
+
+        if re.fullmatch(r"\d{4,}", query_text):
+            filters.insert(0, Product.barcode == query_text)
+
+        products_query = products_query.filter(or_(*filters))
+        products = products_query.order_by(
+            Product.id.desc()
+        ).limit(safe_limit).all()
+
+        products.sort(
+            key=lambda product: (
+                product.barcode == query_text,
+                normalize_search_text(product.name).startswith(normalized_query),
+                normalize_search_text(product.category) not in {"altele", "other", "general"},
+                product.id,
+            ),
+            reverse=True,
+        )
+    else:
+        products = (
+            products_query
+            .filter(uncategorized_product_filter())
+            .order_by(Product.id.desc())
+            .limit(safe_limit)
+            .all()
+        )
+
+    return jsonify([product_to_dict(product) for product in products])
+
+
+@app.route("/admin/products/<int:product_id>", methods=["PATCH"])
+def update_admin_product(product_id):
+    product = db.session.get(Product, product_id)
+
+    if not product:
+        return jsonify({"error": "Produsul nu exista."}), 404
+
+    data = request.get_json(silent=True) or {}
+    text_fields = {
+        "name": ("Numele produsului", 150, 2),
+        "store": ("Magazinul", 100, 2),
+        "category": ("Categoria", 100, 2),
+        "barcode": ("Codul de bare", 80, 0),
+        "image": ("Imaginea", 255, 0),
+        "priceText": ("Pretul afisat", 100, 0),
+        "tag": ("Eticheta", 100, 0),
+        "reason": ("Motivul", 5000, 0),
+        "ingredients": ("Ingredientele", 5000, 0),
+    }
+    errors = []
+
+    for key, (label, max_length, min_length) in text_fields.items():
+        if key not in data:
+            continue
+
+        value = str(data.get(key) or "").strip()
+        error = validate_text_length(value, label, max_length, min_length)
+
+        if error:
+            errors.append(error)
+            continue
+
+        if key == "barcode":
+            barcode_error = validate_barcode(value)
+
+            if barcode_error:
+                errors.append(barcode_error)
+                continue
+
+        field_name = "price_text" if key == "priceText" else key
+        setattr(product, field_name, value or None)
+
+    numeric_fields = {
+        "price": "Pretul",
+        "calories": "Caloriile",
+        "protein": "Proteina",
+        "sugar": "Zaharul",
+        "fat": "Grasimile",
+    }
+    parsed_numbers = {}
+
+    for key, label in numeric_fields.items():
+        value, error, provided = parse_admin_optional_float(data, key, label)
+
+        if error:
+            errors.append(error)
+        elif provided:
+            parsed_numbers[key] = value
+
+    nutrition_error = validate_nutrition_values(
+        parsed_numbers.get("calories", product.calories),
+        parsed_numbers.get("protein", product.protein),
+        parsed_numbers.get("sugar", product.sugar),
+        parsed_numbers.get("fat", product.fat),
+    )
+
+    if nutrition_error:
+        errors.append(nutrition_error)
+
+    if errors:
+        return jsonify({"error": " ".join(errors)}), 400
+
+    for key, value in parsed_numbers.items():
+        setattr(product, key, value)
+
+    for key, field_name in {
+        "vegan": "vegan",
+        "lactoseFree": "lactose_free",
+        "natural": "natural",
+    }.items():
+        if key in data:
+            setattr(product, field_name, bool(data.get(key)))
+
+    recalculate = bool(data.get("recalculate", False))
+
+    if recalculate:
+        inferred_category = infer_catalog_category(product_to_dict(product))
+
+        if should_update_reported_product_category(product.category, inferred_category):
+            product.category = inferred_category[:100]
+
+        product.score = calculate_product_score(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        product.tag = generate_product_tag(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+        product.reason = generate_product_reason(
+            product.category,
+            product.calories,
+            product.protein,
+            product.sugar,
+            product.fat,
+            product.ingredients,
+        )
+    elif "score" in data:
+        score, error, provided = parse_admin_optional_float(data, "score", "Scorul")
+
+        if error:
+            return jsonify({"error": error}), 400
+
+        if provided:
+            if score is not None and (score < 0 or score > 10):
+                return jsonify({"error": "Scorul trebuie sa fie intre 0 si 10."}), 400
+            product.score = score if score is not None else 0
+
+    db.session.add(product)
+    record_user_event(
+        g.current_user.id,
+        "admin_product_updated",
+        "admin",
+        {
+            "productId": product.id,
+            "barcode": product.barcode,
+            "recalculate": recalculate,
+        },
+        commit=False,
+    )
+    db.session.commit()
+
+    return jsonify({
+        "message": "Produs actualizat.",
+        "product": product_to_dict(product),
+    })
 
 
 @app.route("/admin/catalog/recategorize", methods=["GET", "POST"])

@@ -2,6 +2,15 @@
 
 Ultima actualizare: 2026-07-12
 
+Pachetul curent a adaugat editare rapida de produse in admin:
+
+- Backend: `GET /admin/products/search`
+- Backend: `PATCH /admin/products/<product_id>`
+- Frontend: `frontend/app/admin/page.js`
+- Admin-ul poate cauta produse dupa nume, cod de bare, categorie sau magazin, apoi poate corecta rapid numele, barcode-ul, magazinul, categoria, valorile nutritionale, ingredientele si flagurile.
+- Salvarea cu recalculare aplica taxonomia curenta si regenereaza scorul, eticheta si motivul produsului.
+- Smoke test-ul verifica acum ca search/update pentru admin products sunt blocate fara autentificare.
+
 Pachetul curent a adaugat automatizare cron pentru mentenanta:
 
 - Frontend: `frontend/app/api/cron/maintenance/route.js`
