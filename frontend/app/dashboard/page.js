@@ -341,6 +341,11 @@ export default function DashboardPage() {
 
     setBuyingPackId(packId);
     setShopMessage("");
+    trackEvent("checkout_started", {
+      checkoutType: "cecoins",
+      packId,
+      source: "dashboard",
+    });
     trackEvent("cecoins_checkout", {
       packId,
       source: "dashboard",

@@ -6,6 +6,9 @@ import { BarChart3, X } from "lucide-react";
 import { useLocale } from "./LocaleProvider";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "";
+const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
+const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "";
+const HAS_ANALYTICS_PROVIDER = Boolean(GA_ID || META_PIXEL_ID || TIKTOK_PIXEL_ID);
 const CONSENT_KEY = "cealeg_analytics_consent";
 
 function saveConsent(value) {
@@ -23,7 +26,7 @@ export function CookieConsentBanner() {
     });
   }, []);
 
-  if (!GA_ID || choice !== "pending") {
+  if (!HAS_ANALYTICS_PROVIDER || choice !== "pending") {
     return null;
   }
 
@@ -51,8 +54,8 @@ export function CookieConsentBanner() {
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">
                 {pick(
-                  "Folosim Google Analytics doar dacă accepți, pentru statistici anonime despre pagini și erori. Poți continua fără tracking.",
-                  "We use Google Analytics only if you accept, for anonymous page and error statistics. You can continue without tracking."
+                  "Folosim cookie-uri optionale doar daca accepti, pentru statistici, erori si masurarea reclamelor. Poti continua fara tracking.",
+                  "We use optional cookies only if you accept, for analytics, errors and ad measurement. You can continue without tracking."
                 )}{" "}
                 <Link href="/privacy" className="font-bold text-cyan-200 hover:text-foreground">
                   {pick("Confidențialitate", "Privacy")}

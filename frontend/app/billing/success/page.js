@@ -1,22 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Crown, RefreshCw } from "lucide-react";
 import { API_URL } from "../../config";
 import { AppHeader } from "../../components/AppHeader";
 import { useLocale } from "../../components/LocaleProvider";
 import { readApiJson } from "../../utils/apiResponse";
+import { trackEvent } from "../../utils/analytics";
 
 export default function BillingSuccessPage() {
   const { pick } = useLocale();
+  const trackedPlanRef = useRef("");
   const [plan, setPlan] = useState("");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetch(`${API_URL}/billing/status?sync=stripe`)
       .then((response) => (response.ok ? readApiJson(response) : null))
-      .then((data) => setPlan(data?.usage?.plan || ""))
+      .then((data) => {
+        const nextPlan = data?.usage?.plan || "";
+
+        setPlan(nextPlan);
+
+        if (nextPlan && nextPlan !== "free" && trackedPlanRef.current !== nextPlan) {
+          trackedPlanRef.current = nextPlan;
+          trackEvent("subscription_started", {
+            plan: nextPlan,
+            source: "billing_success",
+          });
+        }
+      })
       .catch(() => setPlan(""))
       .finally(() => setIsLoading(false));
   }, []);

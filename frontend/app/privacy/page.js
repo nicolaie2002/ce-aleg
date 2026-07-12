@@ -193,8 +193,8 @@ export default function PrivacyPage() {
             <InfoCard icon={Server} title={pick("Servicii care susțin aplicația", "Services that support the app")}>
               <p>
                 {pick(
-                  "Pentru ca Ce aleg? să funcționeze corect, folosim servicii de încredere pentru găzduire, baze de date, stocare, plăți, emailuri, securitate, statistici și completarea informațiilor despre produse. Aceste servicii includ Supabase, Render, Vercel, Stripe, Brevo, Google Analytics și Open Food Facts.",
-                  "To keep Ce aleg? working correctly, we use trusted services for hosting, databases, storage, payments, emails, security, statistics and product information. These services include Supabase, Render, Vercel, Stripe, Brevo, Google Analytics and Open Food Facts."
+                  "Pentru ca Ce aleg? să funcționeze corect, folosim servicii de încredere pentru găzduire, baze de date, stocare, plăți, emailuri, securitate, statistici, măsurarea reclamelor și completarea informațiilor despre produse. Aceste servicii includ Supabase, Render, Vercel, Stripe, Brevo, Google Analytics, Meta Pixel, TikTok Pixel și Open Food Facts.",
+                  "To keep Ce aleg? working correctly, we use trusted services for hosting, databases, storage, payments, emails, security, statistics, ad measurement and product information. These services include Supabase, Render, Vercel, Stripe, Brevo, Google Analytics, Meta Pixel, TikTok Pixel and Open Food Facts."
                 )}
               </p>
               <p>
@@ -217,8 +217,8 @@ export default function PrivacyPage() {
             <InfoCard icon={Cookie} title={pick("Cookie-uri și stocare locală", "Cookies and local storage")}>
               <p>
                 {pick(
-                  "Folosim cookie-uri și localStorage necesare pentru sesiune, securitate, limbă, temă și preferințe. Google Analytics se încarcă doar dacă accepți cookie-urile opționale din banner.",
-                  "We use cookies and localStorage needed for session, security, language, theme and preferences. Google Analytics loads only if you accept optional cookies in the banner."
+                  "Folosim cookie-uri și localStorage necesare pentru sesiune, securitate, limbă, temă și preferințe. Google Analytics, Meta Pixel și TikTok Pixel se încarcă doar dacă accepți cookie-urile opționale din banner.",
+                  "We use cookies and localStorage needed for session, security, language, theme and preferences. Google Analytics, Meta Pixel and TikTok Pixel load only if you accept optional cookies in the banner."
                 )}
               </p>
             </InfoCard>

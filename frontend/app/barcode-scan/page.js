@@ -9,6 +9,7 @@ import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
 import { getActiveProfilePayload } from "../utils/profilePreferences";
+import { trackEvent } from "../utils/analytics";
 
 function getImageUrl(path) {
   if (!path) return "";
@@ -418,6 +419,10 @@ export default function BarcodeScanPage() {
     lastNativeScanAtRef.current = 0;
     barcodeCandidatesRef.current.clear();
     rotatedBarcodeReaderRef.current = createBarcodeReader();
+    trackEvent("scan_started", {
+      mode: scannerMode,
+      source: "barcode_scan",
+    });
 
     stopScanner();
 
@@ -1027,6 +1032,7 @@ export default function BarcodeScanPage() {
 
   async function lookupBarcode(code) {
     const lookupCode = normalizeDetectedBarcode(code);
+    const lookupSource = detectedRef.current ? "scanner" : "manual";
     let shouldRestartAfterMiss = false;
 
     if (!lookupCode) {
@@ -1066,6 +1072,11 @@ export default function BarcodeScanPage() {
     setLookupIssue("");
     setMissingBarcodeCandidate(null);
     setBillingGate(null);
+    trackEvent("barcode_lookup", {
+      barcode: lookupCode,
+      source: lookupSource,
+      length: lookupCode.length,
+    });
 
     try {
       const response = await fetch(`${API_URL}/barcode/lookup/${lookupCode}`);
@@ -1080,9 +1091,14 @@ export default function BarcodeScanPage() {
         } else if (response.status === 404 || data.code === "external_product_not_found") {
           shouldRestartAfterMiss = false;
           setLookupIssue(data.code || "external_product_not_found");
+          trackEvent("product_missing", {
+            barcode: lookupCode,
+            source: lookupSource,
+            reason: data.code || response.status,
+          });
           setMissingBarcodeCandidate({
             barcode: lookupCode,
-            source: detectedRef.current ? "scanner" : "manual",
+            source: lookupSource,
           });
           detectedRef.current = false;
           barcodeCandidatesRef.current.clear();
@@ -1098,6 +1114,12 @@ export default function BarcodeScanPage() {
       setProductSource(data.source);
       setMissingBarcodeCandidate(null);
       setMessage("");
+      trackEvent("product_found", {
+        barcode: lookupCode,
+        source: data.source || "barcode",
+        category: data.product?.category || "",
+        score: data.product?.score ?? "",
+      });
     } catch (error) {
       setMessage(error.message);
     } finally {

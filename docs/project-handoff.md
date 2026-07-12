@@ -311,6 +311,8 @@ Frontend Vercel:
 - `BACKEND_URL`
 - `CRON_SECRET` cu aceeasi valoare ca in Render
 - `NEXT_PUBLIC_GA_ID` dacă Analytics este activ
+- `NEXT_PUBLIC_META_PIXEL_ID` dacă Meta Ads este activ
+- `NEXT_PUBLIC_TIKTOK_PIXEL_ID` dacă TikTok Ads este activ
 
 ## Comenzi utile
 

@@ -422,6 +422,12 @@ export default function PricingPage() {
 
     setBusyPlan(`${plan}:${selectedBillingCycle}`);
     setMessage("");
+    trackEvent("checkout_started", {
+      checkoutType: "subscription",
+      plan,
+      billingCycle: selectedBillingCycle,
+      source: "pricing",
+    });
     trackEvent("pricing_checkout", {
       plan,
       billingCycle: selectedBillingCycle,
@@ -494,6 +500,11 @@ export default function PricingPage() {
 
     setBusyCoinPack(packId);
     setCoinPackMessage("");
+    trackEvent("checkout_started", {
+      checkoutType: "cecoins",
+      packId,
+      source: "pricing",
+    });
     trackEvent("cecoins_checkout", {
       packId,
       source: "pricing",
