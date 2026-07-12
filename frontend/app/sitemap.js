@@ -14,6 +14,7 @@ const publicRoutes = [
   "/catalog-romania/categorii",
   "/catalog-romania/magazine",
   "/catalog-romania/produse",
+  "/promovare-gratis",
   "/pricing",
   "/login",
   "/register",
