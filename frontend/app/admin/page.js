@@ -25,9 +25,47 @@ import {
 } from "lucide-react";
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
+import { ProductImage } from "../components/ProductImage";
 import { readApiJson } from "../utils/apiResponse";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
+
+const submissionStatusMeta = {
+  pending: {
+    label: "In verificare",
+    priority: 0,
+    tone: "warning",
+  },
+  ai_approved: {
+    label: "Gata de publicat",
+    priority: 1,
+    tone: "default",
+  },
+  needs_review: {
+    label: "Necesita revizie",
+    priority: 2,
+    tone: "danger",
+  },
+  approved: {
+    label: "Aprobat",
+    priority: 3,
+    tone: "default",
+  },
+};
+
+function getSubmissionStatusMeta(status) {
+  return submissionStatusMeta[status] || {
+    label: status || "In verificare",
+    priority: 4,
+    tone: "warning",
+  };
+}
+
+function getSubmissionImageUrl(path) {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  return `${API_URL}${path}`;
+}
 
 const statLabels = {
   users: "Conturi",
@@ -461,6 +499,20 @@ export default function AdminPage() {
 
     return users.filter((item) => item.email?.toLowerCase().includes(term));
   }, [users, userSearch]);
+  const sortedSubmissions = useMemo(() => (
+    [...submissions].sort((left, right) => {
+      const leftMeta = getSubmissionStatusMeta(left.status);
+      const rightMeta = getSubmissionStatusMeta(right.status);
+
+      if (leftMeta.priority !== rightMeta.priority) {
+        return leftMeta.priority - rightMeta.priority;
+      }
+
+      return new Date(right.created_at || 0) - new Date(left.created_at || 0);
+    })
+  ), [submissions]);
+  const pendingSubmissionCount = submissions.filter((item) => item.status !== "approved").length;
+  const publishableSubmissionCount = submissions.filter((item) => item.status === "ai_approved").length;
 
   return (
     <main className="min-h-screen bg-[#080c10] text-white">
@@ -1292,16 +1344,43 @@ export default function AdminPage() {
         </section>
 
         <section className="mt-8">
-          <h2 className="text-2xl font-black">Propuneri recente</h2>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                <Database size={16} /> Coada catalog
+              </p>
+              <h2 className="mt-2 text-2xl font-black">Propuneri recente</h2>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <EventPill tone={pendingSubmissionCount ? "warning" : "default"}>
+                {compactNumber(pendingSubmissionCount)} in lucru
+              </EventPill>
+              <EventPill tone={publishableSubmissionCount ? "default" : "warning"}>
+                {compactNumber(publishableSubmissionCount)} gata
+              </EventPill>
+            </div>
+          </div>
           <div className="mt-4 space-y-3">
-            {submissions.map((item) => (
+            {sortedSubmissions.map((item) => {
+              const statusMeta = getSubmissionStatusMeta(item.status);
+              const canPublish = item.status === "ai_approved";
+
+              return (
               <article key={item.id} className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <ProductImage
+                    src={getSubmissionImageUrl(item.front_image)}
+                    alt={item.product_name}
+                    containerClassName="h-20 w-20 shrink-0 rounded-xl"
+                  />
                   <div>
-                    <p className="text-xs font-bold uppercase text-cyan-200">{item.status}</p>
+                    <EventPill tone={statusMeta.tone}>{statusMeta.label}</EventPill>
                     <h3 className="mt-1 text-xl font-black">{item.product_name}</h3>
                     <p className="mt-1 text-sm text-gray-400">
-                      {item.brand || "Brand nespecificat"} · {item.store}
+                      {item.brand || "Brand nespecificat"} - {item.store}
+                    </p>
+                    <p className="mt-2 text-xs font-bold text-gray-500">
+                      {item.barcode || "fara barcode"} - {item.category || "fara categorie"} - Kcal {item.calories ?? "-"} / Zahar {item.sugar ?? "-"}g
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1309,17 +1388,18 @@ export default function AdminPage() {
                       onClick={() => review(item.id)}
                       className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10"
                     >
-                      <RefreshCw size={15} /> Verifică
+                      <RefreshCw size={15} /> Verifica
                     </button>
                     <button
                       onClick={() => approve(item.id)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-200 px-3 py-2 text-sm font-black text-black hover:bg-white"
+                      disabled={!canPublish}
+                      className="inline-flex items-center gap-2 rounded-lg bg-cyan-200 px-3 py-2 text-sm font-black text-black hover:bg-white disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
                     >
-                      <CheckCircle2 size={15} /> Publică
+                      <CheckCircle2 size={15} /> Publica
                     </button>
                     <button
                       onClick={() => remove(item.id)}
-                      title="Șterge propunerea"
+                      title="Sterge propunerea"
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10"
                     >
                       <Trash2 size={15} />
@@ -1327,8 +1407,9 @@ export default function AdminPage() {
                   </div>
                 </div>
               </article>
-            ))}
-            {!submissions.length && <EmptyState>Nu există propuneri de verificat.</EmptyState>}
+              );
+            })}
+            {!sortedSubmissions.length && <EmptyState>Nu exista propuneri de verificat.</EmptyState>}
           </div>
         </section>
 

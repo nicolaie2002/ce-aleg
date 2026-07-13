@@ -130,7 +130,6 @@ export default function DashboardPage() {
   const findAction = (href) => actions.find((action) => action.href === href);
   const mobilePrimaryActions = ["/barcode-scan", "/store"].map(findAction).filter(Boolean);
   const mobileSecondaryActions = [
-    "/missions",
     "/cart",
     "/submit-product",
     "/history",
@@ -507,6 +506,30 @@ export default function DashboardPage() {
   const nextMissionProgress = nextMission
     ? Math.min(100, Math.max(0, Math.round(Number(nextMission.progress || 0))))
     : 0;
+  const primaryDashboardAction = readyMissionCount > 0
+    ? {
+        href: "/missions",
+        title: pick("Revendica CeCoins", "Claim CeCoins"),
+        description: pick(
+          `${readyMissionCount} misiuni sunt gata. Intra si revendica recompensa.`,
+          `${readyMissionCount} missions are ready. Open them and claim your reward.`
+        ),
+        icon: Trophy,
+        tone: "border-yellow-300/35 bg-yellow-300/10 text-yellow-50",
+        button: pick("Deschide misiunile", "Open missions"),
+      }
+    : {
+        href: "/barcode-scan",
+        title: pick("Scaneaza urmatorul produs", "Scan the next product"),
+        description: pick(
+          "Camera, codul de bare si produsul negasit sunt pregatite pentru mobil.",
+          "Camera, barcode and missing-product flow are ready for mobile."
+        ),
+        icon: Barcode,
+        tone: "border-emerald-300/35 bg-emerald-300/10 text-emerald-50",
+        button: pick("Porneste scanarea", "Start scanning"),
+      };
+  const PrimaryDashboardIcon = primaryDashboardAction.icon;
   const fallbackCoinPacks = [
     {
       id: "bronze",
@@ -711,6 +734,27 @@ export default function DashboardPage() {
               </Link>
             </div>
           )}
+
+          <Link
+            href={primaryDashboardAction.href}
+            className={`mt-6 flex flex-col gap-4 rounded-2xl border p-5 transition hover:-translate-y-0.5 sm:flex-row sm:items-center sm:justify-between ${primaryDashboardAction.tone}`}
+          >
+            <span className="flex items-start gap-3">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-black">
+                <PrimaryDashboardIcon size={22} />
+              </span>
+              <span>
+                <span className="block text-xl font-black">{primaryDashboardAction.title}</span>
+                <span className="mt-1 block text-sm leading-6 text-gray-200">
+                  {primaryDashboardAction.description}
+                </span>
+              </span>
+            </span>
+            <span className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-black">
+              {primaryDashboardAction.button}
+              <ArrowRight size={17} />
+            </span>
+          </Link>
 
           <div className="mt-6 space-y-3 md:hidden">
             <div className="rounded-2xl border border-emerald-300/25 bg-emerald-300/[0.08] p-4">

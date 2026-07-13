@@ -89,6 +89,16 @@ const BARCODE_CONFIRMATION_WINDOW_MS = 2100;
 const BARCODE_CANDIDATE_TTL_MS = 2800;
 const BARCODE_DUPLICATE_LOOKUP_COOLDOWN_MS = 14000;
 
+const STORE_OPTIONS = [
+  "Lidl",
+  "Kaufland",
+  "Carrefour",
+  "Mega Image",
+  "Profi",
+  "Penny",
+  "Market local",
+];
+
 const SCAN_SOURCE_CONFIG = {
   native: { weight: 2.4, requiredCount: 2, requiredScore: 4.2 },
   zxing: { weight: 2.5, requiredCount: 2, requiredScore: 4.2 },
@@ -253,6 +263,7 @@ export default function BarcodeScanPage() {
   const [productSource, setProductSource] = useState("");
   const [lookupIssue, setLookupIssue] = useState("");
   const [missingBarcodeCandidate, setMissingBarcodeCandidate] = useState(null);
+  const [pendingBarcodeConfirmation, setPendingBarcodeConfirmation] = useState(null);
   const [billingGate, setBillingGate] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isLookingUp, setIsLookingUp] = useState(false);
@@ -271,6 +282,7 @@ export default function BarcodeScanPage() {
   const [isPriceFormOpen, setIsPriceFormOpen] = useState(false);
   const [observedPrice, setObservedPrice] = useState("");
   const [observedStore, setObservedStore] = useState("");
+  const [selectedStore, setSelectedStore] = useState("Kaufland");
   const [isSavingPrice, setIsSavingPrice] = useState(false);
 
   useEffect(() => {
@@ -285,10 +297,18 @@ export default function BarcodeScanPage() {
   useEffect(() => {
     queueMicrotask(() => {
       const savedUser = localStorage.getItem("cealeg_user");
+      const savedStore = localStorage.getItem("cealeg_scan_store");
 
       if (!savedUser) {
         window.location.assign("/login");
         return;
+      }
+
+      if (savedStore && STORE_OPTIONS.includes(savedStore)) {
+        setSelectedStore(savedStore);
+        setObservedStore(savedStore);
+      } else {
+        setObservedStore("Kaufland");
       }
 
       setUser(JSON.parse(savedUser));
@@ -302,6 +322,11 @@ export default function BarcodeScanPage() {
       ocrWorkerRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    window.localStorage?.setItem("cealeg_scan_store", selectedStore);
+    setObservedStore((currentStore) => currentStore || selectedStore);
+  }, [selectedStore]);
 
   async function loadScannerCapabilities() {
     try {
@@ -434,6 +459,7 @@ export default function BarcodeScanPage() {
     setProductSource("");
     setLookupIssue("");
     setMissingBarcodeCandidate(null);
+    setPendingBarcodeConfirmation(null);
     setVisualCandidate(null);
     setBarcode("");
     setScanStatus("Pornesc camera...");
@@ -740,9 +766,13 @@ export default function BarcodeScanPage() {
     }
 
     detectedRef.current = true;
-    setScanStatus("Cod confirmat. Caut produsul...");
+    setPendingBarcodeConfirmation({
+      barcode: normalizedCode,
+      source,
+      detectedAt: now,
+    });
+    setScanStatus("Cod citit. Verifica cifrele inainte sa caut produsul.");
     stopScanner();
-    await lookupBarcode(normalizedCode);
     return "confirmed";
   }
 
@@ -1067,9 +1097,9 @@ export default function BarcodeScanPage() {
     }, 250);
   }
 
-  async function lookupBarcode(code) {
+  async function lookupBarcode(code, sourceOverride = "") {
     const lookupCode = normalizeDetectedBarcode(code);
-    const lookupSource = detectedRef.current ? "scanner" : "manual";
+    const lookupSource = sourceOverride || (detectedRef.current ? "scanner" : "manual");
     let shouldRestartAfterMiss = false;
 
     if (!lookupCode) {
@@ -1108,11 +1138,13 @@ export default function BarcodeScanPage() {
     setFoundProduct(null);
     setLookupIssue("");
     setMissingBarcodeCandidate(null);
+    setPendingBarcodeConfirmation(null);
     setBillingGate(null);
     trackEvent("barcode_lookup", {
       barcode: lookupCode,
       source: lookupSource,
       length: lookupCode.length,
+      store: selectedStore,
     });
 
     try {
@@ -1132,10 +1164,12 @@ export default function BarcodeScanPage() {
             barcode: lookupCode,
             source: lookupSource,
             reason: data.code || response.status,
+            store: selectedStore,
           });
           setMissingBarcodeCandidate({
             barcode: lookupCode,
             source: lookupSource,
+            confirmed: lookupSource === "scanner_confirmed",
           });
           detectedRef.current = false;
           barcodeCandidatesRef.current.clear();
@@ -1297,18 +1331,50 @@ export default function BarcodeScanPage() {
 
   function rescanMissingBarcode() {
     setMissingBarcodeCandidate(null);
+    setPendingBarcodeConfirmation(null);
     setLookupIssue("");
     setMessage("");
     setBarcode("");
     setFoundProduct(null);
+    detectedRef.current = false;
     restartScanner();
   }
 
   function editMissingBarcode() {
     setMissingBarcodeCandidate(null);
+    setPendingBarcodeConfirmation(null);
+    detectedRef.current = false;
     setLookupIssue("");
     setMessage("Corectează codul din câmpul manual, apoi apasă Caută produsul.");
     setScanStatus("Verifică cifrele tipărite sub codul de bare.");
+  }
+
+  function rejectPendingBarcode() {
+    setPendingBarcodeConfirmation(null);
+    setBarcode("");
+    setMessage("");
+    setLookupIssue("");
+    detectedRef.current = false;
+    barcodeCandidatesRef.current.clear();
+    restartScanner();
+  }
+
+  function editPendingBarcode() {
+    setPendingBarcodeConfirmation(null);
+    setMessage("Corecteaza codul din campul manual, apoi apasa Cauta produsul.");
+    setScanStatus("Verifica cifrele tiparite sub codul de bare.");
+    detectedRef.current = false;
+  }
+
+  async function confirmPendingBarcode() {
+    const confirmedCode = pendingBarcodeConfirmation?.barcode || barcode;
+
+    if (!confirmedCode || isLookingUp) return;
+
+    detectedRef.current = true;
+    setPendingBarcodeConfirmation(null);
+    setScanStatus("Cod confirmat de tine. Caut produsul...");
+    await lookupBarcode(confirmedCode, "scanner_confirmed");
   }
 
   async function saveObservedPrice() {
@@ -1380,10 +1446,11 @@ export default function BarcodeScanPage() {
 
   function buildSubmitProductLink(confirmed = false) {
     const params = new URLSearchParams();
+    const contributionBarcode = missingBarcodeCandidate?.barcode || barcode;
 
     params.set("name", "");
-    params.set("store", "Kaufland");
-    params.set("barcode", barcode);
+    params.set("store", selectedStore || "Market local");
+    params.set("barcode", contributionBarcode);
     params.set("source", "barcode_not_found");
 
     if (confirmed) {
@@ -1435,6 +1502,28 @@ export default function BarcodeScanPage() {
             Ține codul în chenar câteva clipe. Dacă produsul lipsește, verifici codul citit
             și îl poți trimite rapid la verificare pentru CeCoins.
           </p>
+
+          <div className="mt-5 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-4">
+            <label className="text-sm font-black text-cyan-100">
+              Magazin curent
+            </label>
+            <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+              <select
+                value={selectedStore}
+                onChange={(event) => setSelectedStore(event.target.value)}
+                className="min-h-12 rounded-2xl border border-white/10 bg-[#0b0f14] px-4 text-white outline-none focus:border-cyan-300"
+              >
+                {STORE_OPTIONS.map((storeName) => (
+                  <option key={storeName} value={storeName}>
+                    {storeName}
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm leading-6 text-gray-300">
+                Folosim magazinul pentru preturi si produse lipsa.
+              </p>
+            </div>
+          </div>
 
           <div className="mt-6 rounded-2xl border border-white/10 bg-black/30 p-4">
             <label className="text-sm font-semibold text-gray-300">
@@ -1500,6 +1589,44 @@ export default function BarcodeScanPage() {
             )}
           </div>
 
+          {pendingBarcodeConfirmation && (
+            <div className="mt-4 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4">
+              <p className="text-sm font-black uppercase tracking-wide text-yellow-100">
+                Verifica codul citit
+              </p>
+              <code className="mt-3 block rounded-xl border border-yellow-300/25 bg-black/40 px-3 py-3 text-center font-mono text-xl font-black tracking-[0.12em] text-white sm:text-2xl sm:tracking-[0.16em]">
+                {pendingBarcodeConfirmation.barcode}
+              </code>
+              <p className="mt-3 text-sm leading-6 text-gray-300">
+                Compara cifrele cu cele tiparite sub codul de bare. Caut produsul doar dupa confirmarea ta.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={confirmPendingBarcode}
+                  disabled={isLookingUp}
+                  className="rounded-2xl bg-yellow-300 px-5 py-3 font-semibold text-black hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLookingUp ? "Caut..." : "Da, cauta produsul"}
+                </button>
+                <button
+                  type="button"
+                  onClick={rejectPendingBarcode}
+                  className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-white hover:bg-white/10"
+                >
+                  Nu, rescanez
+                </button>
+                <button
+                  type="button"
+                  onClick={editPendingBarcode}
+                  className="rounded-2xl border border-white/10 px-5 py-3 font-semibold text-white hover:bg-white/10"
+                >
+                  Corectez manual
+                </button>
+              </div>
+            </div>
+          )}
+
           <div className="mt-5 flex flex-col gap-3 sm:flex-row">
             {!isScanning ? (
               <button
@@ -1548,7 +1675,7 @@ export default function BarcodeScanPage() {
                 className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-emerald-400"
               />
               <button
-                onClick={() => lookupBarcode(barcode)}
+                onClick={() => lookupBarcode(barcode, "manual")}
                 disabled={isLookingUp}
                 className="rounded-2xl bg-emerald-400 px-5 py-3 font-semibold text-black hover:bg-emerald-300 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -1624,7 +1751,7 @@ export default function BarcodeScanPage() {
               {visualCandidate.barcode && (
                 <button
                   type="button"
-                  onClick={() => lookupBarcode(visualCandidate.barcode)}
+                  onClick={() => lookupBarcode(visualCandidate.barcode, "visual")}
                   className="mt-4 rounded-2xl bg-yellow-300 px-5 py-3 font-semibold text-black hover:bg-yellow-200"
                 >
                   Verifică acest cod de bare
@@ -1786,7 +1913,7 @@ export default function BarcodeScanPage() {
                   : "Dacă produsul nu apare în catalog, îl poți trimite ca propunere. Mai întâi confirmă că am citit corect codul de bare, apoi faci pozele și îl trimiți la verificare."}
               </p>
               <p className="mt-3 rounded-xl border border-yellow-300/25 bg-black/25 px-4 py-3 text-sm font-bold text-yellow-50">
-                După aprobare primești CeCoins în cont.
+                Dupa aprobare primesti scanare bonus si poti revendica 10 CeCoins din Misiuni.
               </p>
 
               {missingBarcodeCandidate ? (

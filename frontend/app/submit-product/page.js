@@ -9,8 +9,104 @@ import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
 
 const CATALOG_REWARD_COINS = 10;
+const MAX_CONTRIBUTION_IMAGE_WIDTH = 1400;
+const MAX_CONTRIBUTION_IMAGE_BYTES = 1_200_000;
+const CONTRIBUTION_IMAGE_QUALITY = 0.82;
 
-function CaptureField({ id, title, description, file, icon: Icon, onChange }) {
+const SUBMISSION_STATUS = {
+  pending: {
+    label: "In verificare",
+    detail: "Asteapta verificarea adminului.",
+    badge: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
+  },
+  ai_approved: {
+    label: "Gata de publicat",
+    detail: "Verificarea automata arata bine. Adminul poate publica produsul.",
+    badge: "border-cyan-300/35 bg-cyan-300/10 text-cyan-100",
+  },
+  approved: {
+    label: "Aprobat",
+    detail: "Produsul a intrat in catalog sau a confirmat un produs existent.",
+    badge: "border-emerald-300/35 bg-emerald-300/10 text-emerald-100",
+  },
+  needs_review: {
+    label: "Necesita revizie",
+    detail: "Lipsesc informatii sau pozele nu sunt destul de clare.",
+    badge: "border-red-300/35 bg-red-300/10 text-red-100",
+  },
+};
+
+function getSubmissionStatus(status) {
+  return SUBMISSION_STATUS[status] || {
+    label: status || "In verificare",
+    detail: "Propunerea este in coada de verificare.",
+    badge: "border-white/10 bg-white/[0.04] text-gray-200",
+  };
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0);
+
+  if (!size) return "";
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function loadImageElement(file) {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error("Imaginea nu a putut fi citita."));
+    };
+    image.src = objectUrl;
+  });
+}
+
+async function optimizeContributionImage(file) {
+  if (!file?.type?.startsWith("image/")) return file;
+
+  const image = await loadImageElement(file);
+  const scale = Math.min(
+    1,
+    MAX_CONTRIBUTION_IMAGE_WIDTH / Math.max(image.naturalWidth || image.width, 1)
+  );
+
+  if (scale === 1 && file.size <= MAX_CONTRIBUTION_IMAGE_BYTES) {
+    return file;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+  canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+  canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const blob = await new Promise((resolve) => {
+    canvas.toBlob(resolve, "image/jpeg", CONTRIBUTION_IMAGE_QUALITY);
+  });
+
+  if (!blob) return file;
+
+  if (blob.size >= file.size && file.size <= MAX_CONTRIBUTION_IMAGE_BYTES) {
+    return file;
+  }
+
+  const baseName = (file.name || "produs").replace(/\.[^.]+$/, "");
+
+  return new File([blob], `${baseName}.jpg`, {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
+
+function CaptureField({ id, title, description, file, icon: Icon, onChange, busy = false }) {
   return (
     <label
       htmlFor={id}
@@ -29,7 +125,13 @@ function CaptureField({ id, title, description, file, icon: Icon, onChange }) {
               : "border-white/10 bg-white/[0.04] text-gray-300"
           }`}>
             {file ? <CheckCircle2 size={14} /> : <Camera size={14} />}
-            <span className="truncate">{file ? file.name : "Alege sau fă poză"}</span>
+            <span className="truncate">
+              {busy
+                ? "Optimizez poza..."
+                : file
+                  ? `${file.name} ${formatFileSize(file.size)}`
+                  : "Alege sau fa poza"}
+            </span>
           </span>
         </span>
       </span>
@@ -39,6 +141,7 @@ function CaptureField({ id, title, description, file, icon: Icon, onChange }) {
         accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
         capture="environment"
         onChange={(event) => onChange(event.target.files?.[0] || null)}
+        disabled={busy}
         className="sr-only"
       />
     </label>
@@ -59,6 +162,9 @@ function SubmitProductPageContent() {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
+  const [imageNotice, setImageNotice] = useState("");
+  const [imageBusyField, setImageBusyField] = useState("");
+  const [lastSubmittedItem, setLastSubmittedItem] = useState(null);
   const [aiResult, setAiResult] = useState(null);
 
   const [form, setForm] = useState({
@@ -125,7 +231,41 @@ function SubmitProductPageContent() {
     return `${form.quantityValue.trim()} ${form.quantityUnit}`;
   }
 
+  async function handleContributionImageChange(field, file) {
+    const setSelectedImage = field === "front" ? setFrontImage : setNutritionImage;
+
+    if (!file) {
+      setSelectedImage(null);
+      setImageNotice("");
+      return;
+    }
+
+    setImageBusyField(field);
+    setImageNotice("Optimizez poza pentru upload...");
+
+    try {
+      const optimizedFile = await optimizeContributionImage(file);
+
+      setSelectedImage(optimizedFile);
+      setImageNotice(
+        optimizedFile.size < file.size
+          ? `Poza optimizata: ${formatFileSize(file.size)} -> ${formatFileSize(optimizedFile.size)}.`
+          : "Poza adaugata."
+      );
+    } catch {
+      setSelectedImage(file);
+      setImageNotice("Nu am putut comprima poza, dar o folosesc asa cum este.");
+    } finally {
+      setImageBusyField("");
+    }
+  }
+
   async function handleAiExtract() {
+    if (imageBusyField) {
+      setMessage("Asteapta cateva secunde pana se optimizeaza poza.");
+      return;
+    }
+
     if (!frontImage && !nutritionImage && !form.productName.trim()) {
       setMessage("Încarcă cel puțin o poză sau scrie un nume aproximativ al produsului.");
       return;
@@ -195,6 +335,11 @@ function SubmitProductPageContent() {
       return;
     }
 
+    if (imageBusyField) {
+      setMessage("Asteapta cateva secunde pana se optimizeaza poza.");
+      return;
+    }
+
     setIsSubmitting(true);
     setMessage("");
 
@@ -234,7 +379,8 @@ function SubmitProductPageContent() {
         throw new Error(data.error || "Nu s-a putut trimite produsul.");
       }
 
-      setMessage("Produsul a fost trimis la verificare. După aprobare primești o scanare bonus și poți revendica 10 CeCoins din misiunea de catalog.");
+      setLastSubmittedItem(data.item || null);
+      setMessage("Produsul a fost trimis la verificare. Dupa aprobare primesti o scanare bonus si poti revendica 10 CeCoins din misiunea de catalog.");
 
       setForm({
         productName: "",
@@ -255,6 +401,7 @@ function SubmitProductPageContent() {
       setFrontImage(null);
       setNutritionImage(null);
       setAiResult(null);
+      setImageNotice("");
 
       loadSubmissions(user.id);
     } catch (error) {
@@ -348,6 +495,8 @@ function SubmitProductPageContent() {
     );
   }
 
+  const isAdmin = Boolean(user.isAdmin);
+
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
@@ -372,6 +521,32 @@ function SubmitProductPageContent() {
         {message && (
           <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
             {message}
+          </div>
+        )}
+
+        {imageNotice && (
+          <div className="mb-6 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm font-bold text-cyan-100">
+            {imageNotice}
+          </div>
+        )}
+
+        {lastSubmittedItem && (
+          <div className="mb-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4">
+            <p className="text-sm font-black uppercase tracking-wide text-yellow-100">
+              Trimis la verificare
+            </p>
+            <h2 className="mt-2 text-xl font-black text-white">
+              {lastSubmittedItem.product_name}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-300">
+              Status: in verificare. Dupa aprobare apare in catalog, primesti scanare bonus si misiunea de catalog se actualizeaza.
+            </p>
+            <Link
+              href="/missions"
+              className="mt-4 inline-flex rounded-xl bg-yellow-300 px-4 py-2.5 text-sm font-black text-black hover:bg-yellow-200"
+            >
+              Vezi misiunile
+            </Link>
           </div>
         )}
 
@@ -465,7 +640,8 @@ function SubmitProductPageContent() {
                 description="Ambalajul frontal ajută la nume, brand și imagine."
                 file={frontImage}
                 icon={Camera}
-                onChange={setFrontImage}
+                busy={imageBusyField === "front"}
+                onChange={(file) => handleContributionImageChange("front", file)}
               />
               <CaptureField
                 id="nutrition-image-capture"
@@ -473,22 +649,23 @@ function SubmitProductPageContent() {
                 description="Eticheta ajută la calorii, zahăr, proteină și grăsimi."
                 file={nutritionImage}
                 icon={FileText}
-                onChange={setNutritionImage}
+                busy={imageBusyField === "nutrition"}
+                onChange={(file) => handleContributionImageChange("nutrition", file)}
               />
             </div>
 
             <button
               type="button"
               onClick={handleAiExtract}
-              disabled={isExtracting}
+              disabled={isExtracting || Boolean(imageBusyField)}
               className={`mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 font-semibold sm:w-auto ${
-                isExtracting
+                isExtracting || imageBusyField
                   ? "cursor-not-allowed bg-white/10 text-gray-400"
                   : "border border-yellow-300/30 text-yellow-300 hover:bg-yellow-300/10"
               }`}
             >
               <Sparkles size={17} />
-              {isExtracting ? "Se extrag datele..." : "Extrage automat din poze"}
+              {isExtracting ? "Se extrag datele..." : imageBusyField ? "Optimizez poza..." : "Extrage automat din poze"}
             </button>
 
             {aiResult && (
@@ -693,16 +870,18 @@ function SubmitProductPageContent() {
             </div>
 
             <button
-              disabled={isSubmitting}
+              disabled={isSubmitting || Boolean(imageBusyField)}
               className={`md:col-span-2 rounded-2xl px-6 py-4 text-lg font-semibold transition ${
-                isSubmitting
+                isSubmitting || imageBusyField
                   ? "cursor-not-allowed bg-white/10 text-gray-400"
                   : "bg-emerald-400 text-black hover:bg-emerald-300"
               }`}
             >
               {isSubmitting
                 ? "Se trimite produsul..."
-                : `Trimite la verificare · ${CATALOG_REWARD_COINS} CeCoins după aprobare`}
+                : imageBusyField
+                  ? "Optimizez poza..."
+                  : `Trimite la verificare - ${CATALOG_REWARD_COINS} CeCoins dupa aprobare`}
             </button>
           </form>
         </div>
@@ -722,7 +901,10 @@ function SubmitProductPageContent() {
             </div>
           ) : (
             <div className="mt-6 space-y-4">
-              {submissions.map((item) => (
+              {submissions.map((item) => {
+                const statusMeta = getSubmissionStatus(item.status);
+
+                return (
                 <div
                   key={item.id}
                   className="grid gap-4 rounded-3xl border border-white/10 bg-black/30 p-5 md:grid-cols-[auto_1fr_auto]"
@@ -735,8 +917,8 @@ function SubmitProductPageContent() {
 
                   <div>
                     <div className="flex flex-wrap gap-2">
-                      <span className="rounded-full bg-yellow-300 px-3 py-1 text-sm font-bold text-black">
-                        {item.status}
+                      <span className={`rounded-full border px-3 py-1 text-sm font-bold ${statusMeta.badge}`}>
+                        {statusMeta.label}
                       </span>
 
                       <span className="rounded-full border border-white/10 px-3 py-1 text-sm text-gray-300">
@@ -753,6 +935,10 @@ function SubmitProductPageContent() {
                     <h3 className="mt-3 text-2xl font-bold">
                       {item.product_name}
                     </h3>
+
+                    <p className="mt-2 text-sm leading-6 text-gray-400">
+                      {statusMeta.detail}
+                    </p>
 
                     <p className="mt-1 text-sm text-emerald-300">
                       {item.brand || "Brand necunoscut"} ·{" "}
@@ -774,19 +960,21 @@ function SubmitProductPageContent() {
                   </div>
 
                   <div className="flex flex-col gap-2">
-                    <button
-                      onClick={() => reviewWithAi(item.id)}
-                      className="rounded-2xl border border-emerald-400/30 px-5 py-3 font-semibold text-emerald-300 hover:bg-emerald-400/10"
-                    >
-                      Verifică automat
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => reviewWithAi(item.id)}
+                        className="rounded-2xl border border-emerald-400/30 px-5 py-3 font-semibold text-emerald-300 hover:bg-emerald-400/10"
+                      >
+                        Verifica automat
+                      </button>
+                    )}
 
-                    {item.status === "ai_approved" && (
+                    {isAdmin && item.status === "ai_approved" && (
                       <button
                         onClick={() => approveSubmission(item.id)}
                         className="rounded-2xl bg-emerald-400 px-5 py-3 font-semibold text-black hover:bg-emerald-300"
                       >
-                        Publică produsul
+                        Publica produsul
                       </button>
                     )}
 
@@ -794,11 +982,12 @@ function SubmitProductPageContent() {
                       onClick={() => deleteSubmission(item.id)}
                       className="rounded-2xl border border-red-400/30 px-5 py-3 font-semibold text-red-300 hover:bg-red-400/10"
                     >
-                      Șterge
+                      Sterge
                     </button>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
