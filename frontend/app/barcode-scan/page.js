@@ -234,8 +234,30 @@ function isCompactScannerViewport() {
   return typeof window !== "undefined" && window.innerWidth < 768;
 }
 
+function focusScannerPanel(element) {
+  if (!element || typeof window === "undefined") return;
+
+  window.requestAnimationFrame(() => {
+    element.scrollIntoView({
+      behavior: isCompactScannerViewport() ? "smooth" : "auto",
+      block: "start",
+    });
+  });
+}
+
+function pulseScannerFeedback() {
+  try {
+    navigator?.vibrate?.(28);
+  } catch {
+    // Haptics are optional and unsupported on many desktop browsers.
+  }
+}
+
 export default function BarcodeScanPage() {
   const videoRef = useRef(null);
+  const confirmationPanelRef = useRef(null);
+  const resultPanelRef = useRef(null);
+  const missingProductPanelRef = useRef(null);
   const controlsRef = useRef(null);
   const streamRef = useRef(null);
   const scanLoopRef = useRef(null);
@@ -255,6 +277,7 @@ export default function BarcodeScanPage() {
   const lookupInFlightRef = useRef(false);
   const lookupCooldownRef = useRef(new Map());
   const lastNativeScanAtRef = useRef(0);
+  const lastFocusedPanelRef = useRef("");
 
   const [user, setUser] = useState(null);
   const [barcode, setBarcode] = useState("");
@@ -327,6 +350,48 @@ export default function BarcodeScanPage() {
     window.localStorage?.setItem("cealeg_scan_store", selectedStore);
     setObservedStore((currentStore) => currentStore || selectedStore);
   }, [selectedStore]);
+
+  useEffect(() => {
+    const hasMissingProductPrompt =
+      !foundProduct &&
+      barcode &&
+      message &&
+      (missingBarcodeCandidate ||
+        [
+          "openfoodfacts_unavailable",
+          "external_product_not_found",
+          "external_catalog_unavailable",
+        ].includes(lookupIssue));
+
+    let panelKey = "";
+    let panelElement = null;
+
+    if (pendingBarcodeConfirmation?.barcode) {
+      panelKey = `confirm:${pendingBarcodeConfirmation.barcode}`;
+      panelElement = confirmationPanelRef.current;
+    } else if (foundProduct) {
+      panelKey = `found:${foundProduct.barcode || foundProduct.id || foundProduct.name}`;
+      panelElement = resultPanelRef.current;
+    } else if (hasMissingProductPrompt) {
+      panelKey = `missing:${missingBarcodeCandidate?.barcode || barcode}:${lookupIssue || "local"}`;
+      panelElement = missingProductPanelRef.current;
+    }
+
+    if (!panelKey || !panelElement || lastFocusedPanelRef.current === panelKey) {
+      return;
+    }
+
+    lastFocusedPanelRef.current = panelKey;
+    focusScannerPanel(panelElement);
+    pulseScannerFeedback();
+  }, [
+    barcode,
+    foundProduct,
+    lookupIssue,
+    message,
+    missingBarcodeCandidate,
+    pendingBarcodeConfirmation,
+  ]);
 
   async function loadScannerCapabilities() {
     try {
@@ -1468,6 +1533,31 @@ export default function BarcodeScanPage() {
     );
   }
 
+  const hasMissingProductPrompt =
+    !foundProduct &&
+    barcode &&
+    message &&
+    (missingBarcodeCandidate ||
+      [
+        "openfoodfacts_unavailable",
+        "external_product_not_found",
+        "external_catalog_unavailable",
+      ].includes(lookupIssue));
+  const mobileStatusTitle = pendingBarcodeConfirmation
+    ? "Confirma codul"
+    : foundProduct
+      ? "Produs gasit"
+      : hasMissingProductPrompt
+        ? "Produs nou"
+        : isScanning
+          ? "Camera pornita"
+          : "Scanner pregatit";
+  const mobileStatusDetail =
+    pendingBarcodeConfirmation?.barcode ||
+    foundProduct?.name ||
+    missingBarcodeCandidate?.barcode ||
+    scanStatus;
+
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
@@ -1590,7 +1680,10 @@ export default function BarcodeScanPage() {
           </div>
 
           {pendingBarcodeConfirmation && (
-            <div className="mt-4 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4">
+            <div
+              ref={confirmationPanelRef}
+              className="mt-4 scroll-mt-4 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 sm:scroll-mt-6"
+            >
               <p className="text-sm font-black uppercase tracking-wide text-yellow-100">
                 Verifica codul citit
               </p>
@@ -1771,7 +1864,10 @@ export default function BarcodeScanPage() {
           )}
 
           {foundProduct && (
-            <div className="mt-6 rounded-3xl border border-white/10 bg-black/30 p-5">
+            <div
+              ref={resultPanelRef}
+              className="mt-6 scroll-mt-4 rounded-3xl border border-white/10 bg-black/30 p-5 sm:scroll-mt-6"
+            >
               <div className="grid gap-5 md:grid-cols-[160px_1fr]">
                 <ProductImage
                   src={getImageUrl(foundProduct.image)}
@@ -1897,7 +1993,10 @@ export default function BarcodeScanPage() {
             missingBarcodeCandidate ||
             ["openfoodfacts_unavailable", "external_product_not_found", "external_catalog_unavailable"].includes(lookupIssue)
           ) && (
-            <div className="mt-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 sm:rounded-3xl sm:p-5">
+            <div
+              ref={missingProductPanelRef}
+              className="mt-6 scroll-mt-4 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 sm:scroll-mt-6 sm:rounded-3xl sm:p-5"
+            >
               <p className="text-sm font-black uppercase tracking-wide text-yellow-100">
                 Produs nou în România?
               </p>
@@ -1964,6 +2063,57 @@ export default function BarcodeScanPage() {
           )}
         </div>
       </section>
+
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b0f14]/95 px-4 py-3 shadow-2xl backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black uppercase tracking-wide text-cyan-200">
+              {mobileStatusTitle}
+            </p>
+            <p className="mt-0.5 truncate text-sm font-semibold text-gray-200">
+              {mobileStatusDetail}
+            </p>
+          </div>
+
+          {pendingBarcodeConfirmation ? (
+            <button
+              type="button"
+              onClick={confirmPendingBarcode}
+              disabled={isLookingUp}
+              className="shrink-0 rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLookingUp ? "Caut..." : "Confirma"}
+            </button>
+          ) : foundProduct ? (
+            <button
+              type="button"
+              onClick={() => goToResult(foundProduct)}
+              className="shrink-0 rounded-xl bg-emerald-400 px-4 py-3 text-sm font-black text-black"
+            >
+              Analiza
+            </button>
+          ) : hasMissingProductPrompt ? (
+            <Link
+              href={buildSubmitProductLink(Boolean(missingBarcodeCandidate))}
+              className="shrink-0 rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black"
+            >
+              Adauga
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={isScanning ? stopScanner : () => startScanner()}
+              className={`shrink-0 rounded-xl px-4 py-3 text-sm font-black ${
+                isScanning
+                  ? "border border-red-400/35 text-red-200"
+                  : "bg-emerald-400 text-black"
+              }`}
+            >
+              {isScanning ? "Opreste" : "Scaneaza"}
+            </button>
+          )}
+        </div>
+      </div>
     </main>
   );
 }

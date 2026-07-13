@@ -658,7 +658,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
       <AppHeader />
-      <section className="ce-shell ce-page">
+      <section className="ce-shell ce-page pb-24 md:pb-12">
         <div className="mb-8 flex items-center justify-between gap-4">
           <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white">
             <ArrowLeft size={16} /> {pick("Pagina principală", "Home")}
@@ -1155,6 +1155,37 @@ export default function DashboardPage() {
           </div>
         </div>
       </section>
+
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#0b0f14]/95 px-3 py-2 shadow-2xl backdrop-blur md:hidden">
+        <div className="mx-auto grid max-w-xl grid-cols-3 gap-2">
+          <Link
+            href="/barcode-scan"
+            className="flex min-h-14 flex-col items-center justify-center rounded-xl bg-emerald-400 px-2 py-2 text-xs font-black text-black"
+          >
+            <Barcode size={19} />
+            <span className="mt-1">Scaneaza</span>
+          </Link>
+          <Link
+            href="/store"
+            className="flex min-h-14 flex-col items-center justify-center rounded-xl border border-cyan-300/25 px-2 py-2 text-xs font-black text-cyan-100"
+          >
+            <ScanLine size={19} />
+            <span className="mt-1">Cauta</span>
+          </Link>
+          <Link
+            href="/missions"
+            className="relative flex min-h-14 flex-col items-center justify-center rounded-xl border border-yellow-300/25 px-2 py-2 text-xs font-black text-yellow-100"
+          >
+            {readyMissionCount > 0 && (
+              <span className="absolute right-2 top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-yellow-300 px-1 text-[10px] text-black">
+                {readyMissionCount}
+              </span>
+            )}
+            <Trophy size={19} />
+            <span className="mt-1">Misiuni</span>
+          </Link>
+        </div>
+      </nav>
     </main>
   );
 }
