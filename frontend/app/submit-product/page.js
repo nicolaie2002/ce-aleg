@@ -376,11 +376,17 @@ function SubmitProductPageContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut trimite produsul.");
+        if (response.status === 409 && data.item) {
+          setLastSubmittedItem(data.item);
+          setMessage(data.message || "Propunerea exista deja si este in verificare.");
+          return;
+        }
+
+        throw new Error(data.message || data.error || "Nu s-a putut trimite produsul.");
       }
 
       setLastSubmittedItem(data.item || null);
-      setMessage("Produsul a fost trimis la verificare. Dupa aprobare primesti o scanare bonus si poti revendica 10 CeCoins din misiunea de catalog.");
+      setMessage("Produsul a fost trimis la verificare. Dupa aprobare primesti scanare bonus si pana la 10 CeCoins automat.");
 
       setForm({
         productName: "",
@@ -539,7 +545,7 @@ function SubmitProductPageContent() {
               {lastSubmittedItem.product_name}
             </h2>
             <p className="mt-2 text-sm leading-6 text-gray-300">
-              Status: in verificare. Dupa aprobare apare in catalog, primesti scanare bonus si misiunea de catalog se actualizeaza.
+              Status: in verificare. Dupa aprobare apare in catalog, primesti scanare bonus si pana la 10 CeCoins automat.
             </p>
             <Link
               href="/missions"
@@ -565,8 +571,7 @@ function SubmitProductPageContent() {
           </p>
 
           <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
-            Produsele acceptate primesc o scanare bonus, iar misiunea de catalog
-            îți aduce {CATALOG_REWARD_COINS} CeCoins după aprobare. Verificăm propunerile înainte să
+            Produsele acceptate primesc o scanare bonus si pana la {CATALOG_REWARD_COINS} CeCoins automat dupa aprobare. Verificam propunerile inainte sa
             ajungă în catalog, ca recomandările să rămână curate.
           </div>
 
@@ -881,7 +886,7 @@ function SubmitProductPageContent() {
                 ? "Se trimite produsul..."
                 : imageBusyField
                   ? "Optimizez poza..."
-                  : `Trimite la verificare - ${CATALOG_REWARD_COINS} CeCoins dupa aprobare`}
+                  : `Trimite la verificare - pana la ${CATALOG_REWARD_COINS} CeCoins dupa aprobare`}
             </button>
           </form>
         </div>

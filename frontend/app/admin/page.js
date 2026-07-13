@@ -238,7 +238,11 @@ export default function AdminPage() {
       method: "POST",
     });
     const data = await readApiJson(response);
-    setMessage(data.message || data.error);
+    const reward = data.reward || {};
+    const rewardText = response.ok && reward
+      ? ` Bonus: +${reward.bonusScans || 0} scanari, +${reward.coins || 0} CeCoins.`
+      : "";
+    setMessage(`${data.message || data.error || ""}${rewardText}`);
     await loadAdmin();
   }
 

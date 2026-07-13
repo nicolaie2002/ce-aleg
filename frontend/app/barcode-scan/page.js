@@ -1913,7 +1913,7 @@ export default function BarcodeScanPage() {
                   : "Dacă produsul nu apare în catalog, îl poți trimite ca propunere. Mai întâi confirmă că am citit corect codul de bare, apoi faci pozele și îl trimiți la verificare."}
               </p>
               <p className="mt-3 rounded-xl border border-yellow-300/25 bg-black/25 px-4 py-3 text-sm font-bold text-yellow-50">
-                Dupa aprobare primesti scanare bonus si poti revendica 10 CeCoins din Misiuni.
+                Dupa aprobare primesti scanare bonus si pana la 10 CeCoins automat.
               </p>
 
               {missingBarcodeCandidate ? (

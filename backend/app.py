@@ -383,6 +383,9 @@ INVITE_BONUS_DAYS = int(os.environ.get("INVITE_BONUS_DAYS", "2"))
 SUBMISSION_APPROVAL_BONUS_CREDITS = int(
     os.environ.get("SUBMISSION_APPROVAL_BONUS_CREDITS", "1")
 )
+SUBMISSION_APPROVAL_CECOINS = int(
+    os.environ.get("SUBMISSION_APPROVAL_CECOINS", "10")
+)
 PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", "8"))
 PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "manual").strip().lower()
 FRONTEND_PUBLIC_URL = (
@@ -1397,22 +1400,31 @@ def send_cecoin_reward_email(user, item):
     )
 
 
-def send_product_submission_approved_email(user, submission, product=None, duplicate=False):
+def send_product_submission_approved_email(user, submission, product=None, duplicate=False, reward=None):
     if not user:
         return False
 
     dashboard_url = f"{FRONTEND_PUBLIC_URL}/dashboard"
     product_name = submission.product_name or (product.name if product else "produsul trimis")
+    reward = reward or {}
+    awarded_coins = int(reward.get("coins") or 0) if reward.get("claimed") else 0
+    coin_line = (
+        f"Ai primit și {awarded_coins} CeCoins.\n"
+        if awarded_coins > 0
+        else "Misiunea de catalog pentru azi era deja revendicată.\n"
+    )
     text_body = (
         f"Salut, {user.name}!\n\n"
         f"Produsul {product_name} a fost aprobat în catalogul Ce aleg?.\n"
         f"Ai primit {SUBMISSION_APPROVAL_BONUS_CREDITS} scanare bonus.\n\n"
+        f"{coin_line}\n"
         f"Vezi dashboardul: {dashboard_url}\n"
     )
     details = [
         f"Produs: {product_name}",
         f"Magazin: {submission.store or 'nespecificat'}",
         f"Scanări bonus: +{SUBMISSION_APPROVAL_BONUS_CREDITS}",
+        f"CeCoins: +{awarded_coins}",
         (
             "Produsul exista deja în catalog, iar propunerea ta a fost confirmată."
             if duplicate
@@ -1979,6 +1991,83 @@ def add_bonus_scan_credits(user, credits=SUBMISSION_APPROVAL_BONUS_CREDITS, sour
             metadata_json=json.dumps(metadata or {}),
         )
     )
+
+
+def find_existing_catalog_entry_by_barcode(barcode):
+    normalized_barcode = str(barcode or "").strip()
+
+    if not normalized_barcode:
+        return None
+
+    return Product.query.filter_by(barcode=normalized_barcode).first()
+
+
+def find_active_submission_by_barcode(barcode):
+    normalized_barcode = str(barcode or "").strip()
+
+    if not normalized_barcode:
+        return None
+
+    return (
+        ProductSubmission.query.filter(
+            ProductSubmission.barcode == normalized_barcode,
+            ProductSubmission.status != "approved",
+        )
+        .order_by(ProductSubmission.created_at.desc())
+        .first()
+    )
+
+
+def auto_claim_catalog_submission_reward(user, submission, product=None, duplicate=False):
+    if not user or not submission or SUBMISSION_APPROVAL_CECOINS <= 0:
+        return {"claimed": False, "coins": 0, "reason": "disabled"}
+
+    day_start = get_day_start()
+    already_claimed_today = bool(get_mission_claim_events(
+        user.id,
+        series_id="catalog",
+        since=day_start,
+    ))
+
+    if already_claimed_today:
+        return {"claimed": False, "coins": 0, "reason": "daily_already_claimed"}
+
+    mission = next(
+        (
+            item for item in MISSION_CATALOG
+            if item.get("seriesId") == "catalog" and int(item.get("target") or 0) == 1
+        ),
+        None,
+    )
+    mission_id = mission.get("id") if mission else "catalog_1"
+    reward = {
+        "coins": SUBMISSION_APPROVAL_CECOINS,
+        "bonusScans": 0,
+        "bonusDays": 0,
+    }
+
+    db.session.add(
+        UsageEvent(
+            user_id=user.id,
+            event_type="mission_claim",
+            source=mission_id,
+            metadata_json=json.dumps({
+                "reward": reward,
+                "seriesId": "catalog",
+                "daily": True,
+                "current": 1,
+                "target": 1,
+                "claimedAt": datetime.utcnow().isoformat() + "Z",
+                "dayStart": day_start.isoformat() + "Z",
+                "autoClaimed": True,
+                "submissionId": submission.id,
+                "productId": getattr(product, "id", None),
+                "duplicate": bool(duplicate),
+            }),
+        )
+    )
+
+    return {"claimed": True, "coins": SUBMISSION_APPROVAL_CECOINS, "reason": "auto_claimed"}
 
 
 def apply_referral_bonus_after_verification(user):
@@ -10134,6 +10223,31 @@ def add_product_submission():
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
 
+    if barcode:
+        existing_product = find_existing_catalog_entry_by_barcode(barcode)
+
+        if existing_product:
+            return jsonify({
+                "code": "product_already_exists",
+                "message": "Produsul există deja în catalog. Îl poți scana direct.",
+                "product": product_to_dict(existing_product),
+            }), 409
+
+        existing_submission = find_active_submission_by_barcode(barcode)
+
+        if existing_submission:
+            same_user = existing_submission.user_id == user_id
+            return jsonify({
+                "code": "submission_already_pending",
+                "message": (
+                    "Ai trimis deja acest cod de bare. Propunerea este în verificare."
+                    if same_user
+                    else "Produsul este deja în verificare în coada catalogului."
+                ),
+                "item": product_submission_to_dict(existing_submission) if same_user or user.is_admin else None,
+                "status": existing_submission.status,
+            }), 409
+
     front_image_file = request.files.get("front_image")
     nutrition_image_file = request.files.get("nutrition_image")
 
@@ -10220,7 +10334,7 @@ def approve_product_submission(submission_id):
     existing_product = None
 
     if submission.barcode:
-        existing_product = Product.query.filter_by(barcode=submission.barcode).first()
+        existing_product = find_existing_catalog_entry_by_barcode(submission.barcode)
 
     if existing_product is None:
         existing_product = find_duplicate_product_for_submission(submission)
@@ -10234,16 +10348,29 @@ def approve_product_submission(submission_id):
             "submission_approved",
             {"submissionId": submission.id, "productId": existing_product.id},
         )
-        db.session.commit()
-        send_product_submission_approved_email(
+        reward = auto_claim_catalog_submission_reward(
             contributor,
             submission,
             existing_product,
             duplicate=True,
         )
+        db.session.commit()
+        clear_leaderboard_cache()
+        send_product_submission_approved_email(
+            contributor,
+            submission,
+            existing_product,
+            duplicate=True,
+            reward=reward,
+        )
 
         return jsonify({
-            "message": "Produsul exista deja în baza oficială. Propunerea a fost aprobată, iar utilizatorul a primit o scanare bonus.",
+            "message": "Produsul exista deja în baza oficială. Propunerea a fost aprobată, iar recompensa a fost sincronizată.",
+            "reward": {
+                "bonusScans": SUBMISSION_APPROVAL_BONUS_CREDITS,
+                "coins": int(reward.get("coins") or 0) if reward.get("claimed") else 0,
+                "claimed": bool(reward.get("claimed")),
+            },
             "product": product_to_dict(existing_product),
             "submission": product_submission_to_dict(submission),
         })
@@ -10311,16 +10438,29 @@ def approve_product_submission(submission_id):
         "submission_approved",
         {"submissionId": submission.id},
     )
-    db.session.commit()
-    send_product_submission_approved_email(
+    reward = auto_claim_catalog_submission_reward(
         contributor,
         submission,
         new_product,
         duplicate=False,
     )
+    db.session.commit()
+    clear_leaderboard_cache()
+    send_product_submission_approved_email(
+        contributor,
+        submission,
+        new_product,
+        duplicate=False,
+        reward=reward,
+    )
 
     return jsonify({
-        "message": "Produsul a fost publicat în baza oficială, iar utilizatorul a primit o scanare bonus.",
+        "message": "Produsul a fost publicat în baza oficială, iar recompensa a fost sincronizată.",
+        "reward": {
+            "bonusScans": SUBMISSION_APPROVAL_BONUS_CREDITS,
+            "coins": int(reward.get("coins") or 0) if reward.get("claimed") else 0,
+            "claimed": bool(reward.get("claimed")),
+        },
         "product": product_to_dict(new_product),
         "submission": product_submission_to_dict(submission),
     })
