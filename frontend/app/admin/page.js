@@ -486,6 +486,42 @@ export default function AdminPage() {
     }
   }
 
+  async function openReportedProductInCatalog(product = {}) {
+    const query = String(product.barcode || product.name || "").trim();
+
+    if (!query) {
+      setMessage("Raportarea nu are nume sau cod de bare pentru cautare.");
+      return;
+    }
+
+    setCatalogSearchTerm(query);
+    setCatalogSearchBusy(true);
+    setMessage(`Caut produs raportat: ${query}`);
+
+    try {
+      const params = new URLSearchParams({
+        q: query,
+        limit: "20",
+      });
+      const response = await fetch(`${API_URL}/admin/products/search?${params.toString()}`);
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Produsul raportat nu a putut fi cautat.");
+      }
+
+      const items = Array.isArray(data) ? data : [];
+      setCatalogResults(items);
+      setProductEdit(items[0] ? productToEdit(items[0]) : null);
+      setMessage(items.length ? `Am gasit ${items.length} produse pentru raportare.` : "Nu am gasit produsul raportat in catalog.");
+      document.getElementById("catalog-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (error) {
+      setMessage(error.message || "Produsul raportat nu a putut fi cautat.");
+    } finally {
+      setCatalogSearchBusy(false);
+    }
+  }
+
   const readiness = monitoring?.backend;
   const readinessTone = readiness?.ready
     ? "default"
@@ -494,6 +530,7 @@ export default function AdminPage() {
       : "warning";
   const scanIssues = monitoring?.scanIssues || {};
   const reportedAlternativeReports = scanIssues.reportedAlternatives || [];
+  const reportedProductReports = scanIssues.reportedProducts || [];
   const payments = monitoring?.payments || {};
   const email = monitoring?.email || {};
   const catalog = monitoring?.catalog || {};
@@ -594,6 +631,13 @@ export default function AdminPage() {
                 detail="Recomandări marcate de utilizatori ca nepotrivite."
               />
               <StatCard
+                icon={AlertTriangle}
+                label="Produse raportate"
+                value={compactNumber(scanIssues.productReports)}
+                tone={scanIssues.productReports ? "warning" : "default"}
+                detail="Date, preturi, imagini sau scoruri semnalate din pagina de rezultat."
+              />
+              <StatCard
                 icon={CreditCard}
                 label="Checkout-uri"
                 value={compactNumber(payments.checkoutStarted)}
@@ -631,6 +675,10 @@ export default function AdminPage() {
             </h2>
             <p className="mt-2 text-sm leading-6 text-gray-400">
               Mediu: {readiness?.environment || "-"} · DB: {readiness?.database || "-"}
+            </p>
+
+            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-gray-500">
+              API version: {readiness?.version?.shortCommit || "-"}
             </p>
 
             <div className="mt-4 space-y-3">
@@ -794,6 +842,69 @@ export default function AdminPage() {
                 )}
               </div>
             </div>
+
+            <div className="mt-6 border-t border-white/10 pt-5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-black text-yellow-100">
+                    <AlertTriangle size={16} /> Produse raportate
+                  </p>
+                  <p className="mt-1 text-sm text-gray-400">
+                    Date gresite semnalate direct din pagina de rezultat.
+                  </p>
+                </div>
+                <EventPill tone={reportedProductReports.length ? "warning" : "default"}>
+                  {compactNumber(reportedProductReports.length)} rapoarte
+                </EventPill>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {reportedProductReports.map((event) => {
+                  const metadata = event.metadata || {};
+                  const product = metadata.product || {};
+
+                  return (
+                    <article key={event.id} className="rounded-xl border border-white/10 bg-black/20 p-4">
+                      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-black text-white">
+                              {product.name || product.barcode || "Produs fara nume"}
+                            </p>
+                            <EventPill tone="warning">
+                              {metadata.reasonLabel || metadata.reason || "raport"}
+                            </EventPill>
+                          </div>
+                          <p className="mt-1 text-sm leading-6 text-gray-400">
+                            {event.userEmail} · {formatDate(event.createdAt)} · {metadata.store || "-"}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-500">
+                            {product.category || "fara categorie"} · {product.barcode || "fara barcode"} · scor {product.score || "-"}
+                          </p>
+                          {metadata.details && (
+                            <p className="mt-3 rounded-lg border border-yellow-300/15 bg-yellow-300/8 p-3 text-sm leading-6 text-yellow-50">
+                              {metadata.details}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => openReportedProductInCatalog(product)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-3 py-2 text-sm font-black text-black hover:bg-white"
+                        >
+                          <Pencil size={15} />
+                          Deschide in editor
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+                {!reportedProductReports.length && (
+                  <EmptyState>Nu exista produse raportate in intervalul selectat.</EmptyState>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
@@ -946,7 +1057,7 @@ export default function AdminPage() {
             </div>
           )}
 
-          <div className="mt-6 border-t border-white/10 pt-5">
+          <div id="catalog-editor" className="mt-6 scroll-mt-6 border-t border-white/10 pt-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="flex items-center gap-2 text-sm font-black text-cyan-200">

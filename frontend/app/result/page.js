@@ -4,10 +4,12 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowLeft,
   BadgeCheck,
   BadgeDollarSign,
   CandyOff,
+  CheckCircle2,
   Flame,
   Heart,
   Leaf,
@@ -24,6 +26,8 @@ import { getActiveProfile, getActiveProfilePayload, readProfilePreferences, save
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+import { trackEvent } from "../utils/analytics";
+import { readApiJson } from "../utils/apiResponse";
 
 const criteriaOptions = [
   { id: "caffeine", label: "Mai multa cafeina", icon: Zap },
@@ -50,6 +54,15 @@ const emptyScannedProduct = {
   verdict: "Produs analizat pe baza informațiilor disponibile.",
   shortAdvice: "Produsul poate fi comparat cu alternative din aceeași categorie.",
 };
+
+const productReportReasons = [
+  { id: "wrong_product", label: "Produs greșit" },
+  { id: "wrong_price", label: "Preț greșit" },
+  { id: "wrong_nutrition", label: "Date nutriționale greșite" },
+  { id: "wrong_score", label: "Scor/verdict greșit" },
+  { id: "wrong_image", label: "Imagine greșită" },
+  { id: "missing_data", label: "Date incomplete" },
+];
 
 function hasNumericValue(value) {
   return (
@@ -112,6 +125,12 @@ function ResultPageContent() {
   const [errorMessage, setErrorMessage] = useState("");
   const [scannedProduct, setScannedProduct] = useState(null);
   const [preferencesReady, setPreferencesReady] = useState(false);
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("wrong_product");
+  const [reportDetails, setReportDetails] = useState("");
+  const [reportMessage, setReportMessage] = useState("");
+  const [reportError, setReportError] = useState("");
+  const [isReporting, setIsReporting] = useState(false);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -295,6 +314,61 @@ function ResultPageContent() {
     }
   }
 
+  async function reportScannedProduct() {
+    if (isReporting || !scannedProduct) return;
+
+    if (!user) {
+      window.location.assign("/login?next=/result");
+      return;
+    }
+
+    setReportMessage("");
+    setReportError("");
+    setIsReporting(true);
+
+    try {
+      const response = await fetch(`${API_URL}/feedback/product`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          source: "result",
+          store: storeName,
+          reason: reportReason,
+          details: reportDetails,
+          product: {
+            name: scannedProduct.name,
+            barcode: scannedProduct.barcode,
+            brand: scannedProduct.brand,
+            category: scannedProduct.category,
+            score: scannedProduct.score,
+            price: scannedProduct.price,
+            image: scannedProduct.image,
+          },
+        }),
+      });
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(data.error || "Raportarea nu a putut fi trimisă.");
+      }
+
+      setReportMessage(data.message || "Raportarea a fost trimisă.");
+      setReportDetails("");
+      setIsReportOpen(false);
+      trackEvent("product_report", {
+        source: "result",
+        reason: reportReason,
+        category: scannedProduct.category,
+      });
+    } catch (error) {
+      setReportError(error.message || "Raportarea nu a putut fi trimisă.");
+    } finally {
+      setIsReporting(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
       <AppHeader actionHref="/barcode-scan" actionLabel="Scanează din nou" />
@@ -409,6 +483,78 @@ function ResultPageContent() {
                   {errorMessage}
                 </div>
               )}
+
+              <div className="mt-5 rounded-2xl border border-white/10 bg-black/25 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="inline-flex items-center gap-2 text-sm font-black text-yellow-100">
+                      <AlertTriangle size={16} />
+                      Ai observat o problemă?
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-gray-400">
+                      Trimite semnalul în admin ca produsul să fie corectat rapid.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsReportOpen((value) => !value);
+                      setReportError("");
+                    }}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl border border-yellow-300/30 px-4 py-3 text-sm font-black text-yellow-100 hover:bg-yellow-300/10"
+                  >
+                    <AlertTriangle size={16} />
+                    Raportează
+                  </button>
+                </div>
+
+                {isReportOpen && (
+                  <div className="mt-4 border-t border-white/10 pt-4">
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {productReportReasons.map((reason) => (
+                        <button
+                          key={reason.id}
+                          type="button"
+                          onClick={() => setReportReason(reason.id)}
+                          className={`rounded-xl border px-3 py-3 text-left text-sm font-black transition ${
+                            reportReason === reason.id
+                              ? "border-yellow-300 bg-yellow-300 text-black"
+                              : "border-white/10 bg-white/[0.035] text-gray-200 hover:bg-white/10"
+                          }`}
+                        >
+                          {reason.label}
+                        </button>
+                      ))}
+                    </div>
+                    <textarea
+                      value={reportDetails}
+                      onChange={(event) => setReportDetails(event.target.value)}
+                      placeholder="Opțional: ce e greșit? Ex: prețul este 6.99 lei la Kaufland, nu 9.99."
+                      className="mt-3 min-h-24 w-full rounded-xl border border-white/10 bg-black/35 p-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-yellow-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={reportScannedProduct}
+                      disabled={isReporting}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black hover:bg-yellow-200 disabled:cursor-wait disabled:opacity-60 sm:w-auto"
+                    >
+                      {isReporting ? <Loader2 size={17} className="animate-spin" /> : <CheckCircle2 size={17} />}
+                      {isReporting ? "Se trimite..." : "Trimite raportarea"}
+                    </button>
+                  </div>
+                )}
+
+                {reportMessage && (
+                  <p className="mt-3 rounded-xl border border-emerald-300/25 bg-emerald-400/10 p-3 text-sm font-bold text-emerald-100">
+                    {reportMessage}
+                  </p>
+                )}
+                {reportError && (
+                  <p className="mt-3 rounded-xl border border-red-400/25 bg-red-400/10 p-3 text-sm font-bold text-red-100">
+                    {reportError}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -97,6 +97,26 @@ AUTH_RATE_LIMIT_WINDOW = int(os.environ.get("AUTH_RATE_LIMIT_WINDOW", str(15 * 6
 MAX_JSON_BODY_BYTES = int(os.environ.get("MAX_JSON_BODY_BYTES", str(200 * 1024)))
 
 
+def get_application_version():
+    commit = (
+        os.environ.get("RENDER_GIT_COMMIT")
+        or os.environ.get("VERCEL_GIT_COMMIT_SHA")
+        or os.environ.get("GIT_COMMIT")
+        or os.environ.get("SOURCE_VERSION")
+        or os.environ.get("COMMIT_SHA")
+        or "local"
+    )
+    commit = str(commit).strip() or "local"
+
+    return {
+        "service": "ce-aleg-api",
+        "environment": APP_ENV,
+        "commit": commit,
+        "shortCommit": commit[:7] if commit != "local" else "local",
+        "buildTime": os.environ.get("BUILD_TIME") or os.environ.get("RENDER_DEPLOY_CREATED_AT") or None,
+    }
+
+
 def set_limited_cache_item(cache, key, value, max_items):
     if key not in cache and len(cache) >= max(1, int(max_items or 1)):
         cache.pop(next(iter(cache)), None)
@@ -4131,6 +4151,7 @@ AUTH_ENDPOINTS = {
     "delete_family_profile",
     "request_account_deletion",
     "report_alternative_issue",
+    "report_product_issue",
 }
 
 USER_PATH_ENDPOINTS = {
@@ -4207,7 +4228,7 @@ def enforce_access_controls():
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
-    if endpoint in {"contact_support", "track_analytics_event", "report_alternative_issue"} and not rate_limit(
+    if endpoint in {"contact_support", "track_analytics_event", "report_alternative_issue", "report_product_issue"} and not rate_limit(
         endpoint, 20, 60
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
@@ -4682,6 +4703,7 @@ ALLOWED_ANALYTICS_EVENTS = {
     "cecoins_checkout",
     "subscription_started",
     "support_message",
+    "product_report",
     "register_started",
     "login_success",
 }
@@ -4810,6 +4832,84 @@ def report_alternative_issue():
         "message": message,
         "fixed": bool(fix_result and fix_result.get("fixed")),
         "category": (fix_result or {}).get("newCategory"),
+    })
+
+
+PRODUCT_REPORT_REASONS = {
+    "wrong_product": "Produs greșit",
+    "wrong_price": "Preț greșit",
+    "wrong_nutrition": "Date nutriționale greșite",
+    "wrong_score": "Scor/verdict greșit",
+    "wrong_image": "Imagine greșită",
+    "missing_data": "Date incomplete",
+    "other": "Altă problemă",
+}
+
+
+@app.route("/feedback/product", methods=["POST"])
+def report_product_issue():
+    user = g.current_user
+    data = request.get_json(silent=True) or {}
+    product = data.get("product") if isinstance(data.get("product"), dict) else {}
+    product_name = str(product.get("name") or "").strip()
+    barcode = str(product.get("barcode") or "").strip()[:80]
+    store = str(data.get("store") or product.get("store") or "").strip()[:100]
+    reason = str(data.get("reason") or "other").strip()
+    details = str(data.get("details") or "").strip()
+
+    if reason not in PRODUCT_REPORT_REASONS:
+        reason = "other"
+
+    if not product_name and not barcode:
+        return jsonify({"error": "Produsul raportat nu este valid."}), 400
+
+    if len(details) > 1000:
+        return jsonify({"error": "Detaliile sunt prea lungi. Te rugăm să le scurtezi."}), 400
+
+    metadata = {
+        "reason": reason,
+        "reasonLabel": PRODUCT_REPORT_REASONS[reason],
+        "details": details[:1000],
+        "store": store,
+        "source": str(data.get("source") or "result").strip()[:80],
+        "product": {
+            "name": product_name[:160],
+            "barcode": barcode,
+            "brand": str(product.get("brand") or "").strip()[:120],
+            "category": str(product.get("category") or "").strip()[:120],
+            "score": str(product.get("score") or "").strip()[:40],
+            "price": str(product.get("price") or "").strip()[:100],
+            "image": str(product.get("image") or "").strip()[:255],
+        },
+    }
+
+    record_user_event(user.id, "product_report", "result", metadata, commit=False)
+    record_search_event(
+        product_name or barcode,
+        store=store,
+        result_count=0,
+        source="product_report",
+        user_id=user.id,
+    )
+    db.session.commit()
+
+    send_admin_alert(
+        "Produs raportat",
+        "Un utilizator a semnalat date greșite sau incomplete pe pagina de rezultat.",
+        [
+            f"Utilizator: {user.email}",
+            f"Produs: {product_name or '-'}",
+            f"Barcode: {barcode or '-'}",
+            f"Magazin: {store or '-'}",
+            f"Motiv: {PRODUCT_REPORT_REASONS[reason]}",
+            f"Detalii: {details or '-'}",
+        ],
+        alert_key="product_report",
+        min_interval_seconds=900,
+    )
+
+    return jsonify({
+        "message": "Mulțumim. Raportarea a fost salvată și apare în admin pentru corectare.",
     })
 
 
@@ -6687,6 +6787,14 @@ def health():
     })
 
 
+@app.route("/version", methods=["GET"])
+def get_version():
+    return jsonify({
+        "ok": True,
+        **get_application_version(),
+    })
+
+
 @app.route("/readiness", methods=["GET"])
 def get_readiness():
     return jsonify(get_publication_readiness())
@@ -8372,6 +8480,11 @@ def get_admin_monitoring():
         UsageEvent.created_at >= since,
     ).order_by(UsageEvent.created_at.desc()).limit(safe_limit).all()
 
+    product_report_events = UsageEvent.query.filter(
+        UsageEvent.event_type == "product_report",
+        UsageEvent.created_at >= since,
+    ).order_by(UsageEvent.created_at.desc()).limit(safe_limit).all()
+
     cecoin_purchase_events = UsageEvent.query.filter(
         UsageEvent.event_type == "cecoin_purchase",
         UsageEvent.created_at >= since,
@@ -8404,6 +8517,7 @@ def get_admin_monitoring():
             "ready": bool(readiness.get("ready")),
             "environment": readiness.get("environment"),
             "database": readiness.get("database"),
+            "version": get_application_version(),
             "blockers": readiness.get("blockers", []),
             "warnings": readiness.get("warnings", []),
             "renderNote": "Dacă Render anunță health check timeout, verifică Logs și Metrics pentru cold start, conexiuni DB sau request-uri lente.",
@@ -8426,6 +8540,10 @@ def get_admin_monitoring():
                 UsageEvent.event_type == "alternative_report",
                 UsageEvent.created_at >= since,
             ).count(),
+            "productReports": UsageEvent.query.filter(
+                UsageEvent.event_type == "product_report",
+                UsageEvent.created_at >= since,
+            ).count(),
             "bySource": [
                 {
                     "source": row.source or "search",
@@ -8437,6 +8555,9 @@ def get_admin_monitoring():
             "recent": [search_event_to_admin_dict(event) for event in recent_issue_events],
             "reportedAlternatives": [
                 usage_event_to_admin_dict(event) for event in alternative_report_events
+            ],
+            "reportedProducts": [
+                usage_event_to_admin_dict(event) for event in product_report_events
             ],
         },
         "payments": {
