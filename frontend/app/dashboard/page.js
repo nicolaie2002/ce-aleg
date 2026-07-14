@@ -33,7 +33,7 @@ import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile } from "../utils/profilePreferences";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
 const ACTION_TONES = {
@@ -401,6 +401,15 @@ export default function DashboardPage() {
 
   async function buyCoinPack(packId) {
     if (!packId || buyingPackId) return;
+    if (!user?.id) {
+      setShopMessage(
+        pick(
+          "Ai nevoie de cont ca sa cumperi CeCoins. Intra in cont ori creeaza unul, apoi revino la plata.",
+          "You need an account to buy CeCoins. Sign in or create an account, then return to checkout."
+        )
+      );
+      return;
+    }
 
     setBuyingPackId(packId);
     setShopMessage("");
@@ -424,11 +433,23 @@ export default function DashboardPage() {
 
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
-          window.location.assign("/login?next=/dashboard");
+          setShopMessage(
+            pick(
+              "Sesiunea a expirat. Intra din nou in cont ca sa cumperi CeCoins.",
+              "Your session expired. Sign in again to buy CeCoins."
+            )
+          );
           return;
         }
 
-        throw new Error(data.error || "Pachetul CeCoins nu poate fi cumpărat acum.");
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Pachetul CeCoins nu poate fi cumparat acum.",
+            "This CeCoins pack cannot be purchased right now."
+          )
+        );
       }
 
       window.location.assign(data.checkoutUrl);

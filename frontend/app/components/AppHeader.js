@@ -9,6 +9,7 @@ import {
   Crown,
   Database,
   Gift,
+  HelpCircle,
   LayoutDashboard,
   Radio,
   ScanLine,
@@ -206,6 +207,20 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
           <div className="flex shrink-0 items-center gap-2">
             <LanguageSwitcher compact />
             <ThemeSwitcher />
+            <Link
+              href="/help"
+              title={pick("Ajutor", "Help")}
+              aria-label={pick("Ajutor", "Help")}
+              aria-current={pathname === "/help" ? "page" : undefined}
+              className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-black transition ${
+                pathname === "/help"
+                  ? "border-cyan-200/60 bg-cyan-200 text-black"
+                  : "border-white/12 bg-white/[0.04] text-cyan-100 hover:-translate-y-0.5 hover:bg-white/[0.08]"
+              }`}
+            >
+              <HelpCircle size={16} />
+              <span className="hidden sm:inline">{pick("Ajutor", "Help")}</span>
+            </Link>
             <Link
               href="/pricing"
               aria-current={pathname === "/pricing" ? "page" : undefined}

@@ -8,7 +8,7 @@ import { API_URL } from "../config";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 function VerifyEmailContent() {
   const { pick } = useLocale();
@@ -38,7 +38,7 @@ function VerifyEmailContent() {
         const data = await readApiJson(response);
 
         if (!response.ok) {
-          throw new Error(data.error || pick("Emailul nu a putut fi confirmat.", "The email could not be confirmed."));
+          throw new Error(getApiErrorMessage(data, pick, "Emailul nu a putut fi confirmat.", "The email could not be confirmed."));
         }
 
         localStorage.setItem("cealeg_user", JSON.stringify(data.user));
@@ -48,7 +48,7 @@ function VerifyEmailContent() {
 
         if (!isMounted) return;
         setStatus("success");
-        setMessage(data.message || pick("Email confirmat.", "Email confirmed."));
+        setMessage(data.message ? localizeApiMessage(data.message, pick) : pick("Email confirmat.", "Email confirmed."));
         window.setTimeout(() => {
           const onboardingDone = localStorage.getItem("cealeg_onboarding_completed") === "1";
           window.location.assign(onboardingDone ? "/dashboard" : "/onboarding");

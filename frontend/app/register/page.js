@@ -8,7 +8,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PasswordField } from "../components/PasswordField";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 import {
   PASSWORD_MIN_LENGTH,
   getPasswordStrength,
@@ -63,17 +63,17 @@ export default function RegisterPage() {
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
-            pick("Nu s-a putut crea contul.", "The account could not be created.")
+          getApiErrorMessage(data, pick, "Nu s-a putut crea contul.", "The account could not be created.")
         );
       }
 
       setSuccessMessage(
-        data.message ||
-          pick(
-            "Cont creat. Verifică emailul ca să îl activezi.",
-            "Account created. Check your email to activate it."
-          )
+        data.message
+          ? localizeApiMessage(data.message, pick)
+          : pick(
+              "Cont creat. Verifica emailul ca sa il activezi.",
+              "Account created. Check your email to activate it."
+            )
       );
       setDevVerificationLink(data.emailStatus?.devVerificationLink || "");
       setPassword("");

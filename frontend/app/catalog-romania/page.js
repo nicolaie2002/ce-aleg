@@ -23,7 +23,17 @@ import { AppHeader } from "../components/AppHeader";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { API_URL } from "../config";
-import { SEO_ALTERNATIVE_GUIDES, SEO_CATEGORIES, SEO_PRODUCTS, SEO_STORES } from "./seo-data";
+import {
+  SEO_ALTERNATIVE_GUIDES,
+  SEO_CATEGORIES,
+  SEO_PRODUCTS,
+  SEO_STORES,
+  getLocalizedSeoAlternativeGuide,
+  getLocalizedSeoCategory,
+  getLocalizedSeoProduct,
+  getLocalizedSeoStore,
+  localizeCatalogLabel,
+} from "./seo-data";
 
 const fallbackStats = {
   products: 0,
@@ -112,6 +122,23 @@ export default function CatalogRomaniaPage() {
   function formatPercent(value) {
     return `${Number(value || 0).toFixed(1)}%`;
   }
+
+  const localizedStores = useMemo(
+    () => SEO_STORES.map((store) => getLocalizedSeoStore(store, locale)),
+    [locale]
+  );
+  const localizedCategories = useMemo(
+    () => SEO_CATEGORIES.map((category) => getLocalizedSeoCategory(category, locale)),
+    [locale]
+  );
+  const localizedProducts = useMemo(
+    () => SEO_PRODUCTS.map((product) => getLocalizedSeoProduct(product, locale)),
+    [locale]
+  );
+  const localizedAlternativeGuides = useMemo(
+    () => SEO_ALTERNATIVE_GUIDES.map((guide) => getLocalizedSeoAlternativeGuide(guide, locale)),
+    [locale]
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -350,7 +377,7 @@ export default function CatalogRomaniaPage() {
                 {pick("Magazine", "Stores")}
               </p>
               <div className="grid gap-2">
-                {SEO_STORES.slice(0, 4).map((store) => (
+                {localizedStores.slice(0, 4).map((store) => (
                   <Link
                     key={store.slug}
                     href={`/catalog-romania/magazine/${store.slug}`}
@@ -370,7 +397,7 @@ export default function CatalogRomaniaPage() {
                 {pick("Categorii", "Categories")}
               </p>
               <div className="grid gap-2">
-                {SEO_CATEGORIES.slice(0, 4).map((category) => (
+                {localizedCategories.slice(0, 4).map((category) => (
                   <Link
                     key={category.slug}
                     href={`/catalog-romania/categorii/${category.slug}`}
@@ -390,7 +417,7 @@ export default function CatalogRomaniaPage() {
                 {pick("Produse", "Products")}
               </p>
               <div className="grid gap-2">
-                {SEO_PRODUCTS.slice(0, 4).map((product) => (
+                {localizedProducts.slice(0, 4).map((product) => (
                   <Link
                     key={product.slug}
                     href={`/catalog-romania/produse/${product.slug}`}
@@ -410,7 +437,7 @@ export default function CatalogRomaniaPage() {
                 {pick("Alternative", "Alternatives")}
               </p>
               <div className="grid gap-2">
-                {SEO_ALTERNATIVE_GUIDES.slice(0, 4).map((guide) => (
+                {localizedAlternativeGuides.slice(0, 4).map((guide) => (
                   <Link
                     key={guide.slug}
                     href={`/catalog-romania/alternative/${guide.slug}`}
@@ -445,7 +472,7 @@ export default function CatalogRomaniaPage() {
                 stats.categories.map((item) => (
                   <ProgressRow
                     key={item.name}
-                    label={item.name}
+                    label={localizeCatalogLabel(item.name, locale)}
                     value={Number(item.count || 0)}
                     total={maxCategoryCount}
                     detail={formatNumber(item.count)}
@@ -570,7 +597,9 @@ export default function CatalogRomaniaPage() {
                     >
                       <p className="line-clamp-2 text-sm font-black text-white">{item.name}</p>
                       <p className="mt-1 text-xs text-gray-400">
-                        {[item.brand, item.store, item.category].filter(Boolean).join(" · ")}
+                        {[item.brand, item.store, localizeCatalogLabel(item.category, locale)]
+                          .filter(Boolean)
+                          .join(" · ")}
                       </p>
                     </div>
                   ))

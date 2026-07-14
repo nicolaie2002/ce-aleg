@@ -9,7 +9,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PasswordField } from "../components/PasswordField";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 function getSafeDestination() {
   const nextPath = new URLSearchParams(window.location.search).get("next");
@@ -57,7 +57,7 @@ export default function LoginPage() {
         if (data.code === "email_not_verified") {
           setNeedsVerification(true);
         }
-        throw new Error(data.error || pick("Autentificare esuata.", "Sign-in failed."));
+        throw new Error(getApiErrorMessage(data, pick, "Autentificare esuata.", "Sign-in failed."));
       }
 
       localStorage.setItem("cealeg_user", JSON.stringify(data.user));
@@ -97,10 +97,14 @@ export default function LoginPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Emailul nu a putut fi retrimis.", "The email could not be resent."));
+        throw new Error(getApiErrorMessage(data, pick, "Emailul nu a putut fi retrimis.", "The email could not be resent."));
       }
 
-      setVerificationNotice(data.message || pick("Am trimis un nou link de confirmare.", "We sent a new confirmation link."));
+      setVerificationNotice(
+        data.message
+          ? localizeApiMessage(data.message, pick)
+          : pick("Am trimis un nou link de confirmare.", "We sent a new confirmation link.")
+      );
     } catch (error) {
       setErrorMessage(error.message || pick("Emailul nu a putut fi retrimis.", "The email could not be resent."));
     } finally {

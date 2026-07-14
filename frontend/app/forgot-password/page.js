@@ -7,6 +7,7 @@ import { API_URL } from "../config";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 export default function ForgotPasswordPage() {
   const { pick } = useLocale();
@@ -29,13 +30,17 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Nu am putut trimite cererea.", "We could not send the request."));
+        throw new Error(getApiErrorMessage(data, pick, "Nu am putut trimite cererea.", "We could not send the request."));
       }
 
-      setMessage(data.message || pick("Verifică emailul pentru linkul de resetare.", "Check your email for the reset link."));
+      setMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick)
+          : pick("Verifica emailul pentru linkul de resetare.", "Check your email for the reset link.")
+      );
       if (data.devResetLink) {
         setDevResetLink(data.devResetLink);
       }

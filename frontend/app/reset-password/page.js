@@ -8,6 +8,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { PasswordField } from "../components/PasswordField";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import {
   PASSWORD_MIN_LENGTH,
   getPasswordStrength,
@@ -33,10 +34,10 @@ export default function ResetPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token, password }),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Parola nu a putut fi schimbata.", "The password could not be changed."));
+        throw new Error(getApiErrorMessage(data, pick, "Parola nu a putut fi schimbata.", "The password could not be changed."));
       }
 
       localStorage.setItem("cealeg_user", JSON.stringify(data.user));

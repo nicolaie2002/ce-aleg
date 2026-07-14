@@ -15,6 +15,7 @@ const publicRoutes = [
   "/catalog-romania/magazine",
   "/catalog-romania/produse",
   "/pricing",
+  "/help",
   "/login",
   "/register",
   "/support",

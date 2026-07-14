@@ -336,7 +336,7 @@ def get_frontend_origins():
 
 
 frontend_origins = get_frontend_origins()
-CORS(app, resources={r"/*": {"origins": frontend_origins}})
+CORS(app, resources={r"/*": {"origins": frontend_origins}}, supports_credentials=True)
 
 database_url = os.environ.get("DATABASE_URL", "").strip()
 
@@ -412,7 +412,7 @@ FRONTEND_PUBLIC_URL = (
     os.environ.get("FRONTEND_PUBLIC_URL", "").strip().rstrip("/")
     or (frontend_origins[0].rstrip("/") if frontend_origins else "http://localhost:3000")
 )
-EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "smtp").strip().lower()
+EMAIL_PROVIDER = os.environ.get("EMAIL_PROVIDER", "").strip().lower()
 BREVO_API_KEY = read_secret_env("BREVO_API_KEY")
 RESEND_API_KEY = read_secret_env("RESEND_API_KEY")
 EMAIL_SMTP_HOST = os.environ.get("EMAIL_SMTP_HOST", "").strip()
@@ -423,6 +423,15 @@ EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Ce aleg?").strip()
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact@cealeg.shop").strip().lower()
 CRON_SECRET = read_secret_env("CRON_SECRET")
+if not EMAIL_PROVIDER:
+    if BREVO_API_KEY:
+        EMAIL_PROVIDER = "brevo"
+    elif RESEND_API_KEY:
+        EMAIL_PROVIDER = "resend"
+    elif EMAIL_SMTP_HOST:
+        EMAIL_PROVIDER = "smtp"
+    else:
+        EMAIL_PROVIDER = "smtp"
 EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "true").strip().lower() in {
     "1",
     "true",
@@ -695,7 +704,54 @@ def is_email_configured():
     if EMAIL_PROVIDER == "resend":
         return bool(RESEND_API_KEY and EMAIL_FROM)
 
-    return bool(EMAIL_SMTP_HOST and EMAIL_FROM)
+    if EMAIL_PROVIDER == "smtp":
+        return bool(EMAIL_SMTP_HOST and EMAIL_FROM)
+
+    return False
+
+
+def get_email_configuration_diagnostics():
+    issues = []
+    provider_key_configured = bool(BREVO_API_KEY or RESEND_API_KEY or EMAIL_SMTP_HOST)
+
+    if EMAIL_PROVIDER not in {"brevo", "resend", "smtp"}:
+        issues.append(f"Provider necunoscut: {EMAIL_PROVIDER}. Foloseste brevo, resend sau smtp.")
+
+    if not EMAIL_FROM:
+        issues.append("EMAIL_FROM lipseste.")
+
+    if EMAIL_PROVIDER == "brevo" and not BREVO_API_KEY:
+        issues.append("BREVO_API_KEY lipseste pentru providerul Brevo.")
+
+    if EMAIL_PROVIDER == "resend" and not RESEND_API_KEY:
+        issues.append("RESEND_API_KEY lipseste pentru providerul Resend.")
+
+    if EMAIL_PROVIDER == "smtp" and not EMAIL_SMTP_HOST:
+        issues.append("EMAIL_SMTP_HOST lipseste pentru providerul SMTP.")
+
+    email_from_domain = EMAIL_FROM.split("@")[-1].lower() if "@" in EMAIL_FROM else ""
+    contact_domain = CONTACT_EMAIL.split("@")[-1].lower() if "@" in CONTACT_EMAIL else ""
+
+    if EMAIL_PROVIDER == "brevo" and EMAIL_FROM.lower().endswith("@gmail.com"):
+        issues.append(
+            "Brevo poate respinge senderul Gmail. Recomandat: EMAIL_FROM=contact@cealeg.shop si domeniu/sender verificat in Brevo."
+        )
+
+    if email_from_domain and contact_domain and email_from_domain != contact_domain:
+        issues.append(
+            "EMAIL_FROM si CONTACT_EMAIL sunt pe domenii diferite; verifica senderul si reply-to."
+        )
+
+    return {
+        "provider": EMAIL_PROVIDER,
+        "configured": is_email_configured(),
+        "from": EMAIL_FROM,
+        "fromName": EMAIL_FROM_NAME,
+        "replyTo": get_email_reply_to() or EMAIL_FROM,
+        "providerKeyOrHostConfigured": provider_key_configured,
+        "issues": issues,
+        "lastProviderError": LAST_EMAIL_PROVIDER_ERROR,
+    }
 
 
 def set_email_provider_error(message=""):
@@ -905,8 +961,12 @@ def send_smtp_email(to_email, subject, text_body, html_body=None):
 
 def send_transactional_email(to_email, subject, text_body, html_body=None):
     if not is_email_configured():
+        diagnostics = get_email_configuration_diagnostics()
         set_email_provider_error(
-            f"Provider={EMAIL_PROVIDER}, EMAIL_FROM set={bool(EMAIL_FROM)}, provider key/host configured={bool(BREVO_API_KEY or RESEND_API_KEY or EMAIL_SMTP_HOST)}"
+            "Email provider not configured. "
+            f"Provider={diagnostics['provider']}, EMAIL_FROM set={bool(EMAIL_FROM)}, "
+            f"provider key/host configured={diagnostics['providerKeyOrHostConfigured']}, "
+            f"issues={'; '.join(diagnostics['issues']) or 'none'}"
         )
         app.logger.info(
             "Email not sent because provider is not configured. To=%s Subject=%s Provider=%s",
@@ -2225,7 +2285,7 @@ def require_auth(handler):
         user = get_current_user()
 
         if not user:
-            return jsonify({"error": "Autentificare necesară."}), 401
+            return jsonify({"error": "Autentificare necesară.", "code": "auth_required"}), 401
 
         g.current_user = user
         return handler(*args, **kwargs)
@@ -2238,7 +2298,7 @@ def require_admin(handler):
     @require_auth
     def wrapped(*args, **kwargs):
         if not g.current_user.is_admin:
-            return jsonify({"error": "Acces rezervat administratorului."}), 403
+            return jsonify({"error": "Acces rezervat administratorului.", "code": "admin_required"}), 403
 
         return handler(*args, **kwargs)
 
@@ -2461,8 +2521,10 @@ def get_publication_readiness():
         warnings.append("Storage Supabase nu este complet configurat; imaginile contribuite pot rămâne locale.")
 
     if not is_email_configured():
+        email_diagnostics = get_email_configuration_diagnostics()
         warnings.append(
-            "Emailurile tranzacționale nu sunt configurate; welcome/reset vor merge doar în mod local de test."
+            "Emailurile tranzacționale nu sunt configurate corect: "
+            + ("; ".join(email_diagnostics["issues"]) or "verifica providerul si EMAIL_FROM.")
         )
     elif PRODUCTION_MODE and EMAIL_PROVIDER == "brevo" and str(os.environ.get("EMAIL_FROM", "")).lower().endswith("@gmail.com"):
         warnings.append(
@@ -4245,18 +4307,18 @@ def enforce_access_controls():
     user = get_current_user()
 
     if not user:
-        return jsonify({"error": "Autentificare necesară."}), 401
+        return jsonify({"error": "Autentificare necesară.", "code": "auth_required"}), 401
 
     g.current_user = user
 
     if endpoint in ADMIN_ENDPOINTS and not user.is_admin:
-        return jsonify({"error": "Acces rezervat administratorului."}), 403
+        return jsonify({"error": "Acces rezervat administratorului.", "code": "admin_required"}), 403
 
     if endpoint in USER_PATH_ENDPOINTS:
         user_id = request.view_args.get("user_id")
 
         if user_id is not None and not require_same_user(user_id):
-            return jsonify({"error": "Nu poți accesa datele altui cont."}), 403
+            return jsonify({"error": "Nu poți accesa datele altui cont.", "code": "wrong_account"}), 403
 
     if endpoint in ITEM_OWNER_MODELS and not user.is_admin:
         model, argument_name = ITEM_OWNER_MODELS[endpoint]
@@ -6803,6 +6865,7 @@ def get_readiness():
 @app.route("/admin/email-test", methods=["POST"])
 def send_admin_email_test():
     data = request.get_json(silent=True) or {}
+    diagnostics = get_email_configuration_diagnostics()
     to_email = (
         data.get("to")
         or CONTACT_EMAIL
@@ -6820,6 +6883,7 @@ def send_admin_email_test():
             "provider": EMAIL_PROVIDER,
             "from": EMAIL_FROM,
             "to": to_email,
+            "diagnostics": diagnostics,
         }), 400
 
     sent = send_transactional_email(
@@ -6870,6 +6934,7 @@ def send_admin_email_test():
             "provider": EMAIL_PROVIDER,
             "from": EMAIL_FROM,
             "to": to_email,
+            "diagnostics": get_email_configuration_diagnostics(),
         }), 502
 
     record_user_event(
@@ -6889,6 +6954,7 @@ def send_admin_email_test():
         "message": f"Email de test trimis către {to_email}. Verifică inboxul și Spam.",
         "from": EMAIL_FROM,
         "to": to_email,
+        "diagnostics": get_email_configuration_diagnostics(),
     })
 
 
@@ -8594,6 +8660,7 @@ def get_admin_monitoring():
             "from": EMAIL_FROM,
             "replyTo": get_email_reply_to() or EMAIL_FROM,
             "lastProviderError": LAST_EMAIL_PROVIDER_ERROR,
+            "diagnostics": get_email_configuration_diagnostics(),
             "testCount": UsageEvent.query.filter(
                 UsageEvent.event_type == "email_test",
                 UsageEvent.created_at >= since,

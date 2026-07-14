@@ -278,10 +278,13 @@ export default function AdminPage() {
         body: JSON.stringify({ to: emailTestAddress || CONTACT_EMAIL }),
       });
       const data = await readApiJson(response);
+      const diagnosticIssues = data.diagnostics?.issues?.length
+        ? ` Detalii: ${data.diagnostics.issues.join(" ")}`
+        : "";
       setMessage(
-        data.message ||
+        `${data.message ||
           data.error ||
-          (response.ok ? "Test email finalizat." : "Emailul de test nu a putut fi trimis.")
+          (response.ok ? "Test email finalizat." : "Emailul de test nu a putut fi trimis.")}${diagnosticIssues}`
       );
       await loadAdmin();
     } catch {

@@ -460,6 +460,362 @@ export const SEO_ALTERNATIVE_GUIDES = [
   },
 ];
 
+const STORE_COPY_EN = {
+  lidl: {
+    tagline: "Everyday products, many private labels and prices worth comparing.",
+    intro:
+      "This page helps people looking for Lidl products in Romania understand how to scan barcodes, compare labels and contribute missing products to the Ce aleg? catalog.",
+    shopperIntent: "good for dairy, snacks, sweets, drinks and pantry basics",
+    checks: [
+      "compare sugar in yogurts, cereals and snacks",
+      "check protein and ingredients in high-protein products",
+      "add missing products when you scan a new barcode",
+    ],
+  },
+  kaufland: {
+    tagline: "Large baskets, many categories and close shelf alternatives.",
+    intro:
+      "For Kaufland, Ce aleg? works as a quick scanning assistant when you have many similar products and want the clearer option.",
+    shopperIntent: "good for dairy, canned foods, bakery, drinks and family products",
+    checks: [
+      "scan similar products before choosing bulk or large formats",
+      "watch the score, sugar, salt and important ingredients",
+      "submit products that are missing from the catalog",
+    ],
+  },
+  carrefour: {
+    tagline: "Many brands and similar products, useful for fast comparisons.",
+    intro:
+      "In Carrefour you can use Ce aleg? to compare products close in price or category and find alternatives that fit your preferences.",
+    shopperIntent: "good for sweets, snacks, drinks, dairy and organic products",
+    checks: [
+      "look for alternatives when the label is hard to understand",
+      "compare products in the same category by score and nutrients",
+      "report wrong recommendations so we can improve the catalog",
+    ],
+  },
+  "mega-image": {
+    tagline: "Quick shopping, premium products and many small decisions.",
+    intro:
+      "For Mega Image, Ce aleg? pages are built for quick shopping: scan, see the verdict and check whether the alternative is worth it.",
+    shopperIntent: "good for snacks, dairy, coffee, organic products and quick meals",
+    checks: [
+      "quickly check premium or imported products",
+      "compare snacks and sweets by sugar and ingredients",
+      "add the observed price for products you buy often",
+    ],
+  },
+  profi: {
+    tagline: "Nearby stores, everyday products and quick decisions.",
+    intro:
+      "In Profi, Ce aleg? helps especially when you want to quickly check basic products or snacks and save alternatives for next time.",
+    shopperIntent: "good for drinks, sweets, bakery, deli meats and basics",
+    checks: [
+      "scan products you buy often so you keep a useful history",
+      "check differences between similar shelf products",
+      "contribute local or promotional products that are missing",
+    ],
+  },
+  penny: {
+    tagline: "Low prices and basic products that are worth checking simply.",
+    intro:
+      "For Penny, Ce aleg? helps with simple comparisons: is the product right for what you need, or is there a more balanced alternative?",
+    shopperIntent: "good for dairy, canned foods, drinks, sweets and basics",
+    checks: [
+      "compare cheap products by score, not only by price",
+      "watch sugar and ingredients in snacks",
+      "add missing products to help the Romanian catalog",
+    ],
+  },
+  "market-local": {
+    tagline: "Independent shops, regional products and a community-built catalog.",
+    intro:
+      "Products from local shops are the hardest to obtain from retailers, so user contributions matter for a real Romanian catalog.",
+    shopperIntent: "good for local products, deli meats, bakery, dairy and canned foods",
+    checks: [
+      "photograph the package and nutrition table when a product is missing",
+      "complete the store and category so review is faster",
+      "help other people nearby find the product",
+    ],
+  },
+};
+
+const CATEGORY_COPY_EN = {
+  lactate: {
+    name: "Dairy",
+    intro:
+      "Yogurts, milk, skyr, cheeses and dairy desserts can look similar on the shelf, but differ a lot in sugar, protein and ingredients.",
+    examples: ["plain yogurt", "skyr", "milk", "fresh cheese", "dairy dessert"],
+    compareSignals: ["sugar per 100g", "protein", "fat", "simple ingredients"],
+    advice:
+      "Scan the barcode and compare products from the same family, especially when choosing for children or daily snacks.",
+  },
+  mezeluri: {
+    name: "Deli meats",
+    intro:
+      "Deli meats vary widely in salt, meat percentage, additives and processing. A quick check helps when the label is crowded.",
+    examples: ["ham", "salami", "sausages", "sliced chicken breast", "bologna"],
+    compareSignals: ["meat percentage", "salt", "additives", "saturated fat"],
+    advice:
+      "For deli meats, the catalog grows best from real shelf scans because many variants are store-specific.",
+  },
+  dulciuri: {
+    name: "Sweets",
+    intro:
+      "Bars, biscuits, chocolate and packaged desserts are searched often, but some contain a lot of sugar for a small portion.",
+    examples: ["biscuits", "chocolate", "wafers", "bars", "packaged desserts"],
+    compareSignals: ["sugar", "calories per portion", "fat", "sweeteners"],
+    advice:
+      "Scan the product and look for nearby alternatives if you want a more balanced or simpler snack.",
+  },
+  snacks: {
+    name: "Snacks",
+    intro:
+      "Snacks can be quick and convenient, but the score depends a lot on sugar, salt, protein and how processed the recipe is.",
+    examples: ["chips", "protein bars", "pretzels", "mixes", "salty snacks"],
+    compareSignals: ["salt", "sugar", "protein", "calories"],
+    advice:
+      "Use Ce aleg? when you have several similar products and want the one that fits your goal better.",
+  },
+  bauturi: {
+    name: "Drinks",
+    intro:
+      "Soft, plant-based or functional drinks can hide sugar, sweeteners or ingredients that are hard to compare quickly.",
+    examples: ["juices", "plant-based drinks", "energy drinks", "iced teas", "flavored water"],
+    compareSignals: ["sugar per 100ml", "sweeteners", "caffeine", "ingredients"],
+    advice:
+      "Scan drinks you buy often, because small label differences matter when consumption is repeated.",
+  },
+  cereale: {
+    name: "Cereals",
+    intro:
+      "Breakfast cereals, granola and muesli can vary a lot in sugar and fiber even when the packaging looks healthy.",
+    examples: ["breakfast cereal", "granola", "muesli", "oat flakes", "fruit mixes"],
+    compareSignals: ["sugar", "fiber", "protein", "ingredient list"],
+    advice:
+      "Compare products per 100g and check whether the chosen option fits a daily breakfast or only an occasional one.",
+  },
+  conserve: {
+    name: "Canned foods",
+    intro:
+      "Canned foods are practical, but worth comparing by salt, oil, ingredients and the ratio between product and sauce or liquid.",
+    examples: ["tuna", "beans", "chickpeas", "tomatoes", "corn"],
+    compareSignals: ["salt", "oil", "ingredients", "net quantity"],
+    advice:
+      "Scan canned foods you use often in recipes and save the options with a clearer label.",
+  },
+  panificatie: {
+    name: "Bakery",
+    intro:
+      "Packaged bread, wraps, crackers and bakery products differ in fiber, salt and added ingredients.",
+    examples: ["packaged bread", "wraps", "crackers", "buns", "toast"],
+    compareSignals: ["fiber", "salt", "sugar", "flour type"],
+    advice:
+      "For products eaten daily, compare the label quickly and save the alternatives that fit your family.",
+  },
+  "produse-bio": {
+    name: "Organic products",
+    intro:
+      "An organic product is not automatically the best choice for every goal. The label and nutrients still matter.",
+    examples: ["organic snacks", "plant-based drinks", "organic cereals", "organic sauces", "organic desserts"],
+    compareSignals: ["sugar", "ingredients", "calories", "observed price"],
+    advice:
+      "Scan the product and compare it with similar options, not only by the promise on the package.",
+  },
+  cafea: {
+    name: "Coffee",
+    intro:
+      "Plain coffee, coffee-based drinks and instant products should be compared differently, especially when sugar and flavors appear.",
+    examples: ["ground coffee", "capsules", "coffee drinks", "instant", "3-in-1 mixes"],
+    compareSignals: ["sugar", "ingredients", "caffeine", "portion"],
+    advice:
+      "Scan packaged coffee mixes and drinks, where the label can matter more than the brand.",
+  },
+};
+
+const PRODUCT_COPY_EN = {
+  "iaurt-grecesc-2": {
+    name: "Greek yogurt 2%",
+    brand: "catalog example",
+    verdict: "Good choice for simple snacks if the ingredient list stays short.",
+    intro:
+      "Greek yogurt 2% is a good example of a product where protein, sugar and ingredients are worth comparing, not only the packaging.",
+    nutrients: ["good protein", "low sugar", "moderate fat", "simple ingredients"],
+    goodFor: ["quick snack", "breakfast", "simple recipes"],
+    watchOut: ["versions with added sugar", "dairy desserts confused with yogurt", "portions larger than they look"],
+  },
+  "skyr-simplu": {
+    name: "Plain skyr",
+    brand: "catalog example",
+    verdict: "Good profile when you want higher protein and lower sugar.",
+    intro:
+      "Plain skyr is often searched as an alternative to sweet yogurts or dairy desserts, especially when the goal is protein.",
+    nutrients: ["high protein", "low sugar", "low fat", "no sweet topping"],
+    goodFor: ["protein snacks", "breakfast", "fruit recipes"],
+    watchOut: ["flavored versions", "sweet toppings", "price per portion"],
+  },
+  "iaurt-natural-lidl": {
+    name: "Lidl plain yogurt",
+    brand: "Lidl example",
+    verdict: "A good base if the label stays simple and the sugar is natural.",
+    intro:
+      "A store-brand plain yogurt is worth checking quickly because similar products can have different ingredients or nutrition values.",
+    nutrients: ["simple ingredients", "natural sugar", "medium protein", "accessible price"],
+    goodFor: ["family", "recipes", "frequent shopping"],
+    watchOut: ["sweetened yogurts", "large packages that are hard to compare", "different fat levels"],
+  },
+  "iaurt-proteic-lidl": {
+    name: "Lidl protein yogurt",
+    brand: "Lidl example",
+    verdict: "Interesting for protein, but sweeteners and flavors are worth checking.",
+    intro:
+      "Protein products can be useful, but they do not all have the same ingredient list. Scanning helps when many variants look similar.",
+    nutrients: ["high protein", "controlled sugar", "calories per portion", "ingredients to check"],
+    goodFor: ["after training", "filling snack", "quick comparisons"],
+    watchOut: ["sweeteners", "flavors", "marketing promises"],
+  },
+  "iaurt-simplu": {
+    name: "Plain yogurt",
+    brand: "catalog example",
+    verdict: "Balanced choice when the ingredient list is clear.",
+    intro:
+      "Plain yogurt remains a useful category for comparisons, especially when you often choose the same product for home.",
+    nutrients: ["natural sugar", "medium protein", "variable fat", "short ingredients"],
+    goodFor: ["breakfast", "recipes", "family snacks"],
+    watchOut: ["fruit and sugar versions", "large portions", "fat differences"],
+  },
+  "bautura-ovaz": {
+    name: "Oat drink",
+    brand: "catalog example",
+    verdict: "May fit well, but sugar, oils and additives are worth checking.",
+    intro:
+      "Plant-based drinks look similar, but can differ a lot in sugar, oils, salt and additions.",
+    nutrients: ["sugar per 100ml", "oils", "salt", "fortification"],
+    goodFor: ["coffee", "breakfast", "plant-based alternatives"],
+    watchOut: ["added sugar", "oils", "long additive list"],
+  },
+  "baton-proteic": {
+    name: "Protein bar",
+    brand: "catalog example",
+    verdict: "Good alternative when protein is real and sugar stays controlled.",
+    intro:
+      "Protein bars are useful for comparisons because many products promise a lot, but differ in sugar and ingredients.",
+    nutrients: ["protein", "sugar", "fiber", "calories"],
+    goodFor: ["quick snack", "after sport", "alternatives to sweets"],
+    watchOut: ["sugar alcohols", "hidden calories", "price per bar"],
+  },
+  "baton-ovaz": {
+    name: "Sweet oat bar",
+    brand: "catalog example",
+    verdict: "Sweet snack to check carefully, especially for sugar and portion size.",
+    intro:
+      "An oat bar may look like a healthy snack, but some versions contain a lot of sugar for a small portion.",
+    nutrients: ["high sugar", "calories", "fiber", "ingredients"],
+    goodFor: ["occasional", "quick energy"],
+    watchOut: ["sugar per portion", "glazes", "small but calorie-dense portions"],
+  },
+};
+
+const ALTERNATIVE_GUIDE_COPY_EN = {
+  iaurturi: {
+    title: "Alternatives to sweet yogurts",
+    intro:
+      "When a yogurt looks healthy, check sugar, protein and ingredients. Good alternatives are often plain yogurt, skyr or Greek yogurt.",
+    checks: ["sugar per 100g", "protein", "short ingredients", "no sweet topping"],
+    searchIntent: "for people looking for better, simpler or higher-protein yogurts",
+  },
+  dulciuri: {
+    title: "Alternatives to very sugary sweets",
+    intro:
+      "Not all sweet snacks are the same. Some can be replaced with more filling options or products with more controlled sugar.",
+    checks: ["sugar", "calories per portion", "fiber", "protein"],
+    searchIntent: "for searches about better sweets and alternative snacks",
+  },
+  bauturi: {
+    title: "Alternatives to sugary drinks",
+    intro:
+      "Drinks can add sugar without feeling like a meal. Compare values per 100ml and check sweeteners or ingredients.",
+    checks: ["sugar per 100ml", "sweeteners", "caffeine", "ingredients"],
+    searchIntent: "for people who want simpler drinks that are easier to compare",
+  },
+  snacks: {
+    title: "Alternatives to salty or sweet snacks",
+    intro:
+      "For snacks, portion, salt, sugar and satiety matter a lot. Scanning helps you compare similar shelf options.",
+    checks: ["salt", "sugar", "protein", "calories"],
+    searchIntent: "for searches about better snacks and shelf alternatives",
+  },
+  mezeluri: {
+    title: "Alternatives to highly processed deli meats",
+    intro:
+      "Deli meats are a category where the catalog needs real contributions: meat percentage, salt, additives and ingredients.",
+    checks: ["meat percentage", "salt", "additives", "fat"],
+    searchIntent: "for searches about simpler deli meats and less processed products",
+  },
+  "cereale-mic-dejun": {
+    title: "Alternatives to high-sugar breakfast cereals",
+    intro:
+      "Cereals can look suitable for breakfast, but sugar and fiber change the verdict a lot.",
+    checks: ["sugar", "fiber", "protein", "ingredients"],
+    searchIntent: "for searches about simpler breakfasts and family products",
+  },
+};
+
+const CATALOG_LABEL_EN_BY_KEY = {
+  altele: "Other",
+  carne: "Meat",
+  sucuri: "Juices",
+  apa: "Water",
+  "bauturi racoritoare": "Soft drinks",
+  "lactate si branzeturi": "Dairy and cheese",
+  lactate: "Dairy",
+  "fructe si legume": "Fruit and vegetables",
+  mezeluri: "Deli meats",
+  dulciuri: "Sweets",
+  snacks: "Snacks",
+  bauturi: "Drinks",
+  cereale: "Cereals",
+  conserve: "Canned foods",
+  panificatie: "Bakery",
+  cafea: "Coffee",
+  "produse bio": "Organic products",
+};
+
+function normalizeCatalogLabel(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+export function localizeCatalogLabel(value, locale) {
+  if (locale !== "en") return value;
+  return CATALOG_LABEL_EN_BY_KEY[normalizeCatalogLabel(value)] || value;
+}
+
+function localizeSeoItem(item, copyBySlug, locale) {
+  if (locale !== "en" || !item) return item;
+  return { ...item, ...(copyBySlug[item.slug] || {}) };
+}
+
+export function getLocalizedSeoStore(store, locale) {
+  return localizeSeoItem(store, STORE_COPY_EN, locale);
+}
+
+export function getLocalizedSeoCategory(category, locale) {
+  return localizeSeoItem(category, CATEGORY_COPY_EN, locale);
+}
+
+export function getLocalizedSeoProduct(product, locale) {
+  return localizeSeoItem(product, PRODUCT_COPY_EN, locale);
+}
+
+export function getLocalizedSeoAlternativeGuide(guide, locale) {
+  return localizeSeoItem(guide, ALTERNATIVE_GUIDE_COPY_EN, locale);
+}
+
 export function getSeoProduct(slug) {
   return SEO_PRODUCTS.find((product) => product.slug === slug) || null;
 }

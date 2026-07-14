@@ -9,7 +9,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
 const fallbackPlans = {
@@ -378,6 +378,35 @@ export default function PricingPage() {
   const canManageBilling =
     subscription?.provider === "stripe" && subscription?.hasCustomer;
 
+  function getStoredUserId() {
+    try {
+      const savedUser = window.localStorage.getItem("cealeg_user");
+      return savedUser ? JSON.parse(savedUser)?.id : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function hasCheckoutAccount() {
+    return Boolean(billing?.user?.id || getStoredUserId());
+  }
+
+  function requireCheckoutAccount(setter = setMessage) {
+    if (hasCheckoutAccount()) return true;
+
+    const authMessage = pick(
+      "Ai nevoie de cont ca sa cumperi planuri sau CeCoins. Intra in cont ori creeaza unul, apoi revino la plata.",
+      "You need an account to buy plans or CeCoins. Sign in or create an account, then return to checkout."
+    );
+
+    if (setter === setMessage) {
+      setMessageTone("error");
+    }
+
+    setter(authMessage);
+    return false;
+  }
+
   function loadBillingStatus({ syncStripe = false } = {}) {
     const syncQuery = syncStripe ? "?sync=stripe" : "";
     return fetch(`${API_URL}/billing/status${syncQuery}`)
@@ -452,6 +481,7 @@ export default function PricingPage() {
 
   async function choosePlan(plan, selectedBillingCycle = billingCycle) {
     if (plan === "free") return;
+    if (!requireCheckoutAccount(setMessage)) return;
 
     setBusyPlan(`${plan}:${selectedBillingCycle}`);
     setMessage("");
@@ -477,13 +507,20 @@ export default function PricingPage() {
       if (!response.ok) {
         if (data.code === "active_subscription_exists") {
           setMessageTone("info");
-          setMessage(data.error);
+          setMessage(
+            getApiErrorMessage(
+              data,
+              pick,
+              "Exista deja un abonament activ.",
+              "An active subscription already exists."
+            )
+          );
           loadBillingStatus({ syncStripe: true });
           return;
         }
 
         throw new Error(
-          data.error ||
+          getApiErrorMessage(data, pick, "", "") ||
             pick(
               "Plata nu poate fi pornită acum.",
               "Checkout cannot start right now."
@@ -530,6 +567,7 @@ export default function PricingPage() {
 
   async function buyCoinPack(packId) {
     if (!packId || busyCoinPack) return;
+    if (!requireCheckoutAccount(setCoinPackMessage)) return;
 
     setBusyCoinPack(packId);
     setCoinPackMessage("");
@@ -552,13 +590,18 @@ export default function PricingPage() {
       const data = await readApiJson(response);
 
       if (response.status === 401 || response.status === 403) {
-        window.location.assign("/login?next=/pricing");
+        setCoinPackMessage(
+          pick(
+            "Ai nevoie de cont ca sa cumperi CeCoins. Intra in cont ori creeaza unul, apoi revino la plata.",
+            "You need an account to buy CeCoins. Sign in or create an account, then return to checkout."
+          )
+        );
         return;
       }
 
       if (!response.ok) {
         throw new Error(
-          data.error ||
+          getApiErrorMessage(data, pick, "", "") ||
             pick(
               "Pachetul CeCoins nu poate fi cumpărat acum.",
               "This CeCoins pack cannot be purchased right now."
@@ -604,7 +647,7 @@ export default function PricingPage() {
 
       if (!response.ok || !data.portalUrl) {
         throw new Error(
-          data.error ||
+          getApiErrorMessage(data, pick, "", "") ||
             pick(
               "Portalul de abonament nu poate fi deschis acum.",
               "The billing portal cannot be opened right now."
