@@ -15,8 +15,8 @@ const CONTRIBUTION_IMAGE_QUALITY = 0.82;
 
 const SUBMISSION_STATUS = {
   pending: {
-    label: "In verificare",
-    detail: "Asteapta verificarea adminului.",
+    label: "În verificare",
+    detail: "Așteaptă verificarea adminului.",
     badge: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
   },
   ai_approved: {
@@ -26,20 +26,20 @@ const SUBMISSION_STATUS = {
   },
   approved: {
     label: "Aprobat",
-    detail: "Produsul a intrat in catalog sau a confirmat un produs existent.",
+    detail: "Produsul a intrat în catalog sau a confirmat un produs existent.",
     badge: "border-emerald-300/35 bg-emerald-300/10 text-emerald-100",
   },
   needs_review: {
     label: "Necesita revizie",
-    detail: "Lipsesc informatii sau pozele nu sunt destul de clare.",
+    detail: "Lipsesc informații sau pozele nu sunt destul de clare.",
     badge: "border-red-300/35 bg-red-300/10 text-red-100",
   },
 };
 
 function getSubmissionStatus(status) {
   return SUBMISSION_STATUS[status] || {
-    label: status || "In verificare",
-    detail: "Propunerea este in coada de verificare.",
+    label: status || "În verificare",
+    detail: "Propunerea este în coada de verificare.",
     badge: "border-white/10 bg-white/[0.04] text-gray-200",
   };
 }
@@ -249,7 +249,7 @@ function SubmitProductPageContent() {
       setSelectedImage(optimizedFile);
       setImageNotice(
         optimizedFile.size < file.size
-          ? `Poza optimizata: ${formatFileSize(file.size)} -> ${formatFileSize(optimizedFile.size)}.`
+          ? `Poza optimizată: ${formatFileSize(file.size)} -> ${formatFileSize(optimizedFile.size)}.`
           : "Poza adaugata."
       );
     } catch {
@@ -262,7 +262,7 @@ function SubmitProductPageContent() {
 
   async function handleAiExtract() {
     if (imageBusyField) {
-      setMessage("Asteapta cateva secunde pana se optimizeaza poza.");
+      setMessage("Așteaptă câteva secunde până se optimizează poza.");
       return;
     }
 
@@ -336,7 +336,7 @@ function SubmitProductPageContent() {
     }
 
     if (imageBusyField) {
-      setMessage("Asteapta cateva secunde pana se optimizeaza poza.");
+      setMessage("Așteaptă câteva secunde până se optimizează poza.");
       return;
     }
 
@@ -378,7 +378,7 @@ function SubmitProductPageContent() {
       if (!response.ok) {
         if (response.status === 409 && data.item) {
           setLastSubmittedItem(data.item);
-          setMessage(data.message || "Propunerea exista deja si este in verificare.");
+          setMessage(data.message || "Propunerea există deja și este în verificare.");
           return;
         }
 
@@ -386,7 +386,7 @@ function SubmitProductPageContent() {
       }
 
       setLastSubmittedItem(data.item || null);
-      setMessage("Produsul a fost trimis la verificare. Dupa aprobare primesti scanare bonus si pana la 10 CeCoins automat.");
+      setMessage("Produsul a fost trimis la verificare. După aprobare primești scanare bonus și până la 10 CeCoins automat.");
 
       setForm({
         productName: "",
@@ -426,7 +426,7 @@ function SubmitProductPageContent() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut verifica produsul cu AI.");
+        throw new Error(data.error || "Nu s-a putut verifică produsul cu AI.");
       }
 
       let details = `${data.message} Grad de verificare: ${data.confidence}/100.`;
@@ -545,7 +545,7 @@ function SubmitProductPageContent() {
               {lastSubmittedItem.product_name}
             </h2>
             <p className="mt-2 text-sm leading-6 text-gray-300">
-              Status: in verificare. Dupa aprobare apare in catalog, primesti scanare bonus si pana la 10 CeCoins automat.
+              Status: în verificare. După aprobare apare în catalog, primești scanare bonus și până la 10 CeCoins automat.
             </p>
             <Link
               href="/missions"
@@ -571,7 +571,7 @@ function SubmitProductPageContent() {
           </p>
 
           <div className="mt-5 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm leading-6 text-cyan-50">
-            Produsele acceptate primesc o scanare bonus si pana la {CATALOG_REWARD_COINS} CeCoins automat dupa aprobare. Verificam propunerile inainte sa
+            Produsele acceptate primesc o scanare bonus și până la {CATALOG_REWARD_COINS} CeCoins automat după aprobare. Verificăm propunerile înainte să
             ajungă în catalog, ca recomandările să rămână curate.
           </div>
 
@@ -886,7 +886,7 @@ function SubmitProductPageContent() {
                 ? "Se trimite produsul..."
                 : imageBusyField
                   ? "Optimizez poza..."
-                  : `Trimite la verificare - pana la ${CATALOG_REWARD_COINS} CeCoins dupa aprobare`}
+                  : `Trimite la verificare - până la ${CATALOG_REWARD_COINS} CeCoins după aprobare`}
             </button>
           </form>
         </div>
@@ -970,7 +970,7 @@ function SubmitProductPageContent() {
                         onClick={() => reviewWithAi(item.id)}
                         className="rounded-2xl border border-emerald-400/30 px-5 py-3 font-semibold text-emerald-300 hover:bg-emerald-400/10"
                       >
-                        Verifica automat
+                        Verifică automat
                       </button>
                     )}
 
@@ -979,7 +979,7 @@ function SubmitProductPageContent() {
                         onClick={() => approveSubmission(item.id)}
                         className="rounded-2xl bg-emerald-400 px-5 py-3 font-semibold text-black hover:bg-emerald-300"
                       >
-                        Publica produsul
+                        Publică produsul
                       </button>
                     )}
 
@@ -987,7 +987,7 @@ function SubmitProductPageContent() {
                       onClick={() => deleteSubmission(item.id)}
                       className="rounded-2xl border border-red-400/30 px-5 py-3 font-semibold text-red-300 hover:bg-red-400/10"
                     >
-                      Sterge
+                      Șterge
                     </button>
                   </div>
                 </div>

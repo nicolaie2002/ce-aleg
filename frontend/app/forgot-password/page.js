@@ -35,7 +35,7 @@ export default function ForgotPasswordPage() {
         throw new Error(data.error || pick("Nu am putut trimite cererea.", "We could not send the request."));
       }
 
-      setMessage(data.message || pick("Verifica emailul pentru linkul de resetare.", "Check your email for the reset link."));
+      setMessage(data.message || pick("Verifică emailul pentru linkul de resetare.", "Check your email for the reset link."));
       if (data.devResetLink) {
         setDevResetLink(data.devResetLink);
       }

@@ -1,14 +1,14 @@
 export const metadata = {
-  title: "Catalog Romania pentru scanare produse",
+  title: "Catalog România pentru scanare produse",
   description:
-    "Catalog public Ce aleg? pentru produse din Romania, magazine, categorii, scanare cod de bare si contributii ale comunitatii.",
+    "Catalog public Ce aleg? pentru produse din România, magazine, categorii, scanare cod de bare și contribuții ale comunității.",
   alternates: {
     canonical: "/catalog-romania",
   },
   openGraph: {
-    title: "Catalog Romania | Ce aleg?",
+    title: "Catalog România | Ce aleg?",
     description:
-      "Vezi cum creste catalogul Ce aleg? si foloseste paginile publice pentru magazine si categorii.",
+      "Vezi cum crește catalogul Ce aleg? și folosește paginile publice pentru magazine și categorii.",
     url: "/catalog-romania",
     images: ["/opengraph-image.png?v=20260623"],
   },

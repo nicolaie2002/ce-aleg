@@ -856,7 +856,7 @@ function validateAlternativeSearch(requestText) {
   }
 
   if (text.length < 4) {
-    return "Scrie putin mai clar ce cauti.";
+    return "Scrie puțin mai clar ce cauți.";
   }
 
   return "";
@@ -1421,7 +1421,7 @@ function AlternativesPageContent() {
 
           externalLookupWarning =
             externalData.message ||
-            "Open Food Facts nu a gasit suficiente variante pentru produsul scanat.";
+            "Open Food Facts nu a găsit suficiente variante pentru produsul scanat.";
         } catch (externalError) {
           externalLookupWarning = externalError.message;
         }
@@ -1431,7 +1431,7 @@ function AlternativesPageContent() {
         setErrorMessage("");
         setLookupNotice(
           externalLookupWarning ||
-            "Nu am gasit inca suficiente alternative externe pentru produsul scanat."
+            "Nu am găsit încă suficiente alternative externe pentru produsul scanat."
         );
         return;
       }

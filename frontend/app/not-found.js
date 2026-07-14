@@ -18,7 +18,7 @@ export default function NotFound() {
             404
           </p>
           <h1 className="mt-4 text-4xl font-black">
-            {pick("Pagina nu exista.", "This page does not exist.")}
+            {pick("Pagina nu există.", "This page does not exist.")}
           </h1>
           <p className="mt-4 leading-7 text-gray-300">
             {pick(

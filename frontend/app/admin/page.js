@@ -240,7 +240,7 @@ export default function AdminPage() {
     const data = await readApiJson(response);
     const reward = data.reward || {};
     const rewardText = response.ok && reward
-      ? ` Bonus: +${reward.bonusScans || 0} scanari, +${reward.coins || 0} CeCoins.`
+      ? ` Bonus: +${reward.bonusScans || 0} scanări, +${reward.coins || 0} CeCoins.`
       : "";
     setMessage(`${data.message || data.error || ""}${rewardText}`);
     await loadAdmin();
@@ -396,7 +396,7 @@ export default function AdminPage() {
   async function searchCatalogProducts(event) {
     event?.preventDefault();
     setCatalogSearchBusy(true);
-    setMessage("Caut produse in catalog...");
+    setMessage("Caut produse în catalog...");
 
     try {
       const params = new URLSearchParams({
@@ -407,15 +407,15 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Produsele nu au putut fi cautate.");
+        throw new Error(data.error || "Produsele nu au putut fi căutate.");
       }
 
       const items = Array.isArray(data) ? data : [];
       setCatalogResults(items);
       setProductEdit(items[0] ? productToEdit(items[0]) : null);
-      setMessage(items.length ? `Am gasit ${items.length} produse.` : "Nu am gasit produse pentru cautarea asta.");
+      setMessage(items.length ? `Am găsit ${items.length} produse.` : "Nu am găsit produse pentru căutarea asta.");
     } catch (error) {
-      setMessage(error.message || "Produsele nu au putut fi cautate.");
+      setMessage(error.message || "Produsele nu au putut fi căutate.");
     } finally {
       setCatalogSearchBusy(false);
     }
@@ -425,7 +425,7 @@ export default function AdminPage() {
     if (!productEdit?.id) return;
 
     setProductSaveBusy(true);
-    setMessage(recalculate ? "Salvez si recalculez produsul..." : "Salvez produsul...");
+    setMessage(recalculate ? "Salvez și recalculez produsul..." : "Salvez produsul...");
 
     try {
       const response = await fetch(`${API_URL}/admin/products/${productEdit.id}`, {
@@ -490,7 +490,7 @@ export default function AdminPage() {
     const query = String(product.barcode || product.name || "").trim();
 
     if (!query) {
-      setMessage("Raportarea nu are nume sau cod de bare pentru cautare.");
+      setMessage("Raportarea nu are nume sau cod de bare pentru căutare.");
       return;
     }
 
@@ -507,16 +507,16 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Produsul raportat nu a putut fi cautat.");
+        throw new Error(data.error || "Produsul raportat nu a putut fi căutat.");
       }
 
       const items = Array.isArray(data) ? data : [];
       setCatalogResults(items);
       setProductEdit(items[0] ? productToEdit(items[0]) : null);
-      setMessage(items.length ? `Am gasit ${items.length} produse pentru raportare.` : "Nu am gasit produsul raportat in catalog.");
+      setMessage(items.length ? `Am găsit ${items.length} produse pentru raportare.` : "Nu am găsit produsul raportat în catalog.");
       document.getElementById("catalog-editor")?.scrollIntoView({ behavior: "smooth", block: "start" });
     } catch (error) {
-      setMessage(error.message || "Produsul raportat nu a putut fi cautat.");
+      setMessage(error.message || "Produsul raportat nu a putut fi căutat.");
     } finally {
       setCatalogSearchBusy(false);
     }
@@ -635,7 +635,7 @@ export default function AdminPage() {
                 label="Produse raportate"
                 value={compactNumber(scanIssues.productReports)}
                 tone={scanIssues.productReports ? "warning" : "default"}
-                detail="Date, preturi, imagini sau scoruri semnalate din pagina de rezultat."
+                detail="Date, prețuri, imagini sau scoruri semnalate din pagina de rezultat."
               />
               <StatCard
                 icon={CreditCard}
@@ -850,7 +850,7 @@ export default function AdminPage() {
                     <AlertTriangle size={16} /> Produse raportate
                   </p>
                   <p className="mt-1 text-sm text-gray-400">
-                    Date gresite semnalate direct din pagina de rezultat.
+                    Date greșite semnalate direct din pagina de rezultat.
                   </p>
                 </div>
                 <EventPill tone={reportedProductReports.length ? "warning" : "default"}>
@@ -869,7 +869,7 @@ export default function AdminPage() {
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="font-black text-white">
-                              {product.name || product.barcode || "Produs fara nume"}
+                              {product.name || product.barcode || "Produs fără nume"}
                             </p>
                             <EventPill tone="warning">
                               {metadata.reasonLabel || metadata.reason || "raport"}
@@ -879,7 +879,7 @@ export default function AdminPage() {
                             {event.userEmail} · {formatDate(event.createdAt)} · {metadata.store || "-"}
                           </p>
                           <p className="mt-1 text-sm text-gray-500">
-                            {product.category || "fara categorie"} · {product.barcode || "fara barcode"} · scor {product.score || "-"}
+                            {product.category || "fără categorie"} · {product.barcode || "fără barcode"} · scor {product.score || "-"}
                           </p>
                           {metadata.details && (
                             <p className="mt-3 rounded-lg border border-yellow-300/15 bg-yellow-300/8 p-3 text-sm leading-6 text-yellow-50">
@@ -901,7 +901,7 @@ export default function AdminPage() {
                   );
                 })}
                 {!reportedProductReports.length && (
-                  <EmptyState>Nu exista produse raportate in intervalul selectat.</EmptyState>
+                  <EmptyState>Nu există produse raportate in intervalul selectat.</EmptyState>
                 )}
               </div>
             </div>
@@ -1037,7 +1037,7 @@ export default function AdminPage() {
               <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-wide text-gray-500">
                 <span>ID start {catalogPreview.minId || 1}</span>
                 <span>Ultimul ID {catalogPreview.lastScannedId || "-"}</span>
-                <span>{catalogPreview.hasMore ? "Mai exista batch-uri" : "Batch final"}</span>
+                <span>{catalogPreview.hasMore ? "Mai există batch-uri" : "Batch final"}</span>
               </div>
               <div className="mt-3 grid gap-2 lg:grid-cols-2">
                 {(catalogPreview.changes || []).slice(0, 8).map((item) => (
@@ -1061,12 +1061,12 @@ export default function AdminPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
-                  <Pencil size={16} /> Editare rapida produs
+                  <Pencil size={16} /> Editare rapidă produs
                 </p>
-                <h3 className="mt-2 text-xl font-black text-white">Corecteaza catalogul fara SQL</h3>
+                <h3 className="mt-2 text-xl font-black text-white">Corectează catalogul fără SQL</h3>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
-                  Cauta dupa nume, cod de bare, categorie sau magazin. Salveaza cu recalculare ca scorul,
-                  eticheta si motivul sa ramana aliniate cu taxonomia curenta.
+                  Caută după nume, cod de bare, categorie sau magazin. Salvează cu recalculare ca scorul,
+                  eticheta și motivul să ramana aliniate cu taxonomia curenta.
                 </p>
               </div>
               <form onSubmit={searchCatalogProducts} className="flex w-full flex-col gap-2 sm:flex-row lg:max-w-xl">
@@ -1082,7 +1082,7 @@ export default function AdminPage() {
                   className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
                 >
                   <Search size={16} />
-                  {catalogSearchBusy ? "Caut..." : "Cauta"}
+                  {catalogSearchBusy ? "Caut..." : "Caută"}
                 </button>
               </form>
             </div>
@@ -1102,13 +1102,13 @@ export default function AdminPage() {
                   >
                     <span className="block font-bold text-white">{product.name}</span>
                     <span className="mt-1 block text-xs text-gray-400">
-                      #{product.id} · {product.category || "fara categorie"} · {product.store || "fara magazin"}
+                      #{product.id} · {product.category || "fără categorie"} · {product.store || "fără magazin"}
                     </span>
-                    <span className="mt-1 block text-xs text-gray-500">{product.barcode || "fara barcode"}</span>
+                    <span className="mt-1 block text-xs text-gray-500">{product.barcode || "fără barcode"}</span>
                   </button>
                 ))}
                 {!catalogResults.length && (
-                  <EmptyState>Cauta un produs sau lasa campul gol pentru produse cu categoria Altele.</EmptyState>
+                  <EmptyState>Caută un produs sau lasă câmpul gol pentru produse cu categoria Altele.</EmptyState>
                 )}
               </div>
 
@@ -1148,7 +1148,7 @@ export default function AdminPage() {
                   </label>
                   {["calories", "protein", "sugar", "fat", "score"].map((field) => (
                     <label key={field} className="text-sm font-bold text-gray-300">
-                      {field === "calories" ? "Calorii" : field === "protein" ? "Proteina" : field === "sugar" ? "Zahar" : field === "fat" ? "Grasimi" : "Scor"}
+                      {field === "calories" ? "Calorii" : field === "protein" ? "Proteină" : field === "sugar" ? "Zahăr" : field === "fat" ? "Grăsimi" : "Scor"}
                       <input
                         value={productEdit[field]}
                         onChange={(event) => updateProductEdit(field, event.target.value)}
@@ -1178,7 +1178,7 @@ export default function AdminPage() {
                   <div className="flex flex-wrap gap-3 md:col-span-2">
                     {[
                       ["vegan", "Vegan"],
-                      ["lactoseFree", "Fara lactoza"],
+                      ["lactoseFree", "Fără lactoza"],
                       ["natural", "Natural"],
                     ].map(([field, label]) => (
                       <label key={field} className="inline-flex items-center gap-2 text-sm font-bold text-gray-300">
@@ -1202,7 +1202,7 @@ export default function AdminPage() {
                     <span>
                       Anunta utilizatorii care au scanat sau raportat produsul
                       <span className="mt-1 block text-xs font-semibold leading-5 text-cyan-100/75">
-                        Se trimite doar daca exista o modificare vizibila si fiecare utilizator are cooldown anti-dublare.
+                        Se trimite doar dacă există o modificare vizibilă și fiecare utilizator are cooldown anti-dublare.
                       </span>
                     </span>
                   </label>
@@ -1214,7 +1214,7 @@ export default function AdminPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-200 px-4 py-3 text-sm font-black text-black hover:bg-white disabled:opacity-60"
                     >
                       <RefreshCw size={16} />
-                      {productSaveBusy ? "Salvez..." : "Salveaza + recalculeaza"}
+                      {productSaveBusy ? "Salvez..." : "Salvează + recalculează"}
                     </button>
                     <button
                       type="button"
@@ -1223,7 +1223,7 @@ export default function AdminPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10 disabled:opacity-60"
                     >
                       <Save size={16} />
-                      Salveaza manual
+                      Salvează manual
                     </button>
                   </div>
                 </div>
@@ -1278,8 +1278,8 @@ export default function AdminPage() {
               </p>
               <h3 className="mt-2 text-xl font-black text-white">Digest saptamanal controlat</h3>
               <p className="mt-2 text-sm leading-6 text-gray-400">
-                Gaseste utilizatori cu misiuni peste 60% progres si trimite un email scurt
-                catre pagina /missions. Fiecare cont este protejat de cooldown de 6 zile.
+                Găsește utilizatori cu misiuni peste 60% progres și trimite un email scurt
+                către pagina /missions. Fiecare cont este protejat de cooldown de 6 zile.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -1327,12 +1327,12 @@ export default function AdminPage() {
                     </article>
                   ))}
                   {!(missionDigestPreview.recipients || []).length && (
-                    <p className="text-sm text-gray-400">Nu exista destinatari eligibili in batch-ul verificat.</p>
+                    <p className="text-sm text-gray-400">Nu există destinatari eligibili in batch-ul verificat.</p>
                   )}
                 </div>
               ) : (
                 <p className="mt-4 text-sm leading-6 text-gray-400">
-                  Ruleaza preview inainte de trimitere. Butonul de trimitere ramane blocat pana exista destinatari eligibili.
+                  Rulează preview înainte de trimitere. Butonul de trimitere rămâne blocat până există destinatari eligibili.
                 </p>
               )}
             </div>
@@ -1495,7 +1495,7 @@ export default function AdminPage() {
                       {item.brand || "Brand nespecificat"} - {item.store}
                     </p>
                     <p className="mt-2 text-xs font-bold text-gray-500">
-                      {item.barcode || "fara barcode"} - {item.category || "fara categorie"} - Kcal {item.calories ?? "-"} / Zahar {item.sugar ?? "-"}g
+                      {item.barcode || "fără barcode"} - {item.category || "fără categorie"} - Kcal {item.calories ?? "-"} / Zahăr {item.sugar ?? "-"}g
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1503,7 +1503,7 @@ export default function AdminPage() {
                       onClick={() => review(item.id)}
                       className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-3 py-2 text-sm font-bold hover:bg-white/10"
                     >
-                      <RefreshCw size={15} /> Verifica
+                      <RefreshCw size={15} /> Verifică
                     </button>
                     <button
                       onClick={() => approve(item.id)}
@@ -1514,7 +1514,7 @@ export default function AdminPage() {
                     </button>
                     <button
                       onClick={() => remove(item.id)}
-                      title="Sterge propunerea"
+                      title="Șterge propunerea"
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-red-400/30 text-red-300 hover:bg-red-400/10"
                     >
                       <Trash2 size={15} />
@@ -1524,7 +1524,7 @@ export default function AdminPage() {
               </article>
               );
             })}
-            {!sortedSubmissions.length && <EmptyState>Nu exista propuneri de verificat.</EmptyState>}
+            {!sortedSubmissions.length && <EmptyState>Nu există propuneri de verificat.</EmptyState>}
           </div>
         </section>
 

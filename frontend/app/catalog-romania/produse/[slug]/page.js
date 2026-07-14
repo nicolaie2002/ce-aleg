@@ -33,8 +33,8 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${product.name}: scor, eticheta si alternative`,
-    description: `${product.intro} Vezi ce merita verificat, alternative si cum il scanezi in Ce aleg?.`,
+    title: `${product.name}: scor, eticheta și alternative`,
+    description: `${product.intro} Vezi ce merită verificat, alternative și cum îl scanezi în Ce aleg?.`,
     alternates: {
       canonical: `/catalog-romania/produse/${product.slug}`,
     },
@@ -81,8 +81,8 @@ export default async function CatalogProductPage({ params }) {
     <>
       <JsonLd
         data={buildBreadcrumbJsonLd([
-          { name: "Acasa", href: "/" },
-          { name: "Catalog Romania", href: "/catalog-romania" },
+          { name: "Acasă", href: "/" },
+          { name: "Catalog România", href: "/catalog-romania" },
           { name: "Produse", href: "/catalog-romania/produse" },
           { name: product.name, href: `/catalog-romania/produse/${product.slug}` },
         ])}
@@ -90,7 +90,7 @@ export default async function CatalogProductPage({ params }) {
       <JsonLd data={productJsonLd} />
       <CatalogSeoLayout
         eyebrow="Pagina produs"
-        title={`${product.name}: ce verifici inainte sa il cumperi.`}
+        title={`${product.name}: ce verifici înainte să îl cumperi.`}
         description={product.intro}
         image={product.image}
         imageAlt={product.name}
@@ -106,8 +106,8 @@ export default async function CatalogProductPage({ params }) {
 
           <SeoSection
             icon={Search}
-            title="Ce merita urmarit pe eticheta"
-            description="Paginile publice nu inlocuiesc eticheta reala. Scaneaza produsul cand esti la raft pentru datele cele mai utile."
+            title="Ce merită urmărit pe etichetă"
+            description="Paginile publice nu înlocuiesc eticheta reală. Scanează produsul când ești la raft pentru datele cele mai utile."
           >
             <PillGrid items={product.nutrients} />
           </SeoSection>
@@ -116,13 +116,13 @@ export default async function CatalogProductPage({ params }) {
         <SeoSection
           icon={Barcode}
           title="Flow recomandat"
-          description="Daca produsul exista in catalog, primesti verdict si alternative. Daca lipseste, flow-ul de produs negasit ajuta comunitatea."
+          description="Dacă produsul există în catalog, primești verdict și alternative. Dacă lipsește, flow-ul de produs negăsit ajută comunitatea."
         >
           <StepList
             items={[
-              "Scaneaza codul de bare sau cauta produsul dupa nume.",
-              "Compara scorul cu produse similare din aceeasi categorie.",
-              "Cand produsul lipseste, confirma codul si trimite pozele pentru verificare.",
+              "Scanează codul de bare sau caută produsul după nume.",
+              "Compară scorul cu produse similare din aceeași categorie.",
+              "Când produsul lipsește, confirmă codul și trimite pozele pentru verificare.",
             ]}
           />
         </SeoSection>
@@ -130,7 +130,7 @@ export default async function CatalogProductPage({ params }) {
         <SeoSection
           icon={Database}
           title="Alternative apropiate"
-          description="Aceste exemple ajuta utilizatorul sa inteleaga ce poate compara in aplicatie."
+          description="Aceste exemple ajută utilizatorul să înțeleagă ce poate compara în aplicație."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {alternatives.map((alternative) => (
@@ -142,8 +142,8 @@ export default async function CatalogProductPage({ params }) {
         {category ? (
           <SeoSection
             icon={Store}
-            title={`Magazine si categorie pentru ${product.name}`}
-            description={`Produsul este legat de categoria ${category.name}. Linkurile ajuta navigarea si indexarea organica.`}
+            title={`Magazine și categorie pentru ${product.name}`}
+            description={`Produsul este legat de categoria ${category.name}. Linkurile ajută navigarea și indexarea organică.`}
           >
             <CategoryStoreLinks stores={stores} />
           </SeoSection>
@@ -152,7 +152,7 @@ export default async function CatalogProductPage({ params }) {
         <SeoSection
           icon={Search}
           title="Semnale de atentie"
-          description="Nu toate variantele aceluiasi produs sunt identice. Verifica ambalajul real."
+          description="Nu toate variantele aceluiași produs sunt identice. Verifică ambalajul real."
         >
           <PillGrid items={product.watchOut} />
         </SeoSection>

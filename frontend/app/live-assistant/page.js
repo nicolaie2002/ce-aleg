@@ -364,7 +364,7 @@ export default function LiveAssistantPage() {
 
     if (data.code === "scan_limit_reached") {
       setBillingGate(data);
-      setMessage(data.error || pick("Limita gratuita a fost atinsa.", "The free scan limit has been reached."));
+      setMessage(data.error || pick("Limita gratuită a fost atinsă.", "The free scan limit has been reached."));
       return;
     }
 
@@ -378,7 +378,7 @@ export default function LiveAssistantPage() {
     setMessage(
       data.message ||
         pick(
-          "Am citit un cod, dar nu am gasit produsul. Reincadrez camera si incerc din nou.",
+          "Am citit un cod, dar nu am găsit produsul. Reîncadrez camera și încerc din nou.",
           "I read a code, but could not find the product. I will keep looking."
         )
     );
@@ -423,7 +423,7 @@ export default function LiveAssistantPage() {
 
       if (data.code === "scan_limit_reached") {
         setBillingGate(data);
-        setMessage(data.error || pick("Limita gratuita a fost atinsa.", "The free scan limit has been reached."));
+        setMessage(data.error || pick("Limita gratuită a fost atinsă.", "The free scan limit has been reached."));
         return;
       }
 
@@ -553,7 +553,7 @@ export default function LiveAssistantPage() {
     recognition.onstart = () => {
       setIsListening(true);
       setMessage(pick(
-        "Te ascult. Spune ce alternativa vrei.",
+        "Te ascult. Spune ce alternativă vrei.",
         "Listening. Say what alternative you want."
       ));
     };
@@ -729,7 +729,7 @@ export default function LiveAssistantPage() {
                 <p className="font-bold text-yellow-200">
                   {billingGate.code === "paid_plan_required"
                     ? pick("AI vizual în curând pentru Pro și Family", "AI visual coming soon for Pro and Family")
-                    : pick("Limita gratuita a fost atinsa", "Free limit reached")}
+                    : pick("Limita gratuită a fost atinsă", "Free limit reached")}
                 </p>
                 <p className="mt-2">
                   {billingGate.code === "paid_plan_required"

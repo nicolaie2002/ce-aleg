@@ -27,7 +27,7 @@ export default function ErrorPage({ error, reset }) {
           </h1>
           <p className="mt-4 leading-7 text-red-50/80">
             {pick(
-              "Datele tale sunt in siguranta. Daca problema persista, contacteaza suportul.",
+              "Datele tale sunt în siguranță. Dacă problema persistă, contactează suportul.",
               "Your data is safe. If the problem continues, contact support."
             )}
           </p>

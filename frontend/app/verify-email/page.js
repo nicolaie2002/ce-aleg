@@ -25,7 +25,7 @@ function VerifyEmailContent() {
     async function verifyEmail() {
       if (!token) {
         setStatus("error");
-        setMessage(pick("Linkul de confirmare lipseste.", "The confirmation link is missing."));
+        setMessage(pick("Linkul de confirmare lipsește.", "The confirmation link is missing."));
         return;
       }
 

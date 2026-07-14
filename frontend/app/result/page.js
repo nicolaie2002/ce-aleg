@@ -51,7 +51,7 @@ const emptyScannedProduct = {
   protein: null,
   sugar: null,
   fat: null,
-  verdict: "Produs analizat pe baza informațiilor disponibile.",
+  verdict: "Produs analizat pe bază informațiilor disponibile.",
   shortAdvice: "Produsul poate fi comparat cu alternative din aceeași categorie.",
 };
 
@@ -197,7 +197,7 @@ function ResultPageContent() {
   if (!preferencesReady) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">Se incarca rezultatul...</p>
+        <p className="text-gray-300">Se încarcă rezultatul...</p>
       </main>
     );
   }
@@ -208,7 +208,7 @@ function ResultPageContent() {
         <AppHeader actionHref="/barcode-scan" actionLabel="Scanează produs" />
         <section className="ce-shell-sm ce-page">
           <div className="rounded-3xl border border-white/10 bg-black/30 p-8 text-center shadow-2xl">
-            <h1 className="text-3xl font-black">Nu exista un rezultat de afisat.</h1>
+            <h1 className="text-3xl font-black">Nu există un rezultat de afișat.</h1>
             <p className="mt-3 text-gray-300">
               Scanează sau caută un produs ca să vezi analiza și alternativele.
             </p>

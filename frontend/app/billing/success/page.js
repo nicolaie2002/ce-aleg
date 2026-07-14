@@ -45,18 +45,18 @@ export default function BillingSuccessPage() {
             {pick("Plata confirmata", "Payment confirmed")}
           </p>
           <h1 className="mt-4 text-4xl font-black">
-            {pick("Abonamentul tau este pregatit.", "Your subscription is ready.")}
+            {pick("Abonamentul tău este pregătit.", "Your subscription is ready.")}
           </h1>
           <p className="mt-4 leading-7 text-cyan-50/85">
             {isLoading
               ? pick(
-                  "Sincronizam confirmarea de la Stripe. Dureaza doar cateva secunde.",
+                  "Sincronizam confirmarea de la Stripe. Dureaza doar câteva secunde.",
                   "We are syncing the Stripe confirmation. This only takes a few seconds."
                 )
               : plan
                 ? pick(`Plan activ: ${plan.toUpperCase()}.`, `Active plan: ${plan.toUpperCase()}.`)
                 : pick(
-                    "Stripe a confirmat plata. Daca planul nu apare imediat, reincarca dashboard-ul in cateva secunde.",
+                    "Stripe a confirmat plata. Dacă planul nu apare imediat, reîncarcă dashboard-ul in câteva secunde.",
                     "Stripe confirmed the payment. If the plan does not appear immediately, refresh the dashboard in a few seconds."
                   )}
           </p>

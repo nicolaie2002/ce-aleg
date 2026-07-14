@@ -67,7 +67,7 @@ export default function LoginPage() {
       if (!sessionResponse.ok) {
         throw new Error(
           pick(
-            "Sesiunea nu a fost salvata corect. Reincearca dupa refresh.",
+            "Sesiunea nu a fost salvată corect. Reîncearcă după refresh.",
             "The session was not saved correctly. Refresh and try again."
           )
         );

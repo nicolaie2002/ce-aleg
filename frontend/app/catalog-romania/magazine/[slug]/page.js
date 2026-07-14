@@ -30,13 +30,13 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${store.name}: scanare produse si catalog Romania`,
-    description: `${store.intro} Scaneaza coduri de bare, compara alternative si contribuie cu produse lipsa.`,
+    title: `${store.name}: scanare produse și catalog România`,
+    description: `${store.intro} Scanează coduri de bare, compară alternative și contribuie cu produse lipsă.`,
     alternates: {
       canonical: `/catalog-romania/magazine/${store.slug}`,
     },
     openGraph: {
-      title: `${store.name} | Catalog Romania Ce aleg?`,
+      title: `${store.name} | Catalog România Ce aleg?`,
       description: store.intro,
       url: `/catalog-romania/magazine/${store.slug}`,
       images: [store.logo],
@@ -57,7 +57,7 @@ export default async function CatalogStorePage({ params }) {
   const storeJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebPage",
-    name: `${store.name} in catalogul Ce aleg?`,
+    name: `${store.name} în catalogul Ce aleg?`,
     url: pageUrl,
     description: store.intro,
     about: {
@@ -75,8 +75,8 @@ export default async function CatalogStorePage({ params }) {
     <>
       <JsonLd
         data={buildBreadcrumbJsonLd([
-          { name: "Acasa", href: "/" },
-          { name: "Catalog Romania", href: "/catalog-romania" },
+          { name: "Acasă", href: "/" },
+          { name: "Catalog România", href: "/catalog-romania" },
           { name: "Magazine", href: "/catalog-romania/magazine" },
           { name: store.name, href: `/catalog-romania/magazine/${store.slug}` },
         ])}
@@ -84,16 +84,16 @@ export default async function CatalogStorePage({ params }) {
       <JsonLd data={storeJsonLd} />
       <CatalogSeoLayout
         eyebrow="Ghid magazin"
-        title={`${store.name}: scaneaza produse si compara alternative.`}
+        title={`${store.name}: scanează produse și compară alternative.`}
         description={store.intro}
         image={store.logo}
-        imageAlt={`${store.name} in catalogul Ce aleg?`}
+        imageAlt={`${store.name} în catalogul Ce aleg?`}
       >
         <div className="grid gap-5 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <SeoSection
             icon={Store}
             title="Pentru ce e util"
-            description="Pagina nu inlocuieste catalogul live, ci explica modul de folosire si trimite catre scanare."
+            description="Pagina nu înlocuiește catalogul live, ci explică modul de folosire și trimite către scanare."
           >
             <PillGrid items={[store.shopperIntent]} />
           </SeoSection>
@@ -101,7 +101,7 @@ export default async function CatalogStorePage({ params }) {
           <SeoSection
             icon={Search}
             title="Ce verifici la raft"
-            description="Cand produsul lipseste, flow-ul de contributie ajuta catalogul sa creasca organic."
+            description="Când produsul lipsește, flow-ul de contribuție ajută catalogul să crească organic."
           >
             <PillGrid items={store.checks} tone="emerald" />
           </SeoSection>
@@ -109,22 +109,22 @@ export default async function CatalogStorePage({ params }) {
 
         <SeoSection
           icon={Barcode}
-          title={`Cum folosesti Ce aleg? in ${store.name}`}
-          description="Un flow simplu pentru telefon: alegi magazinul, scanezi, compari si contribui cand produsul lipseste."
+          title={`Cum folosești Ce aleg? în ${store.name}`}
+          description="Un flow simplu pentru telefon: alegi magazinul, scanezi, compari și contribui când produsul lipsește."
         >
           <StepList
             items={[
-              `Alege ${store.name} in modul La magazin sau intra direct in scanner.`,
-              "Scaneaza codul de bare si verifica verdictul produsului.",
-              "Daca produsul nu exista, confirma codul si trimite pozele pentru verificare.",
+              `Alege ${store.name} în modul La magazin sau intră direct în scanner.`,
+              "Scanează codul de bare și verifică verdictul produsului.",
+              "Dacă produsul nu există, confirmă codul și trimite pozele pentru verificare.",
             ]}
           />
         </SeoSection>
 
         <SeoSection
           icon={Database}
-          title={`Categorii utile in ${store.name}`}
-          description="Aceste legaturi interne ajuta paginile sa fie mai clare pentru Google si mai rapide pentru utilizatori."
+          title={`Categorii utile în ${store.name}`}
+          description="Aceste legături interne ajută paginile să fie mai clare pentru Google și mai rapide pentru utilizatori."
         >
           <StoreCategoryLinks categories={categories} />
         </SeoSection>

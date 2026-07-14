@@ -54,7 +54,7 @@ export function CookieConsentBanner() {
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">
                 {pick(
-                  "Folosim cookie-uri optionale doar daca accepti, pentru statistici, erori si masurarea reclamelor. Poti continua fara tracking.",
+                  "Folosim cookie-uri opționale doar dacă accepți, pentru statistici, erori și măsurarea reclamelor. Poți continua fără tracking.",
                   "We use optional cookies only if you accept, for analytics, errors and ad measurement. You can continue without tracking."
                 )}{" "}
                 <Link href="/privacy" className="font-bold text-cyan-200 hover:text-foreground">

@@ -71,7 +71,7 @@ export default function RegisterPage() {
       setSuccessMessage(
         data.message ||
           pick(
-            "Cont creat. Verifica emailul ca sa il activezi.",
+            "Cont creat. Verifică emailul ca să îl activezi.",
             "Account created. Check your email to activate it."
           )
       );

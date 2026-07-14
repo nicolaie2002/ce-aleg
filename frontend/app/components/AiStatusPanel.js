@@ -56,7 +56,7 @@ export function AiStatusPanel({ compact = false }) {
               Asistent de cumpărături
             </p>
             <h2 className="mt-1 text-xl font-bold text-white">
-              Totul este pregatit pentru scanare
+              Totul este pregătit pentru scanare
             </h2>
           </div>
         )}

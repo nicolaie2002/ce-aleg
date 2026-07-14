@@ -20,11 +20,11 @@ const fallbackPlans = {
     monthlyScanLimit: 5,
     weeklyScanLimit: 5,
     features: [
-      "5 scanari pe luna",
+      "5 scanări pe lună",
       "2 alternative pentru fiecare produs",
-      "scanare cod de bare si cautare manuala",
+      "scanare cod de bare și căutare manuală",
       "verdict rapid",
-      "istoric de baza",
+      "istoric de bază",
     ],
   },
   pro: {
@@ -33,12 +33,12 @@ const fallbackPlans = {
     yearlyPrice: 149,
     weeklyScanLimit: null,
     features: [
-      "scanari nelimitate",
-      "3 alternative initiale plus afiseaza mai multe",
-      "cautare dupa preferintele tale",
+      "scanări nelimitate",
+      "3 alternative inițiale plus afișează mai multe",
+      "căutare după preferințele tale",
       "istoric complet",
-      "cos si favorite salvate",
-      "asistent vizual AI in curand",
+      "coș și favorite salvate",
+      "asistent vizual AI în curând",
     ],
   },
   family: {
@@ -47,15 +47,15 @@ const fallbackPlans = {
     yearlyPrice: 249,
     weeklyScanLimit: null,
     features: [
-      "scanari nelimitate",
-      "3 alternative initiale plus afiseaza mai multe",
-      "cautare dupa preferintele tale",
+      "scanări nelimitate",
+      "3 alternative inițiale plus afișează mai multe",
+      "căutare după preferințele tale",
       "istoric complet",
-      "cos si favorite salvate",
+      "coș și favorite salvate",
       "profiluri pentru familie",
-      "preferinte separate pe profil",
-      "cos separat pentru fiecare profil",
-      "asistent vizual AI in curand",
+      "preferințe separate pe profil",
+      "coș separat pentru fiecare profil",
+      "asistent vizual AI în curând",
     ],
   },
 };
@@ -69,7 +69,7 @@ const fallbackCoinPacks = [
     configured: false,
     image: "/brand/Bronze.webp",
     icon: "/brand/Bronze_icon.webp",
-    descriptionRo: "Pentru cateva scanari bonus si recompense rapide.",
+    descriptionRo: "Pentru câteva scanări bonus și recompense rapide.",
     descriptionEn: "For a few bonus scans and quick rewards.",
   },
   {
@@ -80,7 +80,7 @@ const fallbackCoinPacks = [
     configured: false,
     image: "/brand/Gold.webp",
     icon: "/brand/Gold_icon.webp",
-    descriptionRo: "Mai multe puncte pentru saptamanile cu multe cumparaturi.",
+    descriptionRo: "Mai multe puncte pentru săptămânile cu multe cumpărături.",
     descriptionEn: "More points for weeks with heavier shopping.",
   },
   {
@@ -91,7 +91,7 @@ const fallbackCoinPacks = [
     configured: false,
     image: "/brand/Diamond.webp",
     icon: "/brand/Diamond_icon.webp",
-    descriptionRo: "Cel mai bun pachet pentru scanari bonus si activari dese.",
+    descriptionRo: "Cel mai bun pachet pentru scanări bonus și activări dese.",
     descriptionEn: "The best pack for bonus scans and frequent unlocks.",
   },
 ];
@@ -130,7 +130,7 @@ const featureLabels = {
     ro: "2 alternative pentru fiecare produs",
     en: "2 alternatives for each product",
   },
-  "scanare cod de bare si cautare manuala": {
+  "scanare cod de bare și căutare manuală": {
     ro: "scanare cod de bare și căutare manuală",
     en: "barcode scanning and manual search",
   },
@@ -138,15 +138,15 @@ const featureLabels = {
     ro: "verdict rapid pentru produs",
     en: "quick product verdict",
   },
-  "istoric de baza": {
+  "istoric de bază": {
     ro: "istoric de bază",
     en: "basic history",
   },
-  "verdict rapid si istoric de baza": {
+  "verdict rapid și istoric de bază": {
     ro: "verdict rapid și istoric de bază",
     en: "quick verdict and basic history",
   },
-  "scanari nelimitate": {
+  "scanări nelimitate": {
     ro: "scanări nelimitate",
     en: "unlimited scans",
   },
@@ -162,19 +162,19 @@ const featureLabels = {
     ro: "asistent vizual AI în curând",
     en: "AI visual assistant coming soon",
   },
-  "asistent vizual AI in curand": {
+  "asistent vizual AI în curând": {
     ro: "asistent vizual AI în curând",
     en: "AI visual assistant coming soon",
   },
-  "3 alternative initiale plus afiseaza mai multe": {
+  "3 alternative inițiale plus afișează mai multe": {
     ro: "3 alternative inițiale + afișează mai multe",
     en: "3 instant alternatives + show more",
   },
-  "3 alternative imediat + afiseaza mai multe": {
+  "3 alternative imediat + afișează mai multe": {
     ro: "3 alternative inițiale + afișează mai multe",
     en: "3 instant alternatives + show more",
   },
-  "cautare dupa preferintele tale": {
+  "căutare după preferințele tale": {
     ro: "căutare după preferințele tale",
     en: "search by your preferences",
   },
@@ -182,7 +182,7 @@ const featureLabels = {
     ro: "istoric complet",
     en: "full history",
   },
-  "cos si favorite salvate": {
+  "coș și favorite salvate": {
     ro: "coș și favorite salvate",
     en: "saved cart and favorites",
   },
@@ -198,26 +198,44 @@ const featureLabels = {
     ro: "profiluri pentru familie",
     en: "family profiles",
   },
-  "preferinte separate pe profil": {
+  "preferințe separate pe profil": {
     ro: "preferințe separate pe profil",
     en: "separate preferences per profile",
   },
-  "cos separat pentru fiecare profil": {
+  "coș separat pentru fiecare profil": {
     ro: "coș separat pentru fiecare profil",
     en: "separate cart for each profile",
   },
-  "preferinte separate": {
+  "preferințe separate": {
     ro: "preferințe separate",
     en: "separate preferences",
   },
-  "liste comune de cumparaturi": {
+  "liste comune de cumpărături": {
     ro: "liste comune de cumpărături",
     en: "shared shopping lists",
   },
 };
 
+function normalizeFeatureKey(feature) {
+  return String(feature || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
+const normalizedFeatureLabels = Object.fromEntries(
+  Object.entries(featureLabels).map(([feature, label]) => [
+    normalizeFeatureKey(feature),
+    label,
+  ])
+);
+
 function getFeatureLabel(feature, locale) {
-  return featureLabels[feature]?.[locale] || feature;
+  return (
+    featureLabels[feature]?.[locale] ||
+    normalizedFeatureLabels[normalizeFeatureKey(feature)]?.[locale] ||
+    feature
+  );
 }
 
 function formatBillingDate(dateString, locale) {
@@ -384,7 +402,7 @@ export default function PricingPage() {
               ...pack,
               descriptionRo:
                 fallbackCoinPacks.find((fallbackPack) => fallbackPack.id === pack.id)?.descriptionRo ||
-                "CeCoins pentru bonusuri si activari in aplicatie.",
+                "CeCoins pentru bonusuri și activări în aplicație.",
               descriptionEn:
                 fallbackCoinPacks.find((fallbackPack) => fallbackPack.id === pack.id)?.descriptionEn ||
                 "CeCoins for bonuses and in-app unlocks.",

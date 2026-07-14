@@ -7,8 +7,8 @@ export function ConfirmModal({
   isOpen,
   title,
   message,
-  confirmLabel = "Confirma",
-  cancelLabel = "Anuleaza",
+  confirmLabel = "Confirmă",
+  cancelLabel = "Anulează",
   onCancel,
   onConfirm,
 }) {

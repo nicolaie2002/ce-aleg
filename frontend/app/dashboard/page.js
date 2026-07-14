@@ -71,7 +71,7 @@ const FamilyProfiles = dynamic(
     ssr: false,
     loading: () => (
       <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm font-bold text-gray-300">
-        Se incarca profilurile familiei...
+        Se încarcă profilurile familiei...
       </div>
     ),
   }
@@ -368,7 +368,7 @@ export default function DashboardPage() {
       setDeleteRequestNotice(
         data.sent
           ? pick(
-              `Am trimis confirmarea la ${data.email}. Contul nu se sterge pana nu confirmi din email.`,
+              `Am trimis confirmarea la ${data.email}. Contul nu se șterge până nu confirmi din email.`,
               `We sent the confirmation to ${data.email}. The account is not deleted until you confirm by email.`
             )
           : data.message || pick("Verifică emailul pentru confirmare.", "Check your email to confirm.")
@@ -511,7 +511,7 @@ export default function DashboardPage() {
         href: "/missions",
         title: pick("Revendica CeCoins", "Claim CeCoins"),
         description: pick(
-          `${readyMissionCount} misiuni sunt gata. Intra si revendica recompensa.`,
+          `${readyMissionCount} misiuni sunt gata. Intră și revendica recompensa.`,
           `${readyMissionCount} missions are ready. Open them and claim your reward.`
         ),
         icon: Trophy,
@@ -520,9 +520,9 @@ export default function DashboardPage() {
       }
     : {
         href: "/barcode-scan",
-        title: pick("Scaneaza urmatorul produs", "Scan the next product"),
+        title: pick("Scanează urmatorul produs", "Scan the next product"),
         description: pick(
-          "Camera, codul de bare si produsul negasit sunt pregatite pentru mobil.",
+          "Camera, codul de bare și produsul negăsit sunt pregătite pentru mobil.",
           "Camera, barcode and missing-product flow are ready for mobile."
         ),
         icon: Barcode,
@@ -1033,7 +1033,7 @@ export default function DashboardPage() {
                 {pick("Acțiuni rapide", "Quick actions")}
               </p>
               <h2 className="mt-1 text-2xl font-black">
-                {pick("Ce vrei sa faci acum?", "What do you want to do now?")}
+                {pick("Ce vrei să faci acum?", "What do you want to do now?")}
               </h2>
             </div>
             <p className="max-w-xl text-sm leading-6 text-gray-400">
@@ -1163,14 +1163,14 @@ export default function DashboardPage() {
             className="flex min-h-14 flex-col items-center justify-center rounded-xl bg-emerald-400 px-2 py-2 text-xs font-black text-black"
           >
             <Barcode size={19} />
-            <span className="mt-1">Scaneaza</span>
+            <span className="mt-1">Scanează</span>
           </Link>
           <Link
             href="/store"
             className="flex min-h-14 flex-col items-center justify-center rounded-xl border border-cyan-300/25 px-2 py-2 text-xs font-black text-cyan-100"
           >
             <ScanLine size={19} />
-            <span className="mt-1">Cauta</span>
+            <span className="mt-1">Caută</span>
           </Link>
           <Link
             href="/missions"

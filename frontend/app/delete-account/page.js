@@ -100,7 +100,7 @@ export default function DeleteAccountPage() {
               {!token && (
                 <div className="mt-6 rounded-lg border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-100">
                   {pick(
-                    "Linkul de confirmare lipseste. Deschide linkul primit pe email.",
+                    "Linkul de confirmare lipsește. Deschide linkul primit pe email.",
                     "The confirmation link is missing. Open the link received by email."
                   )}
                 </div>

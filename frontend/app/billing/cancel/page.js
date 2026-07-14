@@ -18,11 +18,11 @@ export default function BillingCancelPage() {
             {pick("Plata a fost anulata", "Payment was cancelled")}
           </p>
           <h1 className="mt-4 text-4xl font-black">
-            {pick("Poti alege planul oricand esti pregatit.", "You can choose a plan whenever you are ready.")}
+            {pick("Poți alege planul oricând ești pregătit.", "You can choose a plan whenever you are ready.")}
           </h1>
           <p className="mt-4 leading-7 text-gray-300">
             {pick(
-              "Contul tau ramane neschimbat. Poti continua pe Free sau poti incerca din nou plata.",
+              "Contul tău rămâne neschimbat. Poți continua pe Free sau poți încerca din nou plata.",
               "Your account stays unchanged. You can continue on Free or try checkout again."
             )}
           </p>

@@ -249,7 +249,7 @@ function pulseScannerFeedback() {
   try {
     navigator?.vibrate?.(28);
   } catch {
-    // Haptics are optional and unsupported on many desktop browsers.
+    // Haptics are opțional and unsupported on many desktop browsers.
   }
 }
 
@@ -836,7 +836,7 @@ export default function BarcodeScanPage() {
       source,
       detectedAt: now,
     });
-    setScanStatus("Cod citit. Verifica cifrele inainte sa caut produsul.");
+    setScanStatus("Cod citit. Verifică cifrele înainte să caut produsul.");
     stopScanner();
     return "confirmed";
   }
@@ -1426,8 +1426,8 @@ export default function BarcodeScanPage() {
 
   function editPendingBarcode() {
     setPendingBarcodeConfirmation(null);
-    setMessage("Corecteaza codul din campul manual, apoi apasa Cauta produsul.");
-    setScanStatus("Verifica cifrele tiparite sub codul de bare.");
+    setMessage("Corectează codul din câmpul manual, apoi apasă Caută produsul.");
+    setScanStatus("Verifică cifrele tipărite sub codul de bare.");
     detectedRef.current = false;
   }
 
@@ -1544,14 +1544,14 @@ export default function BarcodeScanPage() {
         "external_catalog_unavailable",
       ].includes(lookupIssue));
   const mobileStatusTitle = pendingBarcodeConfirmation
-    ? "Confirma codul"
+    ? "Confirmă codul"
     : foundProduct
-      ? "Produs gasit"
+      ? "Produs găsit"
       : hasMissingProductPrompt
         ? "Produs nou"
         : isScanning
           ? "Camera pornita"
-          : "Scanner pregatit";
+          : "Scanner pregătit";
   const mobileStatusDetail =
     pendingBarcodeConfirmation?.barcode ||
     foundProduct?.name ||
@@ -1610,7 +1610,7 @@ export default function BarcodeScanPage() {
                 ))}
               </select>
               <p className="text-sm leading-6 text-gray-300">
-                Folosim magazinul pentru preturi si produse lipsa.
+                Folosim magazinul pentru prețuri și produse lipsă.
               </p>
             </div>
           </div>
@@ -1685,13 +1685,13 @@ export default function BarcodeScanPage() {
               className="mt-4 scroll-mt-4 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-4 sm:scroll-mt-6"
             >
               <p className="text-sm font-black uppercase tracking-wide text-yellow-100">
-                Verifica codul citit
+                Verifică codul citit
               </p>
               <code className="mt-3 block rounded-xl border border-yellow-300/25 bg-black/40 px-3 py-3 text-center font-mono text-xl font-black tracking-[0.12em] text-white sm:text-2xl sm:tracking-[0.16em]">
                 {pendingBarcodeConfirmation.barcode}
               </code>
               <p className="mt-3 text-sm leading-6 text-gray-300">
-                Compara cifrele cu cele tiparite sub codul de bare. Caut produsul doar dupa confirmarea ta.
+                Compară cifrele cu cele tipărite sub codul de bare. Caut produsul doar după confirmarea ta.
               </p>
               <div className="mt-4 grid gap-3 sm:grid-cols-3">
                 <button
@@ -1700,7 +1700,7 @@ export default function BarcodeScanPage() {
                   disabled={isLookingUp}
                   className="rounded-2xl bg-yellow-300 px-5 py-3 font-semibold text-black hover:bg-yellow-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {isLookingUp ? "Caut..." : "Da, cauta produsul"}
+                  {isLookingUp ? "Caut..." : "Da, caută produsul"}
                 </button>
                 <button
                   type="button"
@@ -1806,7 +1806,7 @@ export default function BarcodeScanPage() {
           {billingGate && (
             <div className="mt-6 rounded-2xl border border-yellow-300/30 bg-yellow-300/10 p-5 text-yellow-100">
               <h2 className="text-xl font-black text-yellow-200">
-                Limita gratuita a fost atinsa
+                Limita gratuită a fost atinsă
               </h2>
               <p className="mt-2 text-sm leading-6">
                 Ai folosit {billingGate.usage?.monthlyScansUsed ?? billingGate.usage?.weeklyScansUsed ?? 0}/
@@ -2012,7 +2012,7 @@ export default function BarcodeScanPage() {
                   : "Dacă produsul nu apare în catalog, îl poți trimite ca propunere. Mai întâi confirmă că am citit corect codul de bare, apoi faci pozele și îl trimiți la verificare."}
               </p>
               <p className="mt-3 rounded-xl border border-yellow-300/25 bg-black/25 px-4 py-3 text-sm font-bold text-yellow-50">
-                Dupa aprobare primesti scanare bonus si pana la 10 CeCoins automat.
+                După aprobare primești scanare bonus și până la 10 CeCoins automat.
               </p>
 
               {missingBarcodeCandidate ? (
@@ -2082,7 +2082,7 @@ export default function BarcodeScanPage() {
               disabled={isLookingUp}
               className="shrink-0 rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {isLookingUp ? "Caut..." : "Confirma"}
+              {isLookingUp ? "Caut..." : "Confirmă"}
             </button>
           ) : foundProduct ? (
             <button
@@ -2097,7 +2097,7 @@ export default function BarcodeScanPage() {
               href={buildSubmitProductLink(Boolean(missingBarcodeCandidate))}
               className="shrink-0 rounded-xl bg-yellow-300 px-4 py-3 text-sm font-black text-black"
             >
-              Adauga
+              Adaugă
             </Link>
           ) : (
             <button
@@ -2109,7 +2109,7 @@ export default function BarcodeScanPage() {
                   : "bg-emerald-400 text-black"
               }`}
             >
-              {isScanning ? "Opreste" : "Scaneaza"}
+              {isScanning ? "Oprește" : "Scanează"}
             </button>
           )}
         </div>

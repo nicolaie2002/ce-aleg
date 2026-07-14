@@ -307,7 +307,7 @@ export default function CatalogRomaniaPage() {
               </h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
                 {pick(
-                  "Le poti distribui in grupuri sau lasa pentru Google: magazine si categorii unde explicam ce se poate scana si cum creste catalogul.",
+                  "Le poți distribui în grupuri sau lăsa pentru Google: magazine și categorii unde explicăm ce se poate scana și cum crește catalogul.",
                   "Share them in groups or let Google index them: stores and categories that explain what can be scanned and how the catalog grows."
                 )}
               </p>

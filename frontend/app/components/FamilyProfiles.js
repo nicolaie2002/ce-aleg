@@ -64,7 +64,7 @@ export function FamilyProfiles({ compact = false }) {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Profilurile nu au putut fi incarcate.", "Profiles could not be loaded."));
+        throw new Error(data.error || pick("Profilurile nu au putut fi încărcate.", "Profiles could not be loaded."));
       }
 
       const loadedProfiles = data.profiles || [];
@@ -182,7 +182,7 @@ export function FamilyProfiles({ compact = false }) {
       <div className="mt-5 flex gap-3 overflow-x-auto pb-2">
         {isLoading ? (
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-gray-300">
-            {pick("Se incarca profilurile...", "Loading profiles...")}
+            {pick("Se încarcă profilurile...", "Loading profiles...")}
           </div>
         ) : (
           profiles.map((profile) => {
@@ -233,7 +233,7 @@ export function FamilyProfiles({ compact = false }) {
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
             disabled={!canAddProfile}
-            placeholder={canAddProfile ? pick("Nume membru nou", "New member name") : pick("Limita de profiluri atinsa", "Profile limit reached")}
+            placeholder={canAddProfile ? pick("Nume membru nou", "New member name") : pick("Limita de profiluri atinsă", "Profile limit reached")}
             className="min-h-11 rounded-lg border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
             maxLength={80}
           />

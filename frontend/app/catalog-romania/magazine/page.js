@@ -10,16 +10,16 @@ import {
 import { CATALOG_SEO_SITE_URL, SEO_STORES } from "../seo-data";
 
 export const metadata = {
-  title: "Magazine Romania: Lidl, Kaufland, Carrefour, Mega, Profi, Penny",
+  title: "Magazine România: Lidl, Kaufland, Carrefour, Mega, Profi, Penny",
   description:
-    "Pagini publice pentru magazine din Romania unde poti scana produse, compara alternative si contribui la catalogul Ce aleg?.",
+    "Pagini publice pentru magazine din România unde poți scana produse, compara alternative și contribui la catalogul Ce aleg?.",
   alternates: {
     canonical: "/catalog-romania/magazine",
   },
   openGraph: {
-    title: "Magazine Romania | Catalog Ce aleg?",
+    title: "Magazine România | Catalog Ce aleg?",
     description:
-      "Alege magazinul si foloseste Ce aleg? pentru scanare cod de bare, alternative si produse lipsa.",
+      "Alege magazinul și folosește Ce aleg? pentru scanare cod de bare, alternative și produse lipsă.",
     url: "/catalog-romania/magazine",
     images: ["/opengraph-image.png?v=20260623"],
   },
@@ -29,10 +29,10 @@ export default function CatalogStoresPage() {
   const collectionJsonLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
-    name: "Magazine Romania in catalogul Ce aleg?",
+    name: "Magazine România în catalogul Ce aleg?",
     url: `${CATALOG_SEO_SITE_URL}/catalog-romania/magazine`,
     description:
-      "Pagini publice pentru magazine unde utilizatorii pot scana produse si ajuta la completarea catalogului.",
+      "Pagini publice pentru magazine unde utilizatorii pot scana produse și ajută la completarea catalogului.",
     mainEntity: SEO_STORES.map((store) => ({
       "@type": "Store",
       name: store.name,
@@ -44,23 +44,23 @@ export default function CatalogStoresPage() {
     <>
       <JsonLd
         data={buildBreadcrumbJsonLd([
-          { name: "Acasa", href: "/" },
-          { name: "Catalog Romania", href: "/catalog-romania" },
+          { name: "Acasă", href: "/" },
+          { name: "Catalog România", href: "/catalog-romania" },
           { name: "Magazine", href: "/catalog-romania/magazine" },
         ])}
       />
       <JsonLd data={collectionJsonLd} />
       <CatalogSeoLayout
         eyebrow="Magazine publice"
-        title="Magazine din Romania unde poti folosi Ce aleg?."
-        description="Fiecare pagina explica de ce merita sa scanezi produse in acel magazin si ce categorii sunt potrivite pentru contributii gratuite."
+        title="Magazine din România unde poți folosi Ce aleg?."
+        description="Fiecare pagină explică de ce merită să scanezi produse în acel magazin și ce categorii sunt potrivite pentru contribuții gratuite."
         image="/stores/any-store.png"
-        imageAlt="Magazine Romania in catalogul Ce aleg?"
+        imageAlt="Magazine România în catalogul Ce aleg?"
       >
         <SeoSection
           icon={Store}
           title="Alege magazinul"
-          description="Paginile sunt publice si indexabile. Nu promit acoperire completa; arata cum folosesti aplicatia si unde comunitatea poate completa catalogul."
+          description="Paginile sunt publice și indexabile. Nu promit acoperire completă; arată cum folosești aplicația și unde comunitatea poate completa catalogul."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {SEO_STORES.map((store) => (
@@ -72,13 +72,13 @@ export default function CatalogStoresPage() {
         <SeoSection
           icon={Search}
           title="De ce sunt utile pentru trafic gratuit"
-          description="Oamenii cauta produse prin numele magazinului. Aceste pagini pot prinde cautari organice fara buget de reclame."
+          description="Oamenii caută produse prin numele magazinului. Aceste pagini pot prinde căutări organice fără buget de reclame."
         >
           <div className="grid gap-3 md:grid-cols-3">
             {[
-              "le poti distribui in grupuri fara sa para reclama agresiva",
+              "le poți distribui în grupuri fără să para reclama agresiva",
               "Google vede pagini clare pentru fiecare magazin",
-              "CTA-ul trimite spre scanare sau produs negasit",
+              "CTA-ul trimite spre scanare sau produs negăsit",
             ].map((item) => (
               <div key={item} className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-sm font-bold leading-6 text-gray-200">{item}</p>

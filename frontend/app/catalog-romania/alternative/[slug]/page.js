@@ -32,8 +32,8 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${guide.title}: ce verifici si ce scanezi`,
-    description: `${guide.intro} Ghid Ce aleg? pentru alternative, etichete si produse scanabile.`,
+    title: `${guide.title}: ce verifici și ce scanezi`,
+    description: `${guide.intro} Ghid Ce aleg? pentru alternative, etichete și produse scanabile.`,
     alternates: {
       canonical: `/catalog-romania/alternative/${guide.slug}`,
     },
@@ -83,8 +83,8 @@ export default async function AlternativeGuidePage({ params }) {
     <>
       <JsonLd
         data={buildBreadcrumbJsonLd([
-          { name: "Acasa", href: "/" },
-          { name: "Catalog Romania", href: "/catalog-romania" },
+          { name: "Acasă", href: "/" },
+          { name: "Catalog România", href: "/catalog-romania" },
           { name: "Alternative", href: "/catalog-romania/alternative" },
           { name: guide.title, href: `/catalog-romania/alternative/${guide.slug}` },
         ])}
@@ -108,14 +108,14 @@ export default async function AlternativeGuidePage({ params }) {
 
           <SeoSection
             icon={Sparkles}
-            title="Cum alegi alternativa"
-            description="Nu cautam produsul perfect, ci varianta mai potrivita pentru contextul tau."
+            title="Cum alegi alternativă"
+            description="Nu cautam produsul perfect, ci varianta mai potrivită pentru contextul tău."
           >
             <StepList
               items={[
-                "Scaneaza produsul pe care voiai sa il cumperi.",
-                "Verifica zaharul, sarea, proteina, ingredientele sau semnalul relevant.",
-                "Compara alternative apropiate si salveaza produsul care se potriveste.",
+                "Scanează produsul pe care voiai să îl cumperi.",
+                "Verifică zahărul, sarea, proteina, ingredientele sau semnalul relevant.",
+                "Compară alternative apropiate și salvează produsul care se potrivește.",
               ]}
             />
           </SeoSection>
@@ -124,7 +124,7 @@ export default async function AlternativeGuidePage({ params }) {
         <SeoSection
           icon={Barcode}
           title="Produse exemplu pentru comparatie"
-          description="Aceste carduri arata tipul de decizie pe care aplicatia o poate ajuta la raft."
+          description="Aceste carduri arata tipul de decizie pe care aplicația o poate ajută la raft."
         >
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {products.map((product) => (
@@ -136,7 +136,7 @@ export default async function AlternativeGuidePage({ params }) {
         <SeoSection
           icon={Database}
           title="Categorii legate"
-          description="Ghidul este legat de paginile de categorie pentru navigare si indexare."
+          description="Ghidul este legat de paginile de categorie pentru navigare și indexare."
         >
           <StoreCategoryLinks categories={categories} />
         </SeoSection>
