@@ -4314,6 +4314,7 @@ ADMIN_ENDPOINTS = {
     "admin_update_user_plan",
     "get_readiness",
     "send_admin_email_test",
+    "admin_resend_email_verification",
 }
 
 AUTH_ENDPOINTS = {
@@ -7099,6 +7100,79 @@ def send_admin_email_test():
         "from": EMAIL_FROM,
         "to": to_email,
         "diagnostics": get_email_configuration_diagnostics(),
+    })
+
+
+@app.route("/admin/users/resend-verification", methods=["POST"])
+def admin_resend_email_verification():
+    data = request.get_json(silent=True) or {}
+    email = str(data.get("email") or "").strip().lower()
+
+    if not is_valid_email_address(email):
+        return jsonify({
+            "code": "invalid_email",
+            "error": "Introdu o adresă de email validă.",
+        }), 400
+
+    user = User.query.filter(func.lower(User.email) == email).first()
+
+    if not user:
+        return jsonify({
+            "code": "user_not_found",
+            "error": "Nu există niciun cont cu această adresă de email.",
+        }), 404
+
+    if bool(user.email_verified):
+        return jsonify({
+            "code": "email_already_verified",
+            "error": "Contul are deja adresa de email confirmată.",
+            "user": {
+                "id": user.id,
+                "name": user.name,
+                "email": user.email,
+                "emailVerified": True,
+            },
+        }), 409
+
+    if not is_email_configured():
+        return jsonify({
+            "code": "email_not_configured",
+            "error": "Sistemul email nu este configurat complet.",
+            "diagnostics": get_email_configuration_diagnostics(),
+        }), 503
+
+    sent, _verification_url = send_email_verification_email(user)
+
+    if not sent:
+        return jsonify({
+            "code": "verification_email_failed",
+            "error": "Emailul de confirmare nu a putut fi trimis momentan.",
+            "diagnostics": get_email_configuration_diagnostics(),
+        }), 502
+
+    record_user_event(
+        g.current_user.id,
+        "admin_verification_email",
+        "admin",
+        {
+            "targetUserId": user.id,
+            "targetEmail": user.email,
+            "provider": EMAIL_PROVIDER,
+            "sentAt": datetime.utcnow().isoformat() + "Z",
+        },
+        commit=True,
+    )
+
+    return jsonify({
+        "sent": True,
+        "message": f"Emailul de confirmare a fost retrimis către {user.email}.",
+        "provider": EMAIL_PROVIDER,
+        "user": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "emailVerified": False,
+        },
     })
 
 

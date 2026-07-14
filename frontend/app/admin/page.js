@@ -166,6 +166,9 @@ export default function AdminPage() {
   const [emailBusy, setEmailBusy] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [emailTestAddress, setEmailTestAddress] = useState(CONTACT_EMAIL);
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationBusy, setVerificationBusy] = useState(false);
+  const [verificationResult, setVerificationResult] = useState(null);
   const [catalogBusy, setCatalogBusy] = useState("");
   const [catalogPreview, setCatalogPreview] = useState(null);
   const [catalogSearchTerm, setCatalogSearchTerm] = useState("");
@@ -291,6 +294,59 @@ export default function AdminPage() {
       setMessage("Emailul de test nu a putut fi trimis.");
     } finally {
       setEmailBusy(false);
+    }
+  }
+
+  async function resendAccountVerification(event, emailOverride = "") {
+    event?.preventDefault();
+    const targetEmail = String(emailOverride || verificationEmail).trim().toLowerCase();
+
+    if (!targetEmail) {
+      setVerificationResult({
+        ok: false,
+        message: "Introdu adresa de email a contului.",
+      });
+      return;
+    }
+
+    setVerificationEmail(targetEmail);
+    setVerificationBusy(true);
+    setVerificationResult(null);
+    setMessage("Trimit din nou emailul de confirmare...");
+
+    try {
+      const response = await fetch(`${API_URL}/admin/users/resend-verification`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: targetEmail }),
+      });
+      const data = await readApiJson(response);
+
+      if (response.status === 401) {
+        window.location.assign("/login?next=/admin");
+        return;
+      }
+
+      const diagnosticIssues = data.diagnostics?.issues?.length
+        ? ` ${data.diagnostics.issues.join(" ")}`
+        : "";
+      const resultMessage = `${
+        data.message || data.error || "Emailul de confirmare nu a putut fi procesat."
+      }${diagnosticIssues}`;
+
+      setVerificationResult({
+        ok: response.ok,
+        message: resultMessage,
+        user: data.user || null,
+        provider: data.provider || "",
+      });
+      setMessage(resultMessage);
+    } catch {
+      const resultMessage = "Emailul de confirmare nu a putut fi trimis.";
+      setVerificationResult({ ok: false, message: resultMessage });
+      setMessage(resultMessage);
+    } finally {
+      setVerificationBusy(false);
     }
   }
 
@@ -1275,6 +1331,58 @@ export default function AdminPage() {
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+            <div className="rounded-xl border border-cyan-300/20 bg-cyan-300/[0.055] p-4">
+              <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                <ShieldCheck size={16} /> Confirmare cont
+              </p>
+              <h3 className="mt-2 text-xl font-black text-white">Retrimite linkul de confirmare</h3>
+              <p className="mt-2 text-sm leading-6 text-gray-400">
+                Folosește adresa exactă a unui cont neconfirmat. Linkul nou expiră în 48 de ore.
+              </p>
+              <form onSubmit={resendAccountVerification} className="mt-4 space-y-3">
+                <label className="block text-xs font-black uppercase text-gray-400" htmlFor="admin-verification-email">
+                  Email utilizator
+                </label>
+                <input
+                  id="admin-verification-email"
+                  value={verificationEmail}
+                  onChange={(event) => {
+                    setVerificationEmail(event.target.value);
+                    setVerificationResult(null);
+                  }}
+                  className="min-h-12 w-full rounded-lg border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
+                  placeholder="utilizator@email.ro"
+                  type="email"
+                  required
+                />
+                <button
+                  type="submit"
+                  disabled={verificationBusy || !email.configured}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black text-black hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                >
+                  <Mail size={16} />
+                  {verificationBusy ? "Se retrimite..." : "Retrimite confirmarea"}
+                </button>
+              </form>
+              {verificationResult && (
+                <div
+                  className={`mt-4 rounded-lg border p-3 text-sm leading-6 ${
+                    verificationResult.ok
+                      ? "border-cyan-300/25 bg-cyan-300/10 text-cyan-100"
+                      : "border-red-400/25 bg-red-400/10 text-red-100"
+                  }`}
+                >
+                  <p className="font-bold">{verificationResult.message}</p>
+                  {verificationResult.user?.name && (
+                    <p className="mt-1 text-xs opacity-80">
+                      Cont: {verificationResult.user.name}
+                      {verificationResult.provider ? ` · Provider: ${verificationResult.provider}` : ""}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="rounded-xl border border-white/10 bg-black/20 p-4">
               <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
                 <Bell size={16} /> Misiuni aproape gata
@@ -1421,10 +1529,11 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="text-gray-400">
                 <tr>
                   <th className="border-b border-white/10 py-3">Email</th>
+                  <th className="border-b border-white/10 py-3">Confirmare</th>
                   <th className="border-b border-white/10 py-3">Admin</th>
                   <th className="border-b border-white/10 py-3">Plan</th>
                   <th className="border-b border-white/10 py-3">Acțiuni</th>
@@ -1434,6 +1543,11 @@ export default function AdminPage() {
                 {filteredUsers.map((item) => (
                   <tr key={item.id}>
                     <td className="border-b border-white/5 py-3">{item.email}</td>
+                    <td className="border-b border-white/5 py-3">
+                      <EventPill tone={item.email_verified ? "default" : "warning"}>
+                        {item.email_verified ? "confirmat" : "neconfirmat"}
+                      </EventPill>
+                    </td>
                     <td className="border-b border-white/5 py-3">{item.is_admin ? "da" : "nu"}</td>
                     <td className="border-b border-white/5 py-3 font-bold text-cyan-200">{item.plan || "free"}</td>
                     <td className="border-b border-white/5 py-3">
@@ -1447,6 +1561,16 @@ export default function AdminPage() {
                             {plan}
                           </button>
                         ))}
+                        {!item.email_verified && (
+                          <button
+                            type="button"
+                            onClick={() => resendAccountVerification(null, item.email)}
+                            disabled={verificationBusy || !email.configured}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 font-bold text-cyan-100 hover:bg-cyan-300/20 disabled:opacity-50"
+                          >
+                            <Mail size={14} /> confirmare
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
