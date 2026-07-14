@@ -3509,6 +3509,138 @@ def get_user_gamification_metrics(user_id, since=None):
     }
 
 
+def get_bulk_user_gamification_metrics(user_ids, since=None):
+    """Load leaderboard metrics in a fixed number of queries."""
+    safe_user_ids = [int(user_id) for user_id in user_ids if user_id is not None]
+
+    if not safe_user_ids:
+        return {}
+
+    metrics_by_user = {
+        user_id: {
+            "scanCount": 0,
+            "scanStreakDays": 0,
+            "historyCount": 0,
+            "favoritesCount": 0,
+            "cartCount": 0,
+            "approvedSubmissions": 0,
+            "confirmedInvites": 0,
+        }
+        for user_id in safe_user_ids
+    }
+
+    def apply_counts(rows, key):
+        for user_id, value in rows:
+            if user_id in metrics_by_user:
+                metrics_by_user[user_id][key] = int(value or 0)
+
+    scan_query = db.session.query(
+        UsageEvent.user_id,
+        func.count(UsageEvent.id),
+    ).filter(
+        UsageEvent.user_id.in_(safe_user_ids),
+        UsageEvent.event_type == "scan",
+    )
+    history_query = db.session.query(
+        ScanHistory.user_id,
+        func.count(ScanHistory.id),
+    ).filter(ScanHistory.user_id.in_(safe_user_ids))
+    favorites_query = db.session.query(
+        Favorite.user_id,
+        func.count(Favorite.id),
+    ).filter(Favorite.user_id.in_(safe_user_ids))
+    cart_query = db.session.query(
+        CartItem.user_id,
+        func.coalesce(func.sum(CartItem.quantity), 0),
+    ).filter(CartItem.user_id.in_(safe_user_ids))
+    cart_event_query = db.session.query(
+        UsageEvent.user_id,
+        func.count(UsageEvent.id),
+    ).filter(
+        UsageEvent.user_id.in_(safe_user_ids),
+        UsageEvent.event_type == "cart_add",
+    )
+    submissions_query = db.session.query(
+        ProductSubmission.user_id,
+        func.count(ProductSubmission.id),
+    ).filter(
+        ProductSubmission.user_id.in_(safe_user_ids),
+        ProductSubmission.status == "approved",
+    )
+    invites_query = db.session.query(
+        UsageEvent.user_id,
+        func.count(UsageEvent.id),
+    ).filter(
+        UsageEvent.user_id.in_(safe_user_ids),
+        UsageEvent.event_type == "bonus_unlimited",
+        UsageEvent.source == "referral_inviter",
+    )
+    streak_query = db.session.query(
+        UsageEvent.user_id,
+        func.date(UsageEvent.created_at),
+    ).filter(
+        UsageEvent.user_id.in_(safe_user_ids),
+        UsageEvent.event_type == "scan",
+    )
+
+    if since:
+        scan_query = scan_query.filter(UsageEvent.created_at >= since)
+        history_query = history_query.filter(ScanHistory.scanned_at >= since)
+        favorites_query = favorites_query.filter(Favorite.created_at >= since)
+        cart_query = cart_query.filter(CartItem.created_at >= since)
+        cart_event_query = cart_event_query.filter(UsageEvent.created_at >= since)
+        submissions_query = submissions_query.filter(ProductSubmission.created_at >= since)
+        invites_query = invites_query.filter(UsageEvent.created_at >= since)
+        streak_query = streak_query.filter(UsageEvent.created_at >= since)
+
+    apply_counts(scan_query.group_by(UsageEvent.user_id).all(), "scanCount")
+    apply_counts(history_query.group_by(ScanHistory.user_id).all(), "historyCount")
+    apply_counts(favorites_query.group_by(Favorite.user_id).all(), "favoritesCount")
+    apply_counts(cart_query.group_by(CartItem.user_id).all(), "cartCount")
+
+    cart_event_counts = dict(
+        cart_event_query.group_by(UsageEvent.user_id).all()
+    )
+    apply_counts(
+        submissions_query.group_by(ProductSubmission.user_id).all(),
+        "approvedSubmissions",
+    )
+    apply_counts(invites_query.group_by(UsageEvent.user_id).all(), "confirmedInvites")
+
+    scan_dates_by_user = {user_id: set() for user_id in safe_user_ids}
+    for user_id, scan_day_value in streak_query.distinct().all():
+        scan_day = coerce_scan_day(scan_day_value)
+        if scan_day and user_id in scan_dates_by_user:
+            scan_dates_by_user[user_id].add(scan_day)
+
+    today = datetime.utcnow().date()
+    yesterday = today - timedelta(days=1)
+
+    for user_id, metrics in metrics_by_user.items():
+        metrics["scanCount"] = max(
+            int(metrics["scanCount"]),
+            int(metrics["historyCount"]),
+        )
+        metrics["cartCount"] = max(
+            int(metrics["cartCount"]),
+            int(cart_event_counts.get(user_id, 0) or 0),
+        )
+
+        scan_dates = scan_dates_by_user[user_id]
+        if today in scan_dates:
+            cursor = today
+        elif yesterday in scan_dates:
+            cursor = yesterday
+        else:
+            continue
+
+        while cursor in scan_dates:
+            metrics["scanStreakDays"] += 1
+            cursor -= timedelta(days=1)
+
+    return metrics_by_user
+
+
 def get_mission_claim_events(user_id, series_id=None, since=None):
     query = UsageEvent.query.filter_by(
         user_id=user_id,
@@ -4007,10 +4139,21 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
         rows = [dict(row) for row in cached["rows"]]
     else:
         users = User.query.order_by(User.created_at.asc()).all()
+        metrics_by_user = get_bulk_user_gamification_metrics(
+            [user.id for user in users],
+            since=since,
+        )
         rows = []
 
         for user in users:
-            metrics = get_user_gamification_metrics(user.id, since=since)
+            metrics = metrics_by_user.get(user.id) or {
+                "scanCount": 0,
+                "scanStreakDays": 0,
+                "favoritesCount": 0,
+                "cartCount": 0,
+                "approvedSubmissions": 0,
+                "confirmedInvites": 0,
+            }
             score = calculate_activity_score(metrics)
             coins = calculate_user_coins(user.id) if since is None else score
 
@@ -4201,6 +4344,7 @@ AUTH_ENDPOINTS = {
     "get_billing_status",
     "get_dashboard_summary",
     "get_gamification_summary",
+    "get_gamification_leaderboard",
     "claim_gamification_mission",
     "redeem_cecoin_reward",
     "start_cecoin_checkout",
@@ -4992,9 +5136,9 @@ def contact_support():
     if len(message) > 4000:
         return jsonify({"error": "Mesajul este prea lung. Te rugăm să îl scurtezi."}), 400
 
-    admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower() or get_email_reply_to()
+    support_email = get_email_reply_to()
 
-    if not admin_email or not is_email_configured():
+    if not support_email or not is_email_configured():
         return jsonify({"error": "Emailul de suport nu este configurat complet."}), 503
 
     details = [
@@ -5020,7 +5164,7 @@ def contact_support():
     ])
 
     sent = send_transactional_email(
-        admin_email,
+        support_email,
         f"[Ce aleg] Suport: {topic}",
         text_body,
         html_body,
@@ -7815,6 +7959,26 @@ def get_gamification_summary():
         return jsonify({
             "code": "gamification_summary_failed",
             "error": "Misiunile nu s-au putut încărca momentan.",
+        }), 500
+
+
+@app.route("/gamification/leaderboard", methods=["GET"])
+def get_gamification_leaderboard():
+    try:
+        period = str(request.args.get("period") or "weekly").strip().lower()
+        since = get_week_start() if period == "weekly" else None
+        return jsonify({
+            "period": period,
+            "leaderboard": build_user_leaderboard(
+                g.current_user.id,
+                since=since,
+            ),
+        })
+    except Exception:
+        app.logger.exception("Gamification leaderboard failed")
+        return jsonify({
+            "code": "gamification_leaderboard_failed",
+            "error": "Clasamentul nu s-a putut încărca momentan.",
         }), 500
 
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -26,7 +26,7 @@ import { AppHeader } from "../components/AppHeader";
 import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 
 const MISSION_ICONS = {
   scan: ScanLine,
@@ -54,11 +54,11 @@ function getMissionHref(mission) {
   return "/dashboard";
 }
 
-function formatMissionReset(value) {
+function formatMissionReset(value, locale) {
   if (!value) return "";
 
   try {
-    return new Intl.DateTimeFormat("ro-RO", {
+    return new Intl.DateTimeFormat(locale === "en" ? "en-GB" : "ro-RO", {
       hour: "2-digit",
       minute: "2-digit",
     }).format(new Date(value));
@@ -67,68 +67,165 @@ function formatMissionReset(value) {
   }
 }
 
+async function fetchMissionData(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const data = await readApiJson(response);
+    return { response, data };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function getLocalizedMissionTitle(mission, pick) {
+  const target = Number(mission?.target || 0);
+  const englishTitles = {
+    scan: target === 1 ? "Scan 1 product" : `Scan ${target} products`,
+    cart: target === 1 ? "Add 1 product to the cart" : `Add ${target} products to the cart`,
+    favorite: target === 1 ? "Save 1 favorite product" : `Save ${target} favorite products`,
+    catalog: target === 1 ? "Add 1 approved product" : `Add ${target} approved products`,
+    streak: `${target} consecutive days with scans`,
+    invite: "Invite friends",
+  };
+
+  return pick(
+    mission?.title || mission?.label || "Misiune",
+    englishTitles[mission?.seriesId] || mission?.title || mission?.label || "Mission"
+  );
+}
+
+function getLocalizedMissionDescription(mission, pick) {
+  const englishDescriptions = {
+    scan: "Scan products and build your daily progress.",
+    cart: "Add useful products to your shopping cart.",
+    favorite: "Save products you want to find quickly later.",
+    catalog: "Submit missing products and earn the reward after approval.",
+    streak: "Return on consecutive days and scan at least one product.",
+    invite: "Invite friends with your code and earn rewards after account verification.",
+  };
+
+  return pick(
+    mission?.description || mission?.detail || "",
+    englishDescriptions[mission?.seriesId] || mission?.description || mission?.detail || ""
+  );
+}
+
+function getLocalizedLevel(level, pick) {
+  const englishLevels = {
+    "Expert la raft": "Shelf expert",
+    "Cumpărător avansat": "Advanced shopper",
+    "În creștere": "Growing",
+    "Start bun": "Good start",
+  };
+  return pick(level || "Start bun", englishLevels[level] || level || "Good start");
+}
+
 export default function MissionsPage() {
-  const { pick } = useLocale();
+  const { locale, pick } = useLocale();
   const [summary, setSummary] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState(null);
+  const [isLeaderboardLoading, setIsLeaderboardLoading] = useState(false);
+  const [leaderboardError, setLeaderboardError] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [claimingMissionId, setClaimingMissionId] = useState("");
+  const initialLoadStarted = useRef(false);
+
+  const loadLeaderboard = useCallback(async () => {
+    setIsLeaderboardLoading(true);
+    setLeaderboardError("");
+
+    try {
+      const { response, data } = await fetchMissionData(
+        `${API_URL}/gamification/leaderboard?period=weekly`,
+        {},
+        12000
+      );
+
+      if (response.status === 401) {
+        window.location.assign("/login?next=/missions");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Clasamentul nu s-a putut încărca.",
+            "The leaderboard could not be loaded."
+          )
+        );
+      }
+
+      setLeaderboard(data.leaderboard || null);
+    } catch (loadError) {
+      setLeaderboard(null);
+      setLeaderboardError(
+        loadError?.name === "AbortError"
+          ? pick("Clasamentul răspunde greu. Îl poți reîncerca separat.", "The leaderboard is taking too long. You can retry it separately.")
+          : loadError.message || pick("Clasamentul nu s-a putut încărca.", "The leaderboard could not be loaded.")
+      );
+    } finally {
+      setIsLeaderboardLoading(false);
+    }
+  }, [pick]);
 
   const loadSummary = useCallback(async () => {
+    setIsLoading(true);
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/gamification/summary?leaderboard=1`, {
-        cache: "no-store",
-      });
-      const data = await readApiJson(response);
+      const { response, data } = await fetchMissionData(
+        `${API_URL}/gamification/summary`,
+        {},
+        15000
+      );
+
+      if (response.status === 401) {
+        window.location.assign("/login?next=/missions");
+        return;
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Misiunile nu s-au putut încărca.", "Missions could not be loaded."));
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Misiunile nu s-au putut încărca.",
+            "Missions could not be loaded."
+          )
+        );
       }
 
       setSummary(data);
+      void loadLeaderboard();
     } catch (loadError) {
       setSummary(null);
       setError(
-        loadError.message ||
+        loadError?.name === "AbortError"
+          ? pick("Serverul răspunde greu. Reîncearcă încărcarea misiunilor.", "The server is taking too long. Retry loading your missions.")
+          : loadError.message ||
           pick("Misiunile nu s-au putut încărca. Reîncearcă în câteva secunde.", "Missions could not be loaded. Try again in a few seconds.")
       );
     } finally {
       setIsLoading(false);
     }
-  }, [pick]);
+  }, [loadLeaderboard, pick]);
 
   useEffect(() => {
-    let isMounted = true;
-
-    queueMicrotask(async () => {
-      try {
-        const authResponse = await fetch(`${API_URL}/auth/me`, { cache: "no-store" });
-
-        if (!authResponse.ok) {
-          window.location.assign("/login?next=/missions");
-          return;
-        }
-
-        const authData = await authResponse.json();
-        if (!isMounted) return;
-
-        window.localStorage.setItem("cealeg_user", JSON.stringify(authData.user));
-        await loadSummary();
-      } catch {
-        if (isMounted) {
-          setError(pick("Nu am putut verifica sesiunea. Intră din nou în cont.", "Could not verify your session. Sign in again."));
-          setIsLoading(false);
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [loadSummary, pick]);
+    if (initialLoadStarted.current) return;
+    initialLoadStarted.current = true;
+    void loadSummary();
+  }, [loadSummary]);
 
   async function claimMission(missionId) {
     if (!missionId || claimingMissionId) return;
@@ -138,19 +235,30 @@ export default function MissionsPage() {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/gamification/claim`, {
+      const { response, data } = await fetchMissionData(`${API_URL}/gamification/claim`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ missionId }),
       });
-      const data = await readApiJson(response);
+
+      if (response.status === 401) {
+        window.location.assign("/login?next=/missions");
+        return;
+      }
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Recompensa nu a putut fi revendicată.", "The reward could not be claimed."));
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Recompensa nu a putut fi revendicată.",
+            "The reward could not be claimed."
+          )
+        );
       }
 
       setSummary(data.summary);
-      setMessage(data.message || pick("Recompensă revendicată.", "Reward claimed."));
+      setMessage(pick(data.message || "Recompensă revendicată.", "Reward claimed."));
     } catch (claimError) {
       setError(claimError.message || pick("Recompensa nu a putut fi revendicată.", "The reward could not be claimed."));
     } finally {
@@ -165,9 +273,9 @@ export default function MissionsPage() {
   const coinBalance = summary?.coins || 0;
   const streakDays = summary?.metrics?.scanStreakDays || 0;
   const progress = clampProgress((completedMissions / Math.max(totalMissions, 1)) * 100);
-  const resetAt = formatMissionReset(summary?.missionsResetAt);
-  const weeklyLeaderboard = summary?.leaderboard?.weekly?.top || [];
-  const currentUserRank = summary?.leaderboard?.weekly?.currentUser?.rank;
+  const resetAt = formatMissionReset(summary?.missionsResetAt, locale);
+  const weeklyLeaderboard = leaderboard?.top || [];
+  const currentUserRank = leaderboard?.currentUser?.rank;
   const readyMissions = missions.filter((mission) => {
     const missionProgress = clampProgress(mission.progress);
     return !mission.automatic && !mission.claimed && !mission.claimedToday && (mission.claimable || missionProgress >= 100);
@@ -181,6 +289,31 @@ export default function MissionsPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
         <p className="text-gray-300">{pick("Se încarcă misiunile...", "Loading missions...")}</p>
+      </main>
+    );
+  }
+
+  if (!summary) {
+    return (
+      <main className="min-h-screen bg-[#0b0f14] text-white">
+        <AppHeader />
+        <section className="ce-shell ce-page flex min-h-[65vh] items-center justify-center">
+          <div className="w-full max-w-xl rounded-xl border border-yellow-300/25 bg-yellow-300/[0.07] p-6 text-center">
+            <Clock3 className="mx-auto text-yellow-100" size={30} />
+            <h1 className="mt-4 text-2xl font-black">
+              {pick("Misiunile nu s-au încărcat", "Missions did not load")}
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-gray-300">{error}</p>
+            <button
+              type="button"
+              onClick={() => void loadSummary()}
+              className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-black text-black hover:bg-cyan-100"
+            >
+              <RefreshCw size={17} />
+              {pick("Reîncearcă", "Try again")}
+            </button>
+          </div>
+        </section>
       </main>
     );
   }
@@ -232,7 +365,7 @@ export default function MissionsPage() {
               </div>
               <p className="mt-3 text-3xl font-black text-white md:text-4xl">{coinBalance}</p>
               <p className="mt-1 text-xs font-bold text-gray-400">
-                {summary?.level || pick("Start bun", "Good start")}
+                {getLocalizedLevel(summary?.level, pick)}
               </p>
             </div>
 
@@ -281,11 +414,12 @@ export default function MissionsPage() {
             </div>
             <button
               type="button"
-              onClick={loadSummary}
+              onClick={() => void loadSummary()}
+              disabled={isLoading}
               className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10"
             >
-              <RefreshCw size={16} />
-              {pick("Actualizează", "Refresh")}
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              {isLoading ? pick("Actualizez...", "Refreshing...") : pick("Actualizează", "Refresh")}
             </button>
           </div>
 
@@ -317,7 +451,7 @@ export default function MissionsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <p className="inline-flex min-w-0 items-center gap-2 text-sm font-black text-white">
                         <MissionIcon size={17} className="shrink-0 text-cyan-200" />
-                        <span className="truncate">{mission.title || mission.label}</span>
+                        <span className="truncate">{getLocalizedMissionTitle(mission, pick)}</span>
                       </p>
                       {isClaimable && (
                         <span className="shrink-0 rounded-full bg-cyan-200 px-2 py-1 text-[11px] font-black text-black">
@@ -332,7 +466,7 @@ export default function MissionsPage() {
                     </div>
 
                     <p className="mt-3 min-h-10 text-sm leading-6 text-gray-400">
-                      {mission.description || mission.detail}
+                      {getLocalizedMissionDescription(mission, pick)}
                     </p>
 
                     <div className="mt-4">
@@ -442,7 +576,24 @@ export default function MissionsPage() {
                 </p>
               )}
               <div className="mt-4 space-y-2">
-                {weeklyLeaderboard.length ? weeklyLeaderboard.slice(0, 5).map((row) => (
+                {isLeaderboardLoading ? (
+                  <p className="inline-flex w-full items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-gray-400">
+                    <RefreshCw size={15} className="animate-spin" />
+                    {pick("Se încarcă separat clasamentul...", "Loading the leaderboard separately...")}
+                  </p>
+                ) : leaderboardError ? (
+                  <div className="rounded-lg border border-yellow-300/20 bg-yellow-300/[0.06] p-3">
+                    <p className="text-sm leading-6 text-gray-300">{leaderboardError}</p>
+                    <button
+                      type="button"
+                      onClick={() => void loadLeaderboard()}
+                      className="mt-3 inline-flex items-center gap-2 text-sm font-black text-cyan-100 hover:text-white"
+                    >
+                      <RefreshCw size={14} />
+                      {pick("Reîncearcă", "Try again")}
+                    </button>
+                  </div>
+                ) : weeklyLeaderboard.length ? weeklyLeaderboard.slice(0, 5).map((row) => (
                   <div
                     key={row.userId}
                     className={`flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm ${
@@ -495,8 +646,8 @@ export default function MissionsPage() {
                   <CheckCircle2 size={17} />
                   {pick("Misiunea catalogului", "Catalog mission")}
                 </p>
-                <h2 className="mt-2 text-2xl font-black">{catalogMission.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-gray-400">{catalogMission.description}</p>
+                <h2 className="mt-2 text-2xl font-black">{getLocalizedMissionTitle(catalogMission, pick)}</h2>
+                <p className="mt-2 text-sm leading-6 text-gray-400">{getLocalizedMissionDescription(catalogMission, pick)}</p>
               </div>
               <Link
                 href="/submit-product"

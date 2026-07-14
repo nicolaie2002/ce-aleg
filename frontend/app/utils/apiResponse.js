@@ -49,6 +49,18 @@ const apiErrorTranslations = {
   "Plata nu poate fi pornita acum.": "Checkout cannot start right now.",
   "Portalul de facturare nu poate fi deschis acum.": "The billing portal cannot be opened right now.",
   "Emailul de test nu a putut fi trimis.": "The test email could not be sent.",
+  "Misiunile nu s-au putut încărca momentan.": "Missions could not be loaded right now.",
+  "Clasamentul nu s-a putut încărca momentan.": "The leaderboard could not be loaded right now.",
+  "Misiunea s-a actualizat. Reîncarcă pagina și încearcă din nou.": "The mission changed. Refresh the page and try again.",
+  "Ai revendicat deja recompensa acestei misiuni azi. Revino mâine pentru următorul nivel.": "You already claimed this mission reward today. Come back tomorrow for the next level.",
+  "Misiunea nu este finalizată încă.": "The mission is not complete yet.",
+  "Introdu o adresă de email validă.": "Enter a valid email address.",
+  "Scrie câteva detalii despre problemă.": "Add a few details about the issue.",
+  "Mesajul este prea lung. Te rugăm să îl scurtezi.": "The message is too long. Please shorten it.",
+  "Emailul de suport nu este configurat complet.": "Support email is not fully configured.",
+  "Mesajul nu a putut fi trimis momentan.": "The message could not be sent right now.",
+  "Serverul a răspuns cu o pagină în loc de date. Reîncarcă pagina și încearcă din nou.": "The server returned a page instead of data. Refresh and try again.",
+  "Răspunsul serverului nu a putut fi citit.": "The server response could not be read.",
 };
 
 export function localizeApiMessage(message, pick) {
@@ -77,7 +89,14 @@ export function getApiErrorMessage(data, pick, fallbackRo, fallbackEn) {
   const rawMessage = data?.error || data?.message;
 
   if (rawMessage) {
-    return localizeApiMessage(rawMessage, pick);
+    const normalizedMessage = String(rawMessage).trim();
+    const localizedMessage = localizeApiMessage(normalizedMessage, pick);
+
+    if (localizedMessage !== normalizedMessage) {
+      return localizedMessage;
+    }
+
+    return pick(normalizedMessage, fallbackEn || normalizedMessage);
   }
 
   return pick(fallbackRo, fallbackEn);

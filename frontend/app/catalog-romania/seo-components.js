@@ -36,10 +36,22 @@ export function buildBreadcrumbJsonLd(items) {
   };
 }
 
-export function CatalogSeoLayout({ eyebrow, title, description, image, imageAlt, children }) {
+export function CatalogSeoLayout({
+  eyebrow,
+  title,
+  description,
+  image,
+  imageAlt,
+  children,
+  actionLabel = "Scanează",
+  catalogLabel = "Catalog România",
+  primaryActionLabel = "Scanează un produs",
+  secondaryActionLabel = "Adaugă produs lipsă",
+  mediaCaption = "Scanare cod de bare, alternative și catalog construit de comunitate.",
+}) {
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
-      <AppHeader actionHref="/barcode-scan" actionLabel="Scanează" />
+      <AppHeader actionHref="/barcode-scan" actionLabel={actionLabel} />
       <section className="ce-shell ce-page space-y-8 pb-28">
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1.12fr)_minmax(19rem,0.88fr)] lg:items-center">
           <div>
@@ -48,7 +60,7 @@ export function CatalogSeoLayout({ eyebrow, title, description, image, imageAlt,
               className="mb-5 inline-flex w-fit items-center gap-2 rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-3 py-2 text-xs font-black uppercase text-emerald-100 transition hover:bg-emerald-300/18"
             >
               <Database size={15} />
-              Catalog România
+              {catalogLabel}
             </Link>
             <p className="text-sm font-black uppercase text-cyan-100">{eyebrow}</p>
             <h1 className="mt-3 max-w-4xl text-4xl font-black leading-tight md:text-6xl">
@@ -63,14 +75,14 @@ export function CatalogSeoLayout({ eyebrow, title, description, image, imageAlt,
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
               >
                 <Barcode size={18} />
-                Scanează un produs
+                {primaryActionLabel}
               </Link>
               <Link
                 href="/submit-product"
                 className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-emerald-300/35 bg-emerald-300/10 px-5 py-3 text-sm font-black text-emerald-100 transition hover:-translate-y-0.5 hover:bg-emerald-300/20"
               >
                 <UploadCloud size={18} />
-                Adaugă produs lipsă
+                {secondaryActionLabel}
               </Link>
             </div>
           </div>
@@ -87,7 +99,7 @@ export function CatalogSeoLayout({ eyebrow, title, description, image, imageAlt,
             <div className="absolute inset-x-0 bottom-0 border-t border-white/10 bg-black/45 p-4 backdrop-blur">
               <p className="flex items-center gap-2 text-sm font-black text-cyan-100">
                 <Sparkles size={16} />
-                Scanare cod de bare, alternative și catalog construit de comunitate.
+                {mediaCaption}
               </p>
             </div>
           </div>
@@ -178,7 +190,7 @@ export function CategoryCard({ category }) {
   );
 }
 
-export function StoreCard({ store }) {
+export function StoreCard({ store, ctaLabel = "Vezi pagina magazinului" }) {
   return (
     <Link
       href={`/catalog-romania/magazine/${store.slug}`}
@@ -198,7 +210,7 @@ export function StoreCard({ store }) {
         <h3 className="text-lg font-black text-white">{store.name}</h3>
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{store.tagline}</p>
         <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-emerald-100">
-          Vezi pagina magazinului
+          {ctaLabel}
           <ArrowRight size={16} />
         </span>
       </div>
@@ -267,26 +279,31 @@ export function AlternativeGuideCard({ guide }) {
   );
 }
 
-export function SeoCtaBand() {
+export function SeoCtaBand({
+  eyebrow = "Catalogul creste gratis",
+  title = "Produs negăsit? Trimite-l la verificare și ajută catalogul pentru România.",
+  description = "Nu avem nevoie să asteptam liste de la retaileri. Produsele reale scanate de utilizatori fac aplicația mai utila pentru toti.",
+  buttonLabel = "Trimite produs",
+}) {
   return (
     <section className="grid gap-4 rounded-lg border border-emerald-300/20 bg-emerald-300/10 p-5 sm:grid-cols-[1fr_auto] sm:items-center">
       <div>
         <p className="flex items-center gap-2 text-sm font-black uppercase text-emerald-100">
           <CheckCircle2 size={17} />
-          Catalogul creste gratis
+          {eyebrow}
         </p>
         <h2 className="mt-2 text-2xl font-black text-white">
-          Produs negăsit? Trimite-l la verificare și ajută catalogul pentru România.
+          {title}
         </h2>
         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-300">
-          Nu avem nevoie să asteptam liste de la retaileri. Produsele reale scanate de utilizatori fac aplicația mai utila pentru toti.
+          {description}
         </p>
       </div>
       <Link
         href="/submit-product"
         className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 text-sm font-black text-black transition hover:-translate-y-0.5 hover:bg-cyan-100"
       >
-        Trimite produs
+        {buttonLabel}
         <ArrowRight size={18} />
       </Link>
     </section>

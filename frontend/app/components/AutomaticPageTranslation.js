@@ -177,7 +177,10 @@ export function AutomaticPageTranslation() {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (manuallyLocalizedPages.has(pathname)) return undefined;
+    if (
+      manuallyLocalizedPages.has(pathname) ||
+      pathname.startsWith("/catalog-romania/magazine")
+    ) return undefined;
 
     translateTree(document.body, locale);
     const observer = new MutationObserver((entries) => {

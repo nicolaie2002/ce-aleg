@@ -7,7 +7,6 @@ import {
   Clock3,
   CreditCard,
   Loader2,
-  Mail,
   MessageCircle,
   Send,
   ShieldCheck,
@@ -15,15 +14,23 @@ import {
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
+const SUPPORT_TOPICS = [
+  { value: "account", ro: "Întrebare despre cont", en: "Account question" },
+  { value: "payment", ro: "Problemă la plată", en: "Payment issue" },
+  { value: "wrong_product", ro: "Produs identificat greșit", en: "Incorrectly identified product" },
+  { value: "alternatives", ro: "Alternative nepotrivite", en: "Unsuitable alternatives" },
+  { value: "privacy", ro: "Ștergere date sau cont", en: "Delete data or account" },
+  { value: "partnership", ro: "Parteneriat", en: "Partnership" },
+];
 
 export default function SupportPage() {
   const { pick } = useLocale();
   const [email, setEmail] = useState("");
-  const [topic, setTopic] = useState("Întrebare despre cont");
+  const [topic, setTopic] = useState("account");
   const [message, setMessage] = useState("");
   const [status, setStatus] = useState("");
   const [statusTone, setStatusTone] = useState("info");
@@ -38,24 +45,33 @@ export default function SupportPage() {
     setStatus("");
 
     try {
+      const selectedTopic = SUPPORT_TOPICS.find((item) => item.value === topic);
+      const topicLabel = selectedTopic ? pick(selectedTopic.ro, selectedTopic.en) : topic;
       const response = await fetch(`${API_URL}/support/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, topic, message }),
+        body: JSON.stringify({ email, topic: topicLabel, message }),
       });
       const data = await readApiJson(response, "Suport");
 
       if (!response.ok) {
-        throw new Error(data.error || "Mesajul nu a putut fi trimis.");
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Mesajul nu a putut fi trimis.",
+            "The message could not be sent."
+          )
+        );
       }
 
       setStatusTone("success");
-      setStatus(data.message || "Mesajul a fost trimis.");
+      setStatus(pick(data.message || "Mesajul a fost trimis.", "Your message was sent."));
       setMessage("");
-      trackEvent("support_message", { topic });
+      trackEvent("support_message", { topic: topicLabel });
     } catch (error) {
       setStatusTone("error");
-      setStatus(error.message || "Mesajul nu a putut fi trimis.");
+      setStatus(error.message || pick("Mesajul nu a putut fi trimis.", "The message could not be sent."));
     } finally {
       setIsSending(false);
     }
@@ -122,12 +138,11 @@ export default function SupportPage() {
                   onChange={(event) => setTopic(event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
                 >
-                  <option>Întrebare despre cont</option>
-                  <option>Problemă la plată</option>
-                  <option>Produs identificat greșit</option>
-                  <option>Alternative nepotrivite</option>
-                  <option>Ștergere date sau cont</option>
-                  <option>Parteneriat</option>
+                  {SUPPORT_TOPICS.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {pick(item.ro, item.en)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
