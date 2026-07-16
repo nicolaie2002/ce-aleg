@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Loader2, Search, SwitchCamera } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfilePayload } from "../utils/profilePreferences";
 import { trackEvent } from "../utils/analytics";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 let barcodeReaderModulePromise = null;
 
@@ -254,6 +256,7 @@ function pulseScannerFeedback() {
 }
 
 export default function BarcodeScanPage() {
+  const { pick } = useLocale();
   const videoRef = useRef(null);
   const confirmationPanelRef = useRef(null);
   const resultPanelRef = useRef(null);
@@ -318,35 +321,6 @@ export default function BarcodeScanPage() {
   }, [liveVisionEnabled]);
 
   useEffect(() => {
-    queueMicrotask(() => {
-      const savedUser = localStorage.getItem("cealeg_user");
-      const savedStore = localStorage.getItem("cealeg_scan_store");
-
-      if (!savedUser) {
-        window.location.assign("/login");
-        return;
-      }
-
-      if (savedStore && STORE_OPTIONS.includes(savedStore)) {
-        setSelectedStore(savedStore);
-        setObservedStore(savedStore);
-      } else {
-        setObservedStore("Kaufland");
-      }
-
-      setUser(JSON.parse(savedUser));
-      loadVideoDevices();
-      loadScannerCapabilities();
-    });
-
-    return () => {
-      stopScanner();
-      ocrWorkerRef.current?.terminate?.();
-      ocrWorkerRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
     window.localStorage?.setItem("cealeg_scan_store", selectedStore);
     setObservedStore((currentStore) => currentStore || selectedStore);
   }, [selectedStore]);
@@ -393,10 +367,10 @@ export default function BarcodeScanPage() {
     pendingBarcodeConfirmation,
   ]);
 
-  async function loadScannerCapabilities() {
+  const loadScannerCapabilities = useCallback(async () => {
     try {
       const response = await fetch(`${API_URL}/ai/status`);
-      const data = await response.json();
+      const data = await readApiJson(response);
       const enabled = Boolean(response.ok && data.cloudVision?.enabled);
 
       liveVisionEnabledRef.current = enabled;
@@ -405,12 +379,12 @@ export default function BarcodeScanPage() {
       liveVisionEnabledRef.current = false;
       setLiveVisionEnabled(false);
     }
-  }
+  }, []);
 
-  async function loadVideoDevices() {
+  const loadVideoDevices = useCallback(async () => {
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-        setMessage("Browserul nu permite listarea camerelor.");
+        setMessage(pick("Browserul nu permite listarea camerelor.", "Your browser cannot list available cameras."));
         return;
       }
 
@@ -434,9 +408,38 @@ export default function BarcodeScanPage() {
         setSelectedDeviceId(backCamera?.deviceId || cameras[0].deviceId);
       }
     } catch {
-      setMessage("Nu am putut lista camerele disponibile.");
+      setMessage(pick("Nu am putut lista camerele disponibile.", "Available cameras could not be listed."));
     }
-  }
+  }, [pick]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      const savedUser = localStorage.getItem("cealeg_user");
+      const savedStore = localStorage.getItem("cealeg_scan_store");
+
+      if (!savedUser) {
+        window.location.assign("/login");
+        return;
+      }
+
+      if (savedStore && STORE_OPTIONS.includes(savedStore)) {
+        setSelectedStore(savedStore);
+        setObservedStore(savedStore);
+      } else {
+        setObservedStore("Kaufland");
+      }
+
+      setUser(JSON.parse(savedUser));
+      loadVideoDevices();
+      loadScannerCapabilities();
+    });
+
+    return () => {
+      stopScanner();
+      ocrWorkerRef.current?.terminate?.();
+      ocrWorkerRef.current = null;
+    };
+  }, [loadScannerCapabilities, loadVideoDevices]);
 
   async function requestCameraPermissionAndReloadDevices() {
     try {
@@ -449,9 +452,9 @@ export default function BarcodeScanPage() {
 
       await loadVideoDevices();
 
-      setMessage("Permisiunea pentru cameră este activă.");
+      setMessage(pick("Permisiunea pentru cameră este activă.", "Camera permission is active."));
     } catch {
-      setMessage("Nu ai permis accesul la cameră sau browserul a blocat camera.");
+      setMessage(pick("Nu ai permis accesul la cameră sau browserul a blocat camera.", "Camera access was denied or blocked by your browser."));
     }
   }
 
@@ -514,7 +517,7 @@ export default function BarcodeScanPage() {
       await track.applyConstraints({ advanced: [{ torch: nextValue }] });
       setTorchEnabled(nextValue);
     } catch {
-      setMessage("Lanterna nu poate fi controlată de acest browser.");
+      setMessage(pick("Lanterna nu poate fi controlată de acest browser.", "This browser cannot control the flashlight."));
     }
   }
 
@@ -553,7 +556,7 @@ export default function BarcodeScanPage() {
   async function startNativeBarcodeDetector(deviceId) {
     if (!("BarcodeDetector" in window)) {
       if (scannerMode === "native") {
-        setMessage("Browserul tău nu suportă BarcodeDetector nativ. Folosește modul ZXing.");
+        setMessage(pick("Browserul tău nu suportă scannerul nativ. Folosește modul ZXing.", "Your browser does not support the native scanner. Use ZXing mode."));
       }
 
       return false;
@@ -628,7 +631,7 @@ export default function BarcodeScanPage() {
     } catch {
 
       if (scannerMode === "native") {
-        setMessage("Nu am putut porni scannerul nativ. Încearcă modul ZXing.");
+        setMessage(pick("Nu am putut porni scannerul nativ. Încearcă modul ZXing.", "The native scanner could not start. Try ZXing mode."));
       }
 
       setIsScanning(false);
@@ -638,7 +641,7 @@ export default function BarcodeScanPage() {
 
   async function startZxingScanner(deviceId) {
     setMessage("");
-    setScanStatus("Pregătesc camera...");
+      setScanStatus(pick("Pregătesc camera...", "Preparing camera..."));
 
     try {
       setIsScanning(true);
@@ -669,10 +672,8 @@ export default function BarcodeScanPage() {
       startBarcodeOcrLoop();
       startLiveVisionLoop();
     } catch {
-      setMessage(
-        "Nu am putut porni camera. Verifică permisiunea camerei sau încearcă altă cameră."
-      );
-      setScanStatus("Camera nu a pornit.");
+      setMessage(pick("Nu am putut porni camera. Verifică permisiunea sau încearcă altă cameră.", "The camera could not start. Check permission or try another camera."));
+      setScanStatus(pick("Camera nu a pornit.", "The camera did not start."));
       setIsScanning(false);
     }
   }
@@ -1012,7 +1013,7 @@ export default function BarcodeScanPage() {
     const response = await fetch(
       `${API_URL}/products/search-label?q=${encodeURIComponent(labelText.slice(0, 180))}`
     );
-    const products = await response.json();
+    const products = await readApiJson(response);
     const bestMatch = Array.isArray(products) ? products[0] : null;
 
     if (!response.ok || !bestMatch || bestMatch.matchScore < 55) return;
@@ -1093,7 +1094,7 @@ export default function BarcodeScanPage() {
         method: "POST",
         body: formData,
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (response.status === 503 && data.code === "vision_not_configured") {
         liveVisionEnabledRef.current = false;
@@ -1114,13 +1115,13 @@ export default function BarcodeScanPage() {
       }
 
       if (!response.ok) {
-        throw new Error(data.error || "Cadrul nu a putut fi analizat.");
+        throw new Error(getApiErrorMessage(data, pick, "Cadrul nu a putut fi analizat.", "The camera frame could not be analyzed."));
       }
 
       if (!data.identified) {
         setScanStatus(
-          data.message ||
-            "Caut produsul... arată partea frontală sau codul de bare."
+          (data.message && localizeApiMessage(data.message, pick, data.code)) ||
+            pick("Caut produsul... arată partea frontală sau codul de bare.", "Looking for the product... show the front or barcode.")
         );
         return;
       }
@@ -1168,14 +1169,14 @@ export default function BarcodeScanPage() {
     let shouldRestartAfterMiss = false;
 
     if (!lookupCode) {
-      setMessage("Introdu sau scanează un cod de bare.");
+      setMessage(pick("Introdu sau scanează un cod de bare.", "Enter or scan a barcode."));
       return;
     }
 
     if (!isReliableScannedBarcode(lookupCode)) {
       setBarcode(lookupCode);
-      setMessage("Codul pare citit greșit. Verifică cifrele sau scanează din nou.");
-      setScanStatus("Cod nevalid. Apropie camera și păstrează produsul nemișcat.");
+      setMessage(pick("Codul pare citit greșit. Verifică cifrele sau scanează din nou.", "The code may have been read incorrectly. Check the digits or scan again."));
+      setScanStatus(pick("Cod nevalid. Apropie camera și ține produsul nemișcat.", "Invalid code. Move the camera closer and hold the product still."));
       return;
     }
 
@@ -1214,7 +1215,7 @@ export default function BarcodeScanPage() {
 
     try {
       const response = await fetch(`${API_URL}/barcode/lookup/${lookupCode}`);
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         setLookupIssue(data.code || (response.status === 404 ? "external_product_not_found" : ""));
@@ -1241,9 +1242,7 @@ export default function BarcodeScanPage() {
           stopScanner();
           setScanStatus("Produs negăsit. Confirmă codul citit înainte să îl adaugi.");
         }
-        throw new Error(
-          data.message || data.error || "Produsul nu a fost găsit."
-        );
+        throw new Error(getApiErrorMessage(data, pick, "Produsul nu a fost găsit.", "The product was not found."));
       }
 
       setFoundProduct(data.product);
@@ -1271,7 +1270,7 @@ export default function BarcodeScanPage() {
 
   function switchCamera() {
     if (videoDevices.length < 2) {
-      setMessage("Nu am găsit o altă cameră disponibilă.");
+      setMessage(pick("Nu am găsit o altă cameră disponibilă.", "No other camera is available."));
       return;
     }
 
@@ -1308,18 +1307,20 @@ export default function BarcodeScanPage() {
         },
         body: JSON.stringify(product),
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         setLookupIssue(data.code || "not_found");
-        throw new Error(
-          data.error || "Nu s-a putut salva produsul în baza locală."
-        );
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut salva produsul în catalog.", "The product could not be saved to the catalog."));
       }
 
       setFoundProduct(data.product);
       setProductSource("local");
-      setMessage(data.message || "Produs salvat în baza locală.");
+      setMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Produs salvat în catalog.", "Product saved to the catalog.")
+      );
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -1379,13 +1380,13 @@ export default function BarcodeScanPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut adăuga produsul în coș.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut adăuga produsul în coș.", "The product could not be added to the cart."));
       }
 
-      setMessage(`Produs adăugat în coș: ${product.name}`);
+      setMessage(pick(`Produs adăugat în coș: ${product.name}`, `Added to cart: ${product.name}`));
       window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
     } catch (error) {
       setMessage(error.message);
@@ -1410,8 +1411,8 @@ export default function BarcodeScanPage() {
     setPendingBarcodeConfirmation(null);
     detectedRef.current = false;
     setLookupIssue("");
-    setMessage("Corectează codul din câmpul manual, apoi apasă Caută produsul.");
-    setScanStatus("Verifică cifrele tipărite sub codul de bare.");
+    setMessage(pick("Corectează codul din câmpul manual, apoi apasă Caută produsul.", "Correct the code in the manual field, then select Search product."));
+    setScanStatus(pick("Verifică cifrele tipărite sub codul de bare.", "Check the digits printed under the barcode."));
   }
 
   function rejectPendingBarcode() {
@@ -1426,8 +1427,8 @@ export default function BarcodeScanPage() {
 
   function editPendingBarcode() {
     setPendingBarcodeConfirmation(null);
-    setMessage("Corectează codul din câmpul manual, apoi apasă Caută produsul.");
-    setScanStatus("Verifică cifrele tipărite sub codul de bare.");
+    setMessage(pick("Corectează codul din câmpul manual, apoi apasă Caută produsul.", "Correct the code in the manual field, then select Search product."));
+    setScanStatus(pick("Verifică cifrele tipărite sub codul de bare.", "Check the digits printed under the barcode."));
     detectedRef.current = false;
   }
 
@@ -1461,10 +1462,10 @@ export default function BarcodeScanPage() {
           price: observedPrice,
         }),
       });
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Prețul nu a putut fi salvat.");
+        throw new Error(getApiErrorMessage(data, pick, "Prețul nu a putut fi salvat.", "The price could not be saved."));
       }
 
       setFoundProduct((currentProduct) => ({
@@ -1473,7 +1474,11 @@ export default function BarcodeScanPage() {
       }));
       setObservedPrice("");
       setIsPriceFormOpen(false);
-      setMessage(data.message);
+      setMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Prețul a fost salvat.", "The price was saved.")
+      );
     } catch (error) {
       setMessage(error.message);
     } finally {

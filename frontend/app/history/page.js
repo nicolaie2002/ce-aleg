@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileClock, Heart, Loader2, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
@@ -10,8 +10,12 @@ import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { AppHeader } from "../components/AppHeader";
+import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
+import { localizeCatalogLabel } from "../catalog-romania/seo-data";
 
 export default function HistoryPage() {
+  const { locale, pick } = useLocale();
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);
   const [message, setMessage] = useState("");
@@ -19,20 +23,20 @@ export default function HistoryPage() {
   const [pendingCartItemId, setPendingCartItemId] = useState(null);
   const [pendingFavoriteItemId, setPendingFavoriteItemId] = useState(null);
 
-  async function loadHistory(userId) {
+  const loadHistory = useCallback(async (userId) => {
     try {
       const response = await fetch(`${API_URL}/history/${userId}`);
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut încărca istoricul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut încărca istoricul.", "Scan history could not be loaded."));
       }
 
       setHistory(data);
     } catch (error) {
       setMessage(error.message);
     }
-  }
+  }, [pick]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -47,7 +51,7 @@ export default function HistoryPage() {
       setUser(parsedUser);
       loadHistory(parsedUser.id);
     });
-  }, []);
+  }, [loadHistory]);
 
   async function clearHistory() {
     if (!user) return;
@@ -57,14 +61,14 @@ export default function HistoryPage() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut șterge istoricul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut șterge istoricul.", "Scan history could not be cleared."));
       }
 
       setHistory([]);
-      setMessage("Istoricul a fost șters.");
+      setMessage(pick("Istoricul a fost șters.", "Scan history was cleared."));
       setIsClearModalOpen(false);
 
       setTimeout(() => setMessage(""), 2500);
@@ -79,14 +83,14 @@ export default function HistoryPage() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut șterge scanarea.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut șterge scanarea.", "The scan could not be removed."));
       }
 
       setHistory(history.filter((item) => item.id !== id));
-      setMessage("Scanare ștearsă din istoric.");
+      setMessage(pick("Scanare ștearsă din istoric.", "Scan removed from history."));
 
       setTimeout(() => setMessage(""), 2500);
     } catch (error) {
@@ -123,13 +127,13 @@ export default function HistoryPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut adăuga produsul în coș.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut adăuga produsul în coș.", "The product could not be added to the cart."));
       }
 
-      setMessage(`Produs adăugat în coș: ${item.name}`);
+      setMessage(pick(`Produs adăugat în coș: ${item.name}`, `Added to cart: ${item.name}`));
       window.dispatchEvent(new CustomEvent("cealeg:cart-updated"));
       setTimeout(() => setMessage(""), 2500);
     } catch (error) {
@@ -167,13 +171,17 @@ export default function HistoryPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut salva la favorite.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut salva la favorite.", "The product could not be saved to favorites."));
       }
 
-      setMessage(data.message || `Produs salvat la favorite: ${item.name}`);
+      setMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick(`Produs salvat la favorite: ${item.name}`, `Saved to favorites: ${item.name}`)
+      );
       setTimeout(() => setMessage(""), 2500);
     } catch (error) {
       setMessage(error.message);
@@ -185,7 +193,7 @@ export default function HistoryPage() {
   function formatDate(dateString) {
     const date = new Date(dateString);
 
-    return date.toLocaleString("ro-RO", {
+    return date.toLocaleString(locale === "en" ? "en-GB" : "ro-RO", {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
@@ -197,21 +205,21 @@ export default function HistoryPage() {
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">Se încarcă istoricul...</p>
+        <p className="text-gray-300" role="status">{pick("Se încarcă istoricul...", "Loading scan history...")}</p>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
-      <AppHeader actionHref="/barcode-scan" actionLabel="Scanează produs" />
+      <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scanează produs", "Scan product")} />
       <section className="ce-shell-lg ce-page">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
             className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            <ArrowLeft size={16} /> Înapoi la dashboard
+            <ArrowLeft size={16} /> {pick("Înapoi la dashboard", "Back to dashboard")}
           </Link>
 
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -220,7 +228,7 @@ export default function HistoryPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
               <ScanLine size={17} />
-              Scanează produs
+              {pick("Scanează produs", "Scan product")}
             </Link>
 
             <Link
@@ -228,7 +236,7 @@ export default function HistoryPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-yellow-300/30 px-5 py-3 text-center font-semibold text-yellow-300 hover:bg-yellow-300/10"
             >
               <Heart size={17} />
-              Favorite
+              {pick("Favorite", "Favorites")}
             </Link>
 
             <Link
@@ -236,47 +244,47 @@ export default function HistoryPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
               <ShoppingCart size={17} />
-              Vezi coșul
+              {pick("Vezi coșul", "View cart")}
             </Link>
           </div>
         </div>
 
         {message && (
-          <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
+          <div role="status" className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
             {message}
           </div>
         )}
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl">
           <p className="mb-3 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300">
-            Istoric scanări
+            {pick("Istoric scanări", "Scan history")}
           </p>
 
           <h1 className="text-4xl font-bold md:text-5xl">
-            Scanările lui {user.name}
+            {pick(`Scanările lui ${user.name}`, `${user.name}'s scans`)}
           </h1>
 
           <p className="mt-4 max-w-2xl text-gray-300">
-            Istoricul este salvat acum în baza de date pentru contul tău.
+            {pick("Istoricul este salvat în contul tău.", "Your scan history is saved to your account.")}
           </p>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Scanări salvate</p>
+              <p className="text-sm text-gray-400">{pick("Scanări salvate", "Saved scans")}</p>
               <p className="mt-1 text-3xl font-black text-emerald-300">
                 {history.length}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Ultimul magazin</p>
+              <p className="text-sm text-gray-400">{pick("Ultimul magazin", "Latest store")}</p>
               <p className="mt-1 text-xl font-bold text-emerald-300">
                 {history[0]?.store || "-"}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Ultimul scor</p>
+              <p className="text-sm text-gray-400">{pick("Ultimul scor", "Latest score")}</p>
               <p className="mt-1 text-3xl font-black text-emerald-300">
                 {history[0]?.score || "-"}
               </p>
@@ -289,10 +297,10 @@ export default function HistoryPage() {
                 <FileClock size={32} />
               </span>
               <h2 className="mt-4 text-2xl font-bold">
-                Nu există scanări încă
+                {pick("Nu există scanări încă", "There are no scans yet")}
               </h2>
               <p className="mt-3 text-gray-400">
-                Scanează primul produs și va apărea automat aici.
+                {pick("Scanează primul produs și va apărea automat aici.", "Scan your first product and it will appear here automatically.")}
               </p>
 
               <Link
@@ -300,7 +308,7 @@ export default function HistoryPage() {
                 className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 font-black text-black hover:bg-cyan-100"
               >
                 <ScanLine size={18} />
-                Scanează primul produs
+                {pick("Scanează primul produs", "Scan your first product")}
               </Link>
             </div>
           ) : (
@@ -327,7 +335,7 @@ export default function HistoryPage() {
                       </span>
 
                       <span className="rounded-full border border-white/10 px-3 py-1 text-sm text-gray-300">
-                        {item.category}
+                        {localizeCatalogLabel(item.category, locale)}
                       </span>
                     </div>
 
@@ -343,7 +351,7 @@ export default function HistoryPage() {
                     />
 
                     <p className="mt-3 text-xs text-gray-500">
-                      Scanat la: {formatDate(item.scanned_at)}
+                      {pick("Scanat la", "Scanned on")}: {formatDate(item.scanned_at)}
                     </p>
                   </div>
 
@@ -358,7 +366,7 @@ export default function HistoryPage() {
                       ) : (
                         <ShoppingCart size={18} />
                       )}
-                      {pendingCartItemId === item.id ? "Se adaugă..." : "Adaugă în coș"}
+                      {pendingCartItemId === item.id ? pick("Se adaugă...", "Adding...") : pick("Adaugă în coș", "Add to cart")}
                     </button>
 
                     <button
@@ -371,14 +379,14 @@ export default function HistoryPage() {
                       ) : (
                         <Heart size={18} />
                       )}
-                      {pendingFavoriteItemId === item.id ? "Se salvează..." : "Favorite"}
+                      {pendingFavoriteItemId === item.id ? pick("Se salvează...", "Saving...") : pick("Favorite", "Favorite")}
                     </button>
 
                     <button
                       onClick={() => deleteHistoryItem(item.id)}
                       className="rounded-2xl border border-red-400/30 px-5 py-3 font-semibold text-red-300 hover:bg-red-400/10"
                     >
-                      Șterge
+                      {pick("Șterge", "Remove")}
                     </button>
                   </div>
                 </div>
@@ -388,7 +396,7 @@ export default function HistoryPage() {
                 onClick={() => setIsClearModalOpen(true)}
                 className="w-full rounded-2xl border border-red-400/30 px-5 py-4 font-semibold text-red-300 hover:bg-red-400/10"
               >
-                Șterge istoricul
+                {pick("Șterge istoricul", "Clear scan history")}
               </button>
             </div>
           )}
@@ -397,9 +405,10 @@ export default function HistoryPage() {
 
       <ConfirmModal
         isOpen={isClearModalOpen}
-        title="Ștergi istoricul?"
-        message="Toate scanările salvate vor fi șterse. Acțiunea nu poate fi anulată."
-        confirmLabel="Șterge istoricul"
+        title={pick("Ștergi istoricul?", "Clear scan history?")}
+        message={pick("Toate scanările salvate vor fi șterse. Acțiunea nu poate fi anulată.", "All saved scans will be removed. This action cannot be undone.")}
+        confirmLabel={pick("Șterge istoricul", "Clear history")}
+        cancelLabel={pick("Anulează", "Cancel")}
         onCancel={() => setIsClearModalOpen(false)}
         onConfirm={clearHistory}
       />

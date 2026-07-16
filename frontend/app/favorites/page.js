@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Heart, ScanLine, ShoppingCart } from "lucide-react";
 import { API_URL } from "../config";
@@ -9,6 +9,9 @@ import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { AppHeader } from "../components/AppHeader";
+import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
+import { localizeCatalogLabel } from "../catalog-romania/seo-data";
 
 function getImageUrl(path) {
   if (!path) return "";
@@ -25,25 +28,26 @@ function getImageUrl(path) {
 }
 
 export default function FavoritesPage() {
+  const { locale, pick } = useLocale();
   const [user, setUser] = useState(null);
   const [favorites, setFavorites] = useState([]);
   const [message, setMessage] = useState("");
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
-  async function loadFavorites(userId) {
+  const loadFavorites = useCallback(async (userId) => {
     try {
       const response = await fetch(`${API_URL}/favorites/${userId}`);
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-au putut încărca favoritele.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-au putut încărca favoritele.", "Favorites could not be loaded."));
       }
 
       setFavorites(data);
     } catch (error) {
       setMessage(error.message);
     }
-  }
+  }, [pick]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -58,7 +62,7 @@ export default function FavoritesPage() {
       setUser(parsedUser);
       loadFavorites(parsedUser.id);
     });
-  }, []);
+  }, [loadFavorites]);
 
   async function removeFavorite(id) {
     try {
@@ -66,14 +70,14 @@ export default function FavoritesPage() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut șterge produsul favorit.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut șterge produsul favorit.", "The favorite product could not be removed."));
       }
 
       setFavorites(favorites.filter((item) => item.id !== id));
-      setMessage("Produs șters din favorite.");
+      setMessage(pick("Produs șters din favorite.", "Product removed from favorites."));
 
       setTimeout(() => {
         setMessage("");
@@ -91,14 +95,14 @@ export default function FavoritesPage() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-au putut șterge favoritele.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-au putut șterge favoritele.", "Favorites could not be cleared."));
       }
 
       setFavorites([]);
-      setMessage("Toate favoritele au fost șterse.");
+      setMessage(pick("Toate favoritele au fost șterse.", "All favorites were cleared."));
       setIsClearModalOpen(false);
 
       setTimeout(() => {
@@ -134,13 +138,13 @@ export default function FavoritesPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut adăuga produsul în coș.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut adăuga produsul în coș.", "The product could not be added to the cart."));
       }
 
-      setMessage(`Produs adăugat în coș: ${item.name}`);
+      setMessage(pick(`Produs adăugat în coș: ${item.name}`, `Added to cart: ${item.name}`));
 
       setTimeout(() => {
         setMessage("");
@@ -153,21 +157,21 @@ export default function FavoritesPage() {
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">Se încarcă favoritele...</p>
+        <p className="text-gray-300" role="status">{pick("Se încarcă favoritele...", "Loading favorites...")}</p>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
-      <AppHeader actionHref="/barcode-scan" actionLabel="Scanează produs" />
+      <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scanează produs", "Scan product")} />
       <section className="ce-shell-lg ce-page">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
             className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            <ArrowLeft size={16} /> Înapoi la dashboard
+            <ArrowLeft size={16} /> {pick("Înapoi la dashboard", "Back to dashboard")}
           </Link>
 
           <div className="flex flex-col gap-3 sm:flex-row">
@@ -176,7 +180,7 @@ export default function FavoritesPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
               <ScanLine size={17} />
-              Scanează produs
+              {pick("Scanează produs", "Scan product")}
             </Link>
 
             <Link
@@ -184,48 +188,50 @@ export default function FavoritesPage() {
               className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
             >
               <ShoppingCart size={17} />
-              Vezi coșul
+              {pick("Vezi coșul", "View cart")}
             </Link>
           </div>
         </div>
 
         {message && (
-          <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
+          <div role="status" className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
             {message}
           </div>
         )}
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl">
           <p className="mb-3 inline-flex rounded-full border border-yellow-300/30 bg-yellow-300/10 px-4 py-2 text-sm text-yellow-300">
-            Produse favorite
+            {pick("Produse favorite", "Favorite products")}
           </p>
 
           <h1 className="text-4xl font-bold md:text-5xl">
-            Favoritele lui {user.name}
+            {pick(`Favoritele lui ${user.name}`, `${user.name}'s favorites`)}
           </h1>
 
           <p className="mt-4 max-w-2xl text-gray-300">
-            Păstrează produsele pe care vrei să le găsești ușor la următoarea
-            cumpărătură.
+            {pick(
+              "Păstrează produsele pe care vrei să le găsești ușor la următoarea cumpărătură.",
+              "Keep the products you want to find easily on your next shopping trip."
+            )}
           </p>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Produse favorite</p>
+              <p className="text-sm text-gray-400">{pick("Produse favorite", "Favorite products")}</p>
               <p className="mt-1 text-3xl font-black text-yellow-300">
                 {favorites.length}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Ultimul produs</p>
+              <p className="text-sm text-gray-400">{pick("Ultimul produs", "Latest product")}</p>
               <p className="mt-1 text-xl font-bold text-yellow-300">
                 {favorites[0]?.name || "-"}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Ultimul scor</p>
+              <p className="text-sm text-gray-400">{pick("Ultimul scor", "Latest score")}</p>
               <p className="mt-1 text-3xl font-black text-yellow-300">
                 {favorites[0]?.score || "-"}
               </p>
@@ -238,11 +244,13 @@ export default function FavoritesPage() {
                 <Heart size={32} />
               </span>
               <h2 className="mt-4 text-2xl font-bold">
-                Nu ai produse favorite încă
+                {pick("Nu ai produse favorite încă", "You do not have any favorite products yet")}
               </h2>
               <p className="mt-3 text-gray-400">
-                Scanează un produs sau alege o alternativă și apasă „Adaugă la
-                favorite”.
+                {pick(
+                  "Scanează un produs sau alege o alternativă și apasă «Adaugă la favorite».",
+                  "Scan a product or choose an alternative and select Add to favorites."
+                )}
               </p>
 
               <Link
@@ -250,7 +258,7 @@ export default function FavoritesPage() {
                 className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 font-black text-black hover:bg-cyan-100"
               >
                 <ScanLine size={18} />
-                Scanează produs
+                {pick("Scanează produs", "Scan product")}
               </Link>
             </div>
           ) : (
@@ -273,12 +281,12 @@ export default function FavoritesPage() {
                       </span>
 
                       <span className="rounded-full border border-white/10 px-3 py-1 text-sm text-gray-300">
-                        {item.store || "Fără magazin"}
+                        {item.store || pick("Fără magazin", "No store")}
                       </span>
 
                       {item.category && (
                         <span className="rounded-full border border-white/10 px-3 py-1 text-sm text-gray-300">
-                          {item.category}
+                          {localizeCatalogLabel(item.category, locale)}
                         </span>
                       )}
                     </div>
@@ -287,13 +295,13 @@ export default function FavoritesPage() {
 
                     <p className="mt-1 text-sm text-emerald-300">
                       {item.price === "preț necunoscut"
-                        ? "Verifică prețul în magazin"
-                        : item.price || "Verifică prețul în magazin"}
+                        ? pick("Verifică prețul în magazin", "Check the price in store")
+                        : item.price || pick("Verifică prețul în magazin", "Check the price in store")}
                     </p>
 
                     <ExpandableText
                       text={item.reason}
-                      fallback="Produs favorit."
+                      fallback={pick("Produs favorit.", "Favorite product.")}
                       className="mt-3 text-sm leading-6 text-gray-300"
                     />
                   </div>
@@ -304,14 +312,14 @@ export default function FavoritesPage() {
                       className="inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black hover:bg-cyan-100"
                     >
                       <ShoppingCart size={18} />
-                      Adaugă în coș
+                      {pick("Adaugă în coș", "Add to cart")}
                     </button>
 
                     <button
                       onClick={() => removeFavorite(item.id)}
                       className="rounded-2xl border border-red-400/30 px-5 py-3 font-semibold text-red-300 hover:bg-red-400/10"
                     >
-                      Șterge
+                      {pick("Șterge", "Remove")}
                     </button>
                   </div>
                 </div>
@@ -321,7 +329,7 @@ export default function FavoritesPage() {
                 onClick={() => setIsClearModalOpen(true)}
                 className="w-full rounded-2xl border border-red-400/30 px-5 py-4 font-semibold text-red-300 hover:bg-red-400/10"
               >
-                Șterge toate favoritele
+                {pick("Șterge toate favoritele", "Clear all favorites")}
               </button>
             </div>
           )}
@@ -330,9 +338,10 @@ export default function FavoritesPage() {
 
       <ConfirmModal
         isOpen={isClearModalOpen}
-        title="Ștergi toate favoritele?"
-        message="Lista de produse favorite va fi golită. Acțiunea nu poate fi anulată."
-        confirmLabel="Șterge favoritele"
+        title={pick("Ștergi toate favoritele?", "Clear all favorites?")}
+        message={pick("Lista de produse favorite va fi golită. Acțiunea nu poate fi anulată.", "Your favorite products list will be cleared. This action cannot be undone.")}
+        confirmLabel={pick("Șterge favoritele", "Clear favorites")}
+        cancelLabel={pick("Anulează", "Cancel")}
         onCancel={() => setIsClearModalOpen(false)}
         onConfirm={clearFavorites}
       />

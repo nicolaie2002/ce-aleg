@@ -20,8 +20,11 @@ import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
 import { CarbonVaporBackground } from "../components/CarbonVaporBackground";
 import { InteractiveSurface } from "../components/InteractiveSurface";
+import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
+import { localizeCatalogLabel } from "../catalog-romania/seo-data";
 
-function getStoreName(storeId) {
+function getStoreName(storeId, pick) {
   const stores = {
     lidl: "Lidl",
     kaufland: "Kaufland",
@@ -29,11 +32,11 @@ function getStoreName(storeId) {
     mega: "Mega Image",
     profi: "Profi",
     penny: "Penny",
-    local: "Market local",
-    any: "Fără magazin ales",
+    local: pick("Magazin local", "Local store"),
+    any: pick("Fără magazin ales", "No store selected"),
   };
 
-  return stores[storeId] || "Fără magazin ales";
+  return stores[storeId] || pick("Fără magazin ales", "No store selected");
 }
 
 function getImageUrl(path) {
@@ -51,9 +54,10 @@ function getImageUrl(path) {
 }
 
 function ScanPageContent() {
+  const { locale, pick } = useLocale();
   const searchParams = useSearchParams();
   const storeParam = searchParams.get("store") || "any";
-  const storeName = getStoreName(storeParam);
+  const storeName = getStoreName(storeParam, pick);
 
   const [user, setUser] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -201,10 +205,10 @@ function ScanPageContent() {
           { signal: controller.signal }
         );
 
-        const data = await response.json();
+        const data = await readApiJson(response);
 
         if (!response.ok) {
-          throw new Error(data.error || "Nu s-au putut încărca sugestiile.");
+          throw new Error(getApiErrorMessage(data, pick, "Nu s-au putut încărca sugestiile.", "Suggestions could not be loaded."));
         }
 
         if (isActive) {
@@ -221,7 +225,7 @@ function ScanPageContent() {
         if (isActive) {
           setSuggestions([]);
           setSearchError(
-            error.message || "Catalogul extern nu răspunde acum. Încearcă din nou în câteva clipe."
+            error.message || pick("Catalogul extern nu răspunde acum. Încearcă din nou în câteva clipe.", "The external catalog is not responding. Try again in a few moments.")
           );
         }
       } finally {
@@ -236,7 +240,7 @@ function ScanPageContent() {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [productQuery, selectedSuggestion, storeParam, user?.id]);
+  }, [pick, productQuery, selectedSuggestion, storeParam, user?.id]);
 
   function selectSuggestion(product) {
     setSelectedSuggestion(product);
@@ -248,8 +252,10 @@ function ScanPageContent() {
   }
 
   function buildResultFromSuggestion(product) {
-    const fallbackReason =
-      "Produs găsit în catalogul online. Verifică eticheta de pe ambalaj înainte de cumpărare și compară alternativele din aceeași categorie.";
+    const fallbackReason = pick(
+      "Produs găsit în catalogul online. Verifică eticheta de pe ambalaj înainte de cumpărare și compară alternativele din aceeași categorie.",
+      "Product found in the online catalog. Check the package label before buying and compare alternatives in the same category."
+    );
 
     return {
       id: product.id || null,
@@ -259,8 +265,8 @@ function ScanPageContent() {
       store: storeName,
       source: product.source || "catalog",
       score: product.score,
-      category: product.category || "Categorie neconfirmată",
-      price: product.priceText || product.price || "Verifică prețul în magazin",
+      category: product.category || pick("Categorie neconfirmată", "Unconfirmed category"),
+      price: product.priceText || product.price || pick("Verifică prețul în magazin", "Check the price in store"),
       calories: product.calories,
       protein: product.protein,
       sugar: product.sugar,
@@ -299,7 +305,10 @@ function ScanPageContent() {
   async function analyzeProduct() {
     if (!productQuery.trim()) {
       setErrorMessage(
-        "Scrie numele produsului sau scanează codul de bare. Exemplu: Skyr natural, Monster Ultra White."
+        pick(
+          "Scrie numele produsului sau scanează codul de bare. Exemplu: skyr natural.",
+          "Enter the product name or scan its barcode. Example: plain skyr."
+        )
       );
       return;
     }
@@ -326,7 +335,10 @@ function ScanPageContent() {
 
       if (!selectedFile) {
         setErrorMessage(
-          "Alege o potrivire din catalog sau încarcă o poză pentru citirea textului de pe ambalaj."
+          pick(
+            "Alege o potrivire din catalog sau încarcă o poză pentru citirea textului de pe ambalaj.",
+            "Choose a catalog match or upload a photo to read the package text."
+          )
         );
         return;
       }
@@ -346,7 +358,7 @@ function ScanPageContent() {
         body: formData,
       });
 
-      const result = await response.json();
+      const result = await readApiJson(response);
 
       if (!response.ok) {
         if (result.product_not_found) {
@@ -354,7 +366,7 @@ function ScanPageContent() {
           return;
         }
 
-        throw new Error(result.error || "Imaginea nu a putut fi analizată.");
+        throw new Error(getApiErrorMessage(result, pick, "Imaginea nu a putut fi analizată.", "The image could not be analyzed."));
       }
 
       localStorage.setItem("cealeg_last_result", JSON.stringify(result));
@@ -366,7 +378,7 @@ function ScanPageContent() {
       console.error(error);
       setErrorMessage(
         error.message ||
-          "Analiza nu este disponibilă acum. Încearcă din nou în câteva clipe."
+          pick("Analiza nu este disponibilă acum. Încearcă din nou în câteva clipe.", "Analysis is unavailable right now. Try again in a few moments.")
       );
     } finally {
       setIsAnalyzing(false);
@@ -388,7 +400,7 @@ function ScanPageContent() {
         <CarbonVaporBackground />
         <div className="relative z-10 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/35 px-5 py-4 shadow-2xl backdrop-blur">
           <Loader2 className="h-5 w-5 animate-spin text-cyan-200" />
-          <p className="font-semibold text-gray-200">Se pregătește scanarea...</p>
+          <p className="font-semibold text-gray-200" role="status">{pick("Se pregătește scanarea...", "Preparing scanner...")}</p>
         </div>
       </main>
     );
@@ -398,7 +410,7 @@ function ScanPageContent() {
     <main className="relative min-h-screen overflow-hidden bg-[#05080f] text-white">
       <CarbonVaporBackground />
       <div className="relative z-10">
-        <AppHeader actionHref="/barcode-scan" actionLabel="Scanează codul" />
+        <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scanează codul", "Scan barcode")} />
       </div>
       <section className="ce-shell-md ce-page relative z-10 flex min-h-screen flex-col">
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -406,7 +418,7 @@ function ScanPageContent() {
             href="/store"
             className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            <ArrowLeft size={16} /> Înapoi la alegerea magazinului
+            <ArrowLeft size={16} /> {pick("Înapoi la alegerea magazinului", "Back to store selection")}
           </Link>
 
           <Link
@@ -414,7 +426,7 @@ function ScanPageContent() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-4 py-2 text-center text-sm font-semibold hover:bg-white/10"
           >
             <Clock3 size={16} />
-            Istoric scanări
+            {pick("Istoric scanări", "Scan history")}
           </Link>
         </div>
 
@@ -422,15 +434,16 @@ function ScanPageContent() {
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
               <Search size={16} />
-              Identificare prin cod sau nume
+              {pick("Identificare prin cod sau nume", "Identify by barcode or name")}
             </p>
             <h1 className="mt-5 max-w-4xl text-3xl font-black leading-tight sm:text-4xl md:text-6xl">
-              Găsește produsul corect fără să ghicești.
+              {pick("Găsește produsul corect fără să ghicești.", "Find the correct product without guessing.")}
             </h1>
             <p className="mt-4 max-w-3xl text-base leading-7 text-gray-300 sm:text-lg sm:leading-8">
-              Momentan identificarea sigură se face prin cod de bare sau prin
-              denumirea scrisă pe ambalaj. Fotografia este opțională și ajută
-              doar la citirea locală a textului vizibil.
+              {pick(
+                "Identificarea sigură se face prin codul de bare sau denumirea de pe ambalaj. Fotografia este opțională și ajută la citirea locală a textului vizibil.",
+                "Reliable identification uses the barcode or the name on the package. A photo is optional and helps read visible text locally."
+              )}
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -439,14 +452,14 @@ function ScanPageContent() {
                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-cyan-200 px-5 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-white"
               >
                 <Search size={18} />
-                Caută produs după nume
+                {pick("Caută produs după nume", "Search by product name")}
               </a>
               <Link
                 href={`/barcode-scan?store=${storeParam}`}
                 className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/12 bg-black/35 px-5 py-3 font-bold text-white transition hover:-translate-y-0.5 hover:bg-white/10"
               >
                 <Barcode size={18} />
-                Scanează codul de bare
+                {pick("Scanează codul de bare", "Scan barcode")}
               </Link>
             </div>
           </div>
@@ -458,21 +471,23 @@ function ScanPageContent() {
               </span>
               <div>
                 <p className="text-sm font-black uppercase text-cyan-200">
-                  AI vizual
+                  {pick("AI vizual", "Visual AI")}
                 </p>
-                <h2 className="mt-1 text-2xl font-black">În dezvoltare</h2>
+                <h2 className="mt-1 text-2xl font-black">{pick("În dezvoltare", "In development")}</h2>
                 <p className="mt-3 leading-7 text-gray-300">
-                  Recunoașterea produsului doar din ambalaj nu este activă
-                  încă. Când o pornim, va fi separată clar de scanarea prin cod.
+                  {pick(
+                    "Recunoașterea produsului doar din ambalaj nu este încă activă. Va fi separată clar de scanarea prin cod.",
+                    "Product recognition from packaging alone is not active yet. It will be clearly separated from barcode scanning."
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="mt-5 grid gap-3">
               {[
-                ["Cod de bare", "cea mai rapidă metodă", Barcode],
-                ["Nume produs", "caută în catalogul online", Search],
-                ["Poză opțională", "citește text local de pe etichetă", Camera],
+                [pick("Cod de bare", "Barcode"), pick("cea mai rapidă metodă", "the fastest method"), Barcode],
+                [pick("Nume produs", "Product name"), pick("caută în catalogul online", "search the online catalog"), Search],
+                [pick("Poză opțională", "Optional photo"), pick("citește local textul etichetei", "read label text locally"), Camera],
               ].map(([title, detail, Icon]) => (
                 <div
                   key={title}
@@ -496,32 +511,34 @@ function ScanPageContent() {
           <div className="mb-6">
             <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-300/35 bg-cyan-300/10 px-4 py-2 text-sm font-black text-cyan-100">
               <Sparkles size={16} />
-              Căutare asistată
+              {pick("Căutare asistată", "Assisted search")}
             </p>
 
             <h2 className="text-2xl font-black sm:text-3xl md:text-4xl">
-              Scrie numele sau alege produsul corect din catalog.
+              {pick("Scrie numele sau alege produsul corect din catalog.", "Enter a name or choose the correct catalog product.")}
             </h2>
 
             <div className="mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Magazin selectat</p>
+              <p className="text-sm text-gray-400">{pick("Magazin selectat", "Selected store")}</p>
               <p className="mt-1 text-xl font-black text-cyan-100">
                 {storeName}
               </p>
             </div>
 
             <p className="mt-4 max-w-4xl leading-7 text-gray-300">
-              Căutarea folosește denumirea, codul de bare și catalogul online.
-              Poza nu identifică singură ambalajul; o folosim doar dacă vrei să
-              extragem textul vizibil de pe etichetă.
+              {pick(
+                "Căutarea folosește denumirea, codul de bare și catalogul online. Poza este folosită doar pentru a extrage textul vizibil de pe etichetă.",
+                "Search uses the name, barcode and online catalog. The photo is only used to extract visible label text."
+              )}
             </p>
 
             <div className="relative mt-5 rounded-2xl border border-white/10 bg-black/30 p-4">
-              <label className="text-sm font-semibold text-gray-300">
-                Nume sau cod de pe ambalaj
+              <label htmlFor="scan-product-query" className="text-sm font-semibold text-gray-300">
+                {pick("Nume sau cod de pe ambalaj", "Name or code from the package")}
               </label>
 
               <input
+                id="scan-product-query"
                 value={productQuery}
                 onChange={(e) => {
                   setProductQuery(e.target.value);
@@ -530,32 +547,32 @@ function ScanPageContent() {
                   setErrorMessage("");
                   setSearchError("");
                 }}
-                placeholder="Ex: Red Bull Zero, Buldak Carbonara, iaurt Zuzu"
+                placeholder={pick("Exemplu: iaurt natural, băutură fără zahăr", "Example: plain yogurt, sugar-free drink")}
                 className="mt-3 w-full rounded-2xl border border-white/10 bg-[#0b0f14] px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300"
               />
 
               <div className="mt-2 flex items-center justify-between">
                 <p className="text-xs text-gray-500">
-                  Alege potrivirea exactă. Dacă există cod de bare, scannerul este mai rapid.
+                  {pick("Alege potrivirea exactă. Scannerul este mai rapid când ai codul de bare.", "Choose the exact match. The scanner is faster when you have the barcode.")}
                 </p>
 
                 {(isSearching || isReadingLabel) && (
                   <p className="inline-flex items-center gap-1 text-xs text-cyan-200">
                     <Loader2 size={13} className="animate-spin" />
-                    {isReadingLabel ? "Se citește eticheta..." : "Se caută..."}
+                    {isReadingLabel ? pick("Se citește eticheta...", "Reading label...") : pick("Se caută...", "Searching...")}
                   </p>
                 )}
               </div>
 
               {detectedLabelText && (
-                <div className="mt-3 rounded-2xl border border-sky-300/25 bg-sky-300/10 p-3 text-sm text-sky-100">
-                  Text citit de pe ambalaj:{" "}
+                <div role="status" className="mt-3 rounded-2xl border border-sky-300/25 bg-sky-300/10 p-3 text-sm text-sky-100">
+                  {pick("Text citit de pe ambalaj", "Text read from the package")}:{" "}
                   <span className="font-bold">{detectedLabelText}</span>
                 </div>
               )}
 
               {searchError && (
-                <div className="mt-3 rounded-2xl border border-red-300/25 bg-red-300/10 p-3 text-sm text-red-200">
+                <div role="alert" className="mt-3 rounded-2xl border border-red-300/25 bg-red-300/10 p-3 text-sm text-red-200">
                   {searchError}
                 </div>
               )}
@@ -565,9 +582,9 @@ function ScanPageContent() {
                   <div className="flex items-start gap-2">
                     <CheckCircle2 size={17} className="mt-0.5 shrink-0" />
                     <p>
-                      Produs selectat:{" "}
+                      {pick("Produs selectat", "Selected product")}:{" "}
                       <span className="font-bold">{selectedSuggestion.name}</span>.
-                      Poți vedea analiza fără să încarci poză.
+                      {pick("Poți vedea analiza fără să încarci o poză.", "You can view the analysis without uploading a photo.")}
                     </p>
                   </div>
                 </div>
@@ -576,7 +593,7 @@ function ScanPageContent() {
               {suggestions.length > 0 && (
                 <div className="mt-4 space-y-3 rounded-2xl border border-white/10 bg-[#0b0f14] p-3">
                   <p className="text-sm font-semibold text-gray-300">
-                    Potriviri din catalog
+                    {pick("Potriviri din catalog", "Catalog matches")}
                   </p>
 
                   {suggestions.map((product) => (
@@ -597,8 +614,8 @@ function ScanPageContent() {
                       <div>
                         <h3 className="font-bold text-white">{product.name}</h3>
                         <p className="mt-1 text-xs text-gray-400">
-                          {product.store} · {product.category} ·{" "}
-                          {product.priceText || "preț necunoscut"}
+                          {product.store} · {localizeCatalogLabel(product.category, locale)} ·{" "}
+                          {product.priceText || pick("preț necunoscut", "unknown price")}
                         </p>
                       </div>
 
@@ -607,7 +624,7 @@ function ScanPageContent() {
                           {product.score === null ||
                           product.score === undefined ||
                           product.score === ""
-                            ? "Date limitate"
+                            ? pick("Date limitate", "Limited data")
                             : `${product.score}/10`}
                         </span>
 
@@ -623,9 +640,10 @@ function ScanPageContent() {
                 !searchError &&
                 !selectedSuggestion && (
                   <div className="mt-4 rounded-2xl border border-yellow-300/20 bg-yellow-300/10 p-3 text-sm text-yellow-300">
-                    Nu avem încă o potrivire sigură. Scrie denumirea mai exact,
-                    scanează codul de bare sau contribuie produsul pentru
-                    verificare.
+                    {pick(
+                      "Nu avem încă o potrivire sigură. Scrie denumirea mai exact, scanează codul sau trimite produsul pentru verificare.",
+                      "We do not have a reliable match yet. Enter a more precise name, scan the barcode or submit the product for review."
+                    )}
                   </div>
                 )}
             </div>
@@ -636,10 +654,10 @@ function ScanPageContent() {
               <ImagePlus size={28} />
             </span>
             <span className="mt-4 text-lg font-semibold">
-              Fotografie de referință, opțional
+              {pick("Fotografie de referință, opțional", "Optional reference photo")}
             </span>
             <span className="mt-2 text-sm text-gray-400">
-              Ajută la citirea textului vizibil, nu la recunoaștere vizuală completă.
+              {pick("Ajută la citirea textului vizibil, nu la recunoaștere vizuală completă.", "Helps read visible text; it does not provide full visual recognition.")}
             </span>
 
             <input
@@ -653,11 +671,11 @@ function ScanPageContent() {
 
           {imagePreview && (
             <div className="mt-8">
-              <h2 className="mb-3 text-xl font-semibold">Imagine selectată</h2>
+              <h2 className="mb-3 text-xl font-semibold">{pick("Imagine selectată", "Selected image")}</h2>
 
               <ProductImage
                 src={imagePreview}
-                alt="Produs scanat"
+                alt={pick("Produs scanat", "Scanned product")}
                 containerClassName="h-80 w-full rounded-2xl"
                 imageClassName="object-cover"
                 fallbackClassName="text-5xl"
@@ -665,7 +683,7 @@ function ScanPageContent() {
 
               {isReadingLabel && (
                 <p className="mt-3 text-sm text-sky-200">
-                  Citim local textul vizibil de pe ambalaj...
+                  {pick("Citim local textul vizibil de pe ambalaj...", "Reading visible package text locally...")}
                 </p>
               )}
             </div>
@@ -683,29 +701,29 @@ function ScanPageContent() {
             {isAnalyzing ? (
               <>
                 <Loader2 size={19} className="animate-spin" />
-                Căutăm produsul potrivit...
+                {pick("Căutăm produsul potrivit...", "Finding the right product...")}
               </>
             ) : selectedSuggestion ? (
-              "Vezi analiza produsului selectat"
+              pick("Vezi analiza produsului selectat", "View selected product analysis")
             ) : selectedFile ? (
-              "Caută produsul după textul din poză"
+              pick("Caută produsul după textul din poză", "Search using text from the photo")
             ) : (
-              "Continuă către analiză"
+              pick("Continuă către analiză", "Continue to analysis")
             )}
           </button>
 
           {unknownProduct && (
             <div className="mt-6 rounded-3xl border border-yellow-300/30 bg-yellow-300/10 p-5">
               <h2 className="text-2xl font-bold text-yellow-300">
-                Produsul nu a fost găsit
+                {pick("Produsul nu a fost găsit", "Product not found")}
               </h2>
 
               <p className="mt-3 text-gray-300">
-                Am căutat produsul{" "}
+                {pick("Am căutat produsul", "We searched for")} {" "}
                 <span className="font-bold text-white">
                   {unknownProduct.searchedText}
                 </span>{" "}
-                pentru magazinul{" "}
+                {pick("pentru magazinul", "in the store")} {" "}
                 <span className="font-bold text-white">
                   {unknownProduct.store}
                 </span>
@@ -714,27 +732,28 @@ function ScanPageContent() {
 
               {unknownProduct.matchScore !== undefined && (
                 <p className="mt-2 text-sm text-gray-400">
-                  Scor potrivire: {unknownProduct.matchScore}
+                  {pick("Scor potrivire", "Match score")}: {unknownProduct.matchScore}
                 </p>
               )}
 
               <p className="mt-3 text-sm text-gray-400">
-                Nu afișăm automat un produs asemănător, fiindcă ar putea avea
-                alte ingrediente sau valori nutriționale. Poți contribui
-                produsul pentru verificare și completarea catalogului.
+                {pick(
+                  "Nu afișăm automat un produs asemănător, fiindcă poate avea alte ingrediente sau valori nutriționale. Îl poți trimite pentru verificare și completarea catalogului.",
+                  "We do not automatically show a similar product because it may have different ingredients or nutrition values. You can submit it for review and help complete the catalog."
+                )}
               </p>
 
               <Link
                 href={buildSubmitProductLink()}
                 className="mt-5 inline-block rounded-2xl bg-yellow-300 px-6 py-3 font-semibold text-black hover:bg-yellow-200"
               >
-                Contribuie cu acest produs
+                {pick("Contribuie cu acest produs", "Submit this product")}
               </Link>
             </div>
           )}
 
           {errorMessage && (
-            <div className="mt-6 rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-red-300">
+            <div role="alert" className="mt-6 rounded-2xl border border-red-400/30 bg-red-400/10 p-4 text-red-300">
               {errorMessage}
             </div>
           )}

@@ -475,6 +475,12 @@ SUBMISSION_APPROVAL_CECOINS = int(
 PASSWORD_MIN_LENGTH = max(10, int(os.environ.get("PASSWORD_MIN_LENGTH", "12")))
 SUBMISSION_DAILY_LIMIT = max(1, int(os.environ.get("SUBMISSION_DAILY_LIMIT", "10")))
 SUBMISSION_PENDING_LIMIT = max(1, int(os.environ.get("SUBMISSION_PENDING_LIMIT", "20")))
+RETENTION_ACTIVITY_DAYS = max(30, int(os.environ.get("RETENTION_ACTIVITY_DAYS", "395")))
+RETENTION_UNVERIFIED_ACCOUNT_DAYS = max(
+    7,
+    int(os.environ.get("RETENTION_UNVERIFIED_ACCOUNT_DAYS", "30")),
+)
+RETENTION_SCAN_FILE_HOURS = max(1, int(os.environ.get("RETENTION_SCAN_FILE_HOURS", "48")))
 TERMS_VERSION = os.environ.get("TERMS_VERSION", "2026-07").strip() or "2026-07"
 SEARCH_RETENTION_DAYS = max(30, int(os.environ.get("SEARCH_RETENTION_DAYS", "180")))
 ANALYTICS_RETENTION_DAYS = max(30, int(os.environ.get("ANALYTICS_RETENTION_DAYS", "365")))
@@ -2333,6 +2339,10 @@ def user_to_dict(user):
         "inviteCode": invite_code,
         "bonusScanCredits": max(0, int(user.bonus_scan_credits or 0)),
         "processingRestricted": bool(getattr(user, "processing_restricted", False)),
+        "processingRestrictedAt": (
+            user.processing_restricted_at.isoformat() + "Z"
+            if user.processing_restricted_at else None
+        ),
         "analyticsConsent": getattr(user, "analytics_consent", None),
         "bonusUnlimitedUntil": (
             user.bonus_unlimited_until.isoformat() + "Z"
@@ -3994,6 +4004,66 @@ def calculate_user_coins(user_id, metrics=None):
     return max(0, earned - spent)
 
 
+def calculate_bulk_user_coins(user_ids, metrics_by_user=None):
+    safe_user_ids = [int(user_id) for user_id in user_ids if user_id is not None]
+
+    if not safe_user_ids:
+        return {}
+
+    totals = {
+        user_id: {
+            "missions": 0,
+            "claimedInvite": 0,
+            "purchased": 0,
+            "recordedReferral": 0,
+            "spent": 0,
+        }
+        for user_id in safe_user_ids
+    }
+    events = UsageEvent.query.filter(
+        UsageEvent.user_id.in_(safe_user_ids),
+        UsageEvent.event_type.in_([
+            "mission_claim",
+            "cecoin_purchase",
+            "referral_cecoin_bonus",
+            "cecoin_spend",
+        ]),
+    ).all()
+
+    for event in events:
+        values = totals.get(event.user_id)
+        if values is None:
+            continue
+
+        metadata = parse_usage_metadata(event)
+
+        if event.event_type == "mission_claim":
+            coins = int((metadata.get("reward") or {}).get("coins") or 0)
+            values["missions"] += coins
+            if str(event.source or "").startswith("invite_"):
+                values["claimedInvite"] += coins
+        elif event.event_type == "cecoin_purchase":
+            values["purchased"] += int(metadata.get("coins") or 0)
+        elif event.event_type == "referral_cecoin_bonus":
+            values["recordedReferral"] += int(metadata.get("coins") or 0)
+        elif event.event_type == "cecoin_spend":
+            values["spent"] += int(metadata.get("cost") or 0)
+
+    metrics_by_user = metrics_by_user or get_bulk_user_gamification_metrics(safe_user_ids)
+    result = {}
+
+    for user_id, values in totals.items():
+        confirmed_invites = int((metrics_by_user.get(user_id) or {}).get("confirmedInvites", 0) or 0)
+        expected_referral = max(0, confirmed_invites * 100 - values["claimedInvite"])
+        referral = max(values["recordedReferral"], expected_referral)
+        result[user_id] = max(
+            0,
+            values["missions"] + values["purchased"] + referral - values["spent"],
+        )
+
+    return result
+
+
 def clear_leaderboard_cache():
     LEADERBOARD_CACHE.clear()
 
@@ -4395,6 +4465,11 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
             [user.id for user in users],
             since=since,
         )
+        coins_by_user = (
+            calculate_bulk_user_coins([user.id for user in users], metrics_by_user)
+            if since is None
+            else {}
+        )
         rows = []
 
         for user in users:
@@ -4407,7 +4482,7 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
                 "confirmedInvites": 0,
             }
             score = calculate_activity_score(metrics)
-            coins = calculate_user_coins(user.id) if since is None else score
+            coins = coins_by_user.get(user.id, 0) if since is None else score
 
             rows.append({
                 "userId": user.id,
@@ -4562,6 +4637,7 @@ ADMIN_ENDPOINTS = {
     "resolve_admin_alternative_report",
     "recategorize_admin_catalog",
     "send_admin_mission_digest",
+    "run_admin_retention",
     "update_admin_product",
     "delete_admin_product",
     "admin_update_user_plan",
@@ -4611,13 +4687,11 @@ AUTH_ENDPOINTS = {
     "delete_family_profile",
     "request_account_deletion",
     "get_account_data",
-    "export_account_data",
-    "update_processing_restriction",
     "record_privacy_consent",
     "get_account_privacy",
     "export_account_data",
     "update_account_consent",
-    "request_processing_restriction",
+    "update_processing_restriction",
     "report_alternative_issue",
     "report_product_issue",
 }
@@ -4744,6 +4818,9 @@ def enforce_access_controls():
         "update_processing_restriction",
         "export_account_data",
         "get_account_data",
+        "get_account_privacy",
+        "update_account_consent",
+        "record_privacy_consent",
         "request_account_deletion",
         "confirm_account_deletion",
         "logout",
@@ -4858,6 +4935,27 @@ def add_security_headers(response):
             "Strict-Transport-Security",
             "max-age=31536000; includeSubDomains",
         )
+
+    if response.status_code >= 400 and response.is_json:
+        payload = response.get_json(silent=True)
+
+        if isinstance(payload, dict):
+            payload.setdefault("requestId", getattr(g, "request_id", uuid4().hex))
+            payload.setdefault("code", {
+                400: "invalid_request",
+                401: "auth_required",
+                403: "forbidden",
+                404: "not_found",
+                409: "conflict",
+                413: "payload_too_large",
+                423: "processing_restricted",
+                429: "rate_limit_exceeded",
+                500: "internal_error",
+                502: "upstream_error",
+                503: "service_unavailable",
+            }.get(response.status_code, "request_failed"))
+            response.set_data(json.dumps(payload, ensure_ascii=False))
+            response.content_type = "application/json; charset=utf-8"
 
     return response
 
@@ -7341,6 +7439,36 @@ def ensure_database_indexes():
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_usage_events_idempotency_key "
             "ON usage_events (idempotency_key) WHERE idempotency_key IS NOT NULL",
         ),
+        (
+            "usage events user type date",
+            "CREATE INDEX IF NOT EXISTS ix_usage_events_user_type_created "
+            "ON usage_events (user_id, event_type, created_at)",
+        ),
+        (
+            "usage events user type source",
+            "CREATE INDEX IF NOT EXISTS ix_usage_events_user_type_source "
+            "ON usage_events (user_id, event_type, source)",
+        ),
+        (
+            "submissions user status date",
+            "CREATE INDEX IF NOT EXISTS ix_product_submissions_user_status_created "
+            "ON product_submissions (user_id, status, created_at)",
+        ),
+        (
+            "submissions barcode status",
+            "CREATE INDEX IF NOT EXISTS ix_product_submissions_barcode_status "
+            "ON product_submissions (barcode, status)",
+        ),
+        (
+            "subscriptions provider customer",
+            "CREATE INDEX IF NOT EXISTS ix_subscriptions_provider_customer "
+            "ON subscriptions (provider, provider_customer_id)",
+        ),
+        (
+            "subscriptions provider subscription",
+            "CREATE INDEX IF NOT EXISTS ix_subscriptions_provider_subscription "
+            "ON subscriptions (provider, provider_subscription_id)",
+        ),
     ]
 
     for label, statement in common_indexes:
@@ -8058,96 +8186,6 @@ def update_account_consent():
     })
 
 
-@app.route("/account/restriction", methods=["POST"])
-def request_processing_restriction():
-    data = request.get_json(silent=True) or {}
-    restricted = data.get("restricted", True)
-
-    if not isinstance(restricted, bool):
-        return jsonify({"error": "Valoarea restricted trebuie să fie true sau false."}), 400
-
-    user = g.current_user
-    user.processing_restricted = restricted
-    user.processing_restricted_at = datetime.utcnow() if restricted else None
-    record_user_event(
-        user.id,
-        "privacy_restriction",
-        "account",
-        {"restricted": restricted},
-    )
-    db.session.commit()
-    return jsonify({
-        "message": (
-            "Prelucrarea opțională a datelor a fost restricționată."
-            if restricted
-            else "Restricția de prelucrare a fost ridicată."
-        ),
-        "processingRestricted": restricted,
-    })
-
-
-@app.route("/account/data-export", methods=["GET"])
-def export_account_data():
-    user = g.current_user
-    subscription = Subscription.query.filter_by(user_id=user.id).first()
-    usage_events = UsageEvent.query.filter_by(user_id=user.id).order_by(UsageEvent.created_at.asc()).all()
-    search_events = SearchEvent.query.filter_by(user_id=user.id).order_by(SearchEvent.created_at.asc()).all()
-    prices = PriceObservation.query.filter_by(user_id=user.id).order_by(PriceObservation.observed_at.asc()).all()
-    export = {
-        "generatedAt": datetime.utcnow().isoformat() + "Z",
-        "formatVersion": 1,
-        "account": {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "emailVerified": bool(user.email_verified),
-            "createdAt": admin_iso(user.created_at),
-            "termsVersion": user.terms_version,
-            "termsAcceptedAt": admin_iso(user.terms_accepted_at),
-            "ageConfirmedAt": admin_iso(user.age_confirmed_at),
-            "analyticsConsent": user.analytics_consent,
-            "analyticsConsentAt": admin_iso(user.analytics_consent_at),
-            "processingRestricted": bool(user.processing_restricted),
-        },
-        "subscription": ({
-            "plan": subscription.plan,
-            "status": subscription.status,
-            "provider": subscription.provider,
-            "currentPeriodStart": admin_iso(subscription.current_period_start),
-            "currentPeriodEnd": admin_iso(subscription.current_period_end),
-        } if subscription else None),
-        "familyProfiles": [family_profile_to_dict(item) for item in FamilyProfile.query.filter_by(user_id=user.id).all()],
-        "scanHistory": [scan_history_item_to_dict(item) for item in ScanHistory.query.filter_by(user_id=user.id).all()],
-        "favorites": [favorite_item_to_dict(item) for item in Favorite.query.filter_by(user_id=user.id).all()],
-        "cart": [cart_item_to_dict(item) for item in CartItem.query.filter_by(user_id=user.id).all()],
-        "submissions": [product_submission_to_dict(item) for item in ProductSubmission.query.filter_by(user_id=user.id).all()],
-        "priceObservations": [{
-            "barcode": item.product_barcode,
-            "store": item.store,
-            "price": item.price,
-            "currency": item.currency,
-            "observedAt": admin_iso(item.observed_at),
-        } for item in prices],
-        "searches": [{
-            "query": item.search_text,
-            "store": item.store,
-            "resultCount": item.result_count,
-            "source": item.source,
-            "createdAt": admin_iso(item.created_at),
-        } for item in search_events],
-        "activity": [{
-            "type": item.event_type,
-            "source": item.source,
-            "metadata": parse_usage_metadata(item),
-            "createdAt": admin_iso(item.created_at),
-        } for item in usage_events],
-    }
-    response = jsonify(export)
-    response.headers["Content-Disposition"] = "attachment; filename=cealeg-account-data.json"
-    response.headers["Cache-Control"] = "no-store, max-age=0"
-    return response
-
-
 @app.route("/account/delete/confirm", methods=["POST"])
 def confirm_account_deletion():
     data = request.get_json(silent=True) or {}
@@ -8190,6 +8228,183 @@ def get_authenticated_user():
         return jsonify({"error": "Autentificare necesara."}), 401
 
     return jsonify({"user": user_to_dict(user)})
+
+
+def build_account_export(user):
+    subscription = Subscription.query.filter_by(user_id=user.id).first()
+    return {
+        "exportedAt": datetime.utcnow().isoformat() + "Z",
+        "formatVersion": "1.0",
+        "account": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "emailVerified": bool(user.email_verified),
+            "createdAt": user.created_at.isoformat() + "Z" if user.created_at else None,
+            "inviteCode": user.invite_code,
+            "referredByUserId": user.referred_by_user_id,
+            "processingRestricted": bool(user.processing_restricted),
+            "processingRestrictedAt": (
+                user.processing_restricted_at.isoformat() + "Z"
+                if user.processing_restricted_at else None
+            ),
+            "processingRestrictionReason": user.processing_restriction_reason,
+        },
+        "subscription": subscription_to_billing_dict(subscription) if subscription else None,
+        "familyProfiles": [
+            {
+                "id": item.id,
+                "name": item.name,
+                "color": item.color,
+                "avatar": item.avatar,
+                "isPrimary": bool(item.is_primary),
+                "createdAt": item.created_at.isoformat() + "Z",
+            }
+            for item in FamilyProfile.query.filter_by(user_id=user.id).all()
+        ],
+        "cart": [cart_item_to_dict(item) for item in CartItem.query.filter_by(user_id=user.id).all()],
+        "favorites": [favorite_item_to_dict(item) for item in Favorite.query.filter_by(user_id=user.id).all()],
+        "scanHistory": [scan_history_item_to_dict(item) for item in ScanHistory.query.filter_by(user_id=user.id).all()],
+        "productSubmissions": [
+            product_submission_to_dict(item)
+            for item in ProductSubmission.query.filter_by(user_id=user.id).all()
+        ],
+        "priceObservations": [
+            {
+                "id": item.id,
+                "barcode": item.product_barcode,
+                "store": item.store,
+                "price": item.price,
+                "currency": item.currency,
+                "observedAt": item.observed_at.isoformat() + "Z",
+            }
+            for item in PriceObservation.query.filter_by(user_id=user.id).all()
+        ],
+        "searches": [
+            {
+                "id": item.id,
+                "query": item.search_text,
+                "store": item.store,
+                "resultCount": item.result_count,
+                "source": item.source,
+                "createdAt": item.created_at.isoformat() + "Z",
+            }
+            for item in SearchEvent.query.filter_by(user_id=user.id).all()
+        ],
+        "usageEvents": [
+            {
+                "id": item.id,
+                "type": item.event_type,
+                "source": item.source,
+                "metadata": parse_usage_metadata(item),
+                "createdAt": item.created_at.isoformat() + "Z",
+            }
+            for item in UsageEvent.query.filter_by(user_id=user.id).all()
+        ],
+        "consents": [
+            {
+                "type": item.consent_type,
+                "granted": bool(item.granted),
+                "policyVersion": item.policy_version,
+                "source": item.source,
+                "createdAt": item.created_at.isoformat() + "Z",
+            }
+            for item in ConsentRecord.query.filter_by(user_id=user.id).all()
+        ],
+    }
+
+
+@app.route("/account/data", methods=["GET"])
+def get_account_data():
+    payload = build_account_export(g.current_user)
+    return jsonify({
+        "account": payload["account"],
+        "subscription": payload["subscription"],
+        "counts": {
+            key: len(value)
+            for key, value in payload.items()
+            if isinstance(value, list)
+        },
+        "exportUrl": "/account/export",
+    })
+
+
+@app.route("/account/export", methods=["GET"])
+@app.route("/account/data-export", methods=["GET"])
+def export_account_data():
+    payload = build_account_export(g.current_user)
+    return Response(
+        json.dumps(payload, ensure_ascii=False, indent=2),
+        mimetype="application/json",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="ce-aleg-data-export-{g.current_user.id}.json"'
+            ),
+        },
+    )
+
+
+@app.route("/account/restriction", methods=["POST"])
+def update_processing_restriction():
+    data = request.get_json(silent=True) or {}
+    restricted = data.get("restricted", True)
+
+    if not isinstance(restricted, bool):
+        return jsonify({"error": "Câmpul restricted trebuie să fie boolean."}), 400
+
+    reason = str(data.get("reason") or "").strip()
+    if len(reason) > 500:
+        return jsonify({"error": "Motivul poate avea maximum 500 de caractere."}), 400
+
+    user = g.current_user
+    user.processing_restricted = restricted
+    user.processing_restricted_at = datetime.utcnow() if restricted else None
+    user.processing_restriction_reason = reason or None if restricted else None
+    record_user_event(
+        user.id,
+        "processing_restriction_changed",
+        "privacy",
+        {"restricted": restricted, "reason": reason[:500]},
+    )
+    db.session.commit()
+    return jsonify({
+        "message": (
+            "Prelucrarea datelor a fost restricționată."
+            if restricted
+            else "Restricția de prelucrare a fost ridicată."
+        ),
+        "restricted": restricted,
+        "processingRestricted": restricted,
+    })
+
+
+@app.route("/privacy/consent", methods=["POST"])
+def record_privacy_consent():
+    data = request.get_json(silent=True) or {}
+    consent_type = str(data.get("type") or "").strip().lower()
+    granted = data.get("granted")
+    allowed_types = {"analytics", "marketing", "functional", "privacy", "terms"}
+
+    if consent_type not in allowed_types or not isinstance(granted, bool):
+        return jsonify({"error": "Consimțământ invalid."}), 400
+
+    policy_version = str(data.get("policyVersion") or "2026-07").strip()[:40]
+    identity_hash = hmac.new(
+        app.config["AUTH_SECRET"].encode("utf-8"),
+        (request.remote_addr or "unknown").encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    record = ConsentRecord(
+        user_id=g.current_user.id,
+        consent_type=consent_type,
+        granted=granted,
+        policy_version=policy_version,
+        source=str(data.get("source") or "web").strip()[:80] or "web",
+        request_identity_hash=identity_hash,
+    )
+    db.session.add(record)
+    db.session.commit()
+    return jsonify({"recorded": True, "consentId": record.id}), 201
 
 
 @app.route("/logout", methods=["POST"])
@@ -10193,6 +10408,95 @@ def get_cron_recategorize_min_id(limit):
     return 1 + ((day_number * safe_limit) % max(1, int(max_product_id)))
 
 
+def run_retention_cleanup(apply_changes=False):
+    now = datetime.utcnow()
+    activity_cutoff = now - timedelta(days=RETENTION_ACTIVITY_DAYS)
+    account_cutoff = now - timedelta(days=RETENTION_UNVERIFIED_ACCOUNT_DAYS)
+    scan_cutoff = time.time() - RETENTION_SCAN_FILE_HOURS * 3600
+    ephemeral_event_types = {
+        "alternative_report",
+        "email_test",
+        "mission_digest_email",
+        "payment_checkout_started",
+        "payment_error",
+        "product_report",
+        "support_message",
+    }
+    usage_query = UsageEvent.query.filter(
+        UsageEvent.created_at < activity_cutoff,
+        or_(
+            UsageEvent.event_type.in_(ephemeral_event_types),
+            UsageEvent.event_type.like("ui_%"),
+        ),
+    )
+    search_query = SearchEvent.query.filter(SearchEvent.created_at < activity_cutoff)
+    webhook_query = StripeWebhookEvent.query.filter(
+        StripeWebhookEvent.status == "processed",
+        StripeWebhookEvent.updated_at < activity_cutoff,
+    )
+    unverified_users = (
+        User.query.outerjoin(Subscription, Subscription.user_id == User.id)
+        .filter(
+            User.email_verified.is_(False),
+            User.created_at < account_cutoff,
+            or_(Subscription.id.is_(None), Subscription.plan == "free"),
+        )
+        .all()
+    )
+    expired_scan_files = []
+
+    if os.path.isdir(UPLOAD_FOLDER):
+        for candidate in os.scandir(UPLOAD_FOLDER):
+            try:
+                if (
+                    candidate.is_file()
+                    and candidate.name.startswith("scan_")
+                    and candidate.stat().st_mtime < scan_cutoff
+                ):
+                    expired_scan_files.append(candidate.path)
+            except OSError:
+                continue
+
+    result = {
+        "applied": bool(apply_changes),
+        "activityCutoff": activity_cutoff.isoformat() + "Z",
+        "unverifiedAccountCutoff": account_cutoff.isoformat() + "Z",
+        "usageEvents": usage_query.count(),
+        "searchEvents": search_query.count(),
+        "webhookEvents": webhook_query.count(),
+        "unverifiedAccounts": len(unverified_users),
+        "scanFiles": len(expired_scan_files),
+    }
+
+    if not apply_changes:
+        return result
+
+    for user in unverified_users:
+        delete_account_data(user)
+
+    usage_query.delete(synchronize_session=False)
+    search_query.delete(synchronize_session=False)
+    webhook_query.delete(synchronize_session=False)
+    db.session.commit()
+
+    for filepath in expired_scan_files:
+        try:
+            os.remove(filepath)
+        except OSError as error:
+            app.logger.warning("Retention could not remove scan file %s: %s", filepath, error)
+
+    return result
+
+
+@app.route("/admin/retention", methods=["GET", "POST"])
+def run_admin_retention():
+    apply_changes = request.method == "POST" and (
+        str((request.get_json(silent=True) or {}).get("apply", "false")).lower()
+        in {"1", "true", "yes", "on"}
+    )
+    return jsonify(run_retention_cleanup(apply_changes=apply_changes))
+
+
 def purge_expired_data():
     now = datetime.utcnow()
     search_cutoff = now - timedelta(days=SEARCH_RETENTION_DAYS)
@@ -10250,11 +10554,13 @@ def run_cron_maintenance():
     send_digest = str(data.get("sendDigest", "true")).lower() in {"1", "true", "yes", "on"}
     run_recategorize = str(data.get("recategorize", "true")).lower() in {"1", "true", "yes", "on"}
     run_retention = str(data.get("retention", "true")).lower() in {"1", "true", "yes", "on"}
+    run_retention = str(data.get("retention", "true")).lower() in {"1", "true", "yes", "on"}
     result = {
         "ok": True,
         "generatedAt": datetime.utcnow().isoformat() + "Z",
         "recategorize": None,
         "missionDigest": None,
+        "retention": None,
         "retention": None,
     }
 
@@ -10272,6 +10578,9 @@ def run_cron_maintenance():
             apply_changes=is_email_configured(),
         )
         result["missionDigest"]["emailConfigured"] = is_email_configured()
+
+    if run_retention:
+        result["retention"] = run_retention_cleanup(apply_changes=True)
 
     if run_retention:
         result["retention"] = purge_expired_data()

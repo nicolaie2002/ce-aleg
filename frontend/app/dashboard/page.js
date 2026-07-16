@@ -12,11 +12,13 @@ import {
   Coins,
   Copy,
   Database,
+  Download,
   Eye,
   EyeOff,
   Gift,
   Heart,
   ListPlus,
+  LockKeyhole,
   LogOut,
   Plus,
   ScanLine,
@@ -72,7 +74,7 @@ const FamilyProfiles = dynamic(
     ssr: false,
     loading: () => (
       <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm font-bold text-gray-300">
-        Se încarcă profilurile familiei...
+        Se încarcă profilurile familiei... / Loading family profiles...
       </div>
     ),
   }
@@ -114,6 +116,8 @@ export default function DashboardPage() {
   const [gamificationError, setGamificationError] = useState("");
   const [buyingPackId, setBuyingPackId] = useState("");
   const [shopMessage, setShopMessage] = useState("");
+  const [privacyMessage, setPrivacyMessage] = useState("");
+  const [isPrivacyUpdating, setIsPrivacyUpdating] = useState(false);
 
   const actions = [
     { href: "/barcode-scan", title: pick("Scanează codul", "Scan barcode"), description: pick("Identifică rapid produsul cu telefonul și vezi verdictul.", "Identify the product quickly with your phone and see the verdict."), icon: Barcode, tone: "emerald" },
@@ -384,6 +388,50 @@ export default function DashboardPage() {
       setDeleteRequestError(error.message || pick("A aparut o eroare.", "An error occurred."));
     } finally {
       setIsDeleteRequesting(false);
+    }
+  }
+
+  async function toggleProcessingRestriction() {
+    if (!user) return;
+
+    const restricted = !user.processingRestricted;
+    setIsPrivacyUpdating(true);
+    setPrivacyMessage("");
+
+    try {
+      const response = await fetch(`${API_URL}/account/restriction`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ restricted }),
+      });
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Preferința nu a putut fi actualizată.",
+            "The preference could not be updated."
+          )
+        );
+      }
+
+      const updatedUser = { ...user, processingRestricted: restricted };
+      setUser(updatedUser);
+      storeAuthenticatedUser(updatedUser);
+      setPrivacyMessage(
+        restricted
+          ? pick(
+              "Prelucrarea opțională este restricționată. Exportul și ștergerea contului rămân disponibile.",
+              "Optional processing is restricted. Data export and account deletion remain available."
+            )
+          : pick("Restricția a fost ridicată.", "The restriction was removed.")
+      );
+    } catch (error) {
+      setPrivacyMessage(error.message || pick("A apărut o eroare.", "An error occurred."));
+    } finally {
+      setIsPrivacyUpdating(false);
     }
   }
 
@@ -1096,6 +1144,52 @@ export default function DashboardPage() {
             </Link>
           )}
 
+          <section className="mt-8 border-y border-white/10 py-6" aria-labelledby="privacy-tools-title">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="max-w-2xl">
+                <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
+                  <LockKeyhole aria-hidden="true" size={16} />
+                  {pick("Datele tale", "Your data")}
+                </p>
+                <h2 id="privacy-tools-title" className="mt-2 text-2xl font-black">
+                  {pick("Export și control GDPR", "GDPR export and controls")}
+                </h2>
+                <p className="mt-2 leading-7 text-gray-300">
+                  {pick(
+                    "Descarcă datele contului în format JSON sau oprește prelucrările opționale fără să pierzi accesul la export și ștergere.",
+                    "Download your account data as JSON or stop optional processing while keeping access to export and deletion."
+                  )}
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2 sm:flex-row lg:flex-col">
+                <a
+                  href={`${API_URL}/account/data-export`}
+                  download="cealeg-account-data.json"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-black text-black hover:bg-cyan-100"
+                >
+                  <Download aria-hidden="true" size={18} />
+                  {pick("Descarcă datele", "Download data")}
+                </a>
+                <button
+                  type="button"
+                  onClick={toggleProcessingRestriction}
+                  disabled={isPrivacyUpdating}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 font-black text-white hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+                >
+                  <LockKeyhole aria-hidden="true" size={18} />
+                  {user.processingRestricted
+                    ? pick("Ridică restricția", "Remove restriction")
+                    : pick("Restricționează prelucrarea", "Restrict processing")}
+                </button>
+              </div>
+            </div>
+            {privacyMessage ? (
+              <p className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-300/10 p-3 text-sm text-cyan-50" role="status">
+                {privacyMessage}
+              </p>
+            ) : null}
+          </section>
+
           <div className="ce-danger-panel mt-8 rounded-2xl border p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-3xl">
@@ -1185,14 +1279,14 @@ export default function DashboardPage() {
             className="flex min-h-14 flex-col items-center justify-center rounded-xl bg-emerald-400 px-2 py-2 text-xs font-black text-black"
           >
             <Barcode size={19} />
-            <span className="mt-1">Scanează</span>
+            <span className="mt-1">{pick("Scanează", "Scan")}</span>
           </Link>
           <Link
             href="/store"
             className="flex min-h-14 flex-col items-center justify-center rounded-xl border border-cyan-300/25 px-2 py-2 text-xs font-black text-cyan-100"
           >
             <ScanLine size={19} />
-            <span className="mt-1">Caută</span>
+            <span className="mt-1">{pick("Caută", "Search")}</span>
           </Link>
           <Link
             href="/missions"
@@ -1204,7 +1298,7 @@ export default function DashboardPage() {
               </span>
             )}
             <Trophy size={19} />
-            <span className="mt-1">Misiuni</span>
+            <span className="mt-1">{pick("Misiuni", "Missions")}</span>
           </Link>
         </div>
       </nav>

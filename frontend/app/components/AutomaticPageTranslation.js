@@ -123,10 +123,13 @@ const manuallyLocalizedPages = new Set([
   "/",
   "/billing/cancel",
   "/billing/success",
+  "/cart",
   "/dashboard",
   "/delete-account",
   "/forgot-password",
+  "/favorites",
   "/help",
+  "/history",
   "/catalog-romania",
   "/live-assistant",
   "/login",
@@ -136,6 +139,7 @@ const manuallyLocalizedPages = new Set([
   "/pricing",
   "/privacy",
   "/register",
+  "/result",
   "/reset-password",
   "/store",
   "/support",
@@ -179,7 +183,7 @@ export function AutomaticPageTranslation() {
   useEffect(() => {
     if (
       manuallyLocalizedPages.has(pathname) ||
-      pathname.startsWith("/catalog-romania/magazine")
+      pathname.startsWith("/catalog-romania")
     ) return undefined;
 
     translateTree(document.body, locale);

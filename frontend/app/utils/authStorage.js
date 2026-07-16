@@ -52,6 +52,17 @@ export function storeAuthenticatedUser(user) {
   }
 
   window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+
+  const analyticsChoice = window.localStorage.getItem("cealeg_analytics_consent");
+  if (analyticsChoice === "accepted" || analyticsChoice === "declined") {
+    fetch("/api/backend/account/consent", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ analytics: analyticsChoice === "accepted" }),
+      keepalive: true,
+    }).catch(() => {});
+  }
 }
 
 export function clearAuthenticatedSession() {

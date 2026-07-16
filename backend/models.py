@@ -26,8 +26,6 @@ class User(db.Model):
     age_confirmed_at = db.Column(db.DateTime, nullable=True)
     analytics_consent = db.Column(db.Boolean, nullable=True)
     analytics_consent_at = db.Column(db.DateTime, nullable=True)
-    processing_restricted = db.Column(db.Boolean, default=False, nullable=False)
-    processing_restricted_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 

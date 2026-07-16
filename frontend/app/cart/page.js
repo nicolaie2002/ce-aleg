@@ -11,6 +11,8 @@ import { InlineNotice } from "../components/InlineNotice";
 import { AppHeader } from "../components/AppHeader";
 import { FamilyProfiles } from "../components/FamilyProfiles";
 import { TranslatedText } from "../components/TranslatedText";
+import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 
 function getImageUrl(path) {
   if (!path) return "";
@@ -31,6 +33,7 @@ function notifyCartUpdated() {
 }
 
 export default function CartPage() {
+  const { pick } = useLocale();
   const [user, setUser] = useState(null);
   const [cartItems, setCartItems] = useState([]);
   const [newStoreName, setNewStoreName] = useState("");
@@ -51,10 +54,10 @@ export default function CartPage() {
       const profileId = profile?.id;
       const profileQuery = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : "";
       const response = await fetch(`${API_URL}/cart/${userId}${profileQuery}`);
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut încărca coșul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut încărca coșul.", "The cart could not be loaded."));
       }
 
       setCartItems(data);
@@ -62,7 +65,7 @@ export default function CartPage() {
     } catch (error) {
       showError(error.message);
     }
-  }, [showError]);
+  }, [pick, showError]);
 
   useEffect(() => {
     let isMounted = true;
@@ -105,7 +108,7 @@ export default function CartPage() {
           "Mega Image",
           "Profi",
           "Penny",
-          "Market local",
+          pick("Magazin local", "Local store"),
         ];
 
         setStores(defaultStores);
@@ -119,7 +122,7 @@ export default function CartPage() {
       isMounted = false;
       window.removeEventListener("cealeg:profile-change", handleProfileChange);
     };
-  }, [loadCart]);
+  }, [loadCart, pick]);
 
   function toggleReason(itemId) {
     setExpandedReasons((current) => ({
@@ -151,10 +154,10 @@ export default function CartPage() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut șterge produsul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut șterge produsul.", "The product could not be removed."));
       }
 
       setCartItems((current) => current.filter((item) => item.id !== id));
@@ -177,10 +180,10 @@ export default function CartPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut actualiza produsul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut actualiza produsul.", "The product could not be updated."));
       }
 
       setCartItems(
@@ -206,10 +209,10 @@ export default function CartPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut schimba magazinul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut schimba magazinul.", "The store could not be changed."));
       }
 
       setCartItems(
@@ -235,10 +238,10 @@ export default function CartPage() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut actualiza cantitatea.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut actualiza cantitatea.", "The quantity could not be updated."));
       }
 
       if (quantity <= 0) {
@@ -270,16 +273,16 @@ export default function CartPage() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut goli coșul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut goli coșul.", "The cart could not be cleared."));
       }
 
       setCartItems([]);
       setExpandedReasons({});
       setMessageTone("success");
-      setMessage("Coșul a fost golit.");
+      setMessage(pick("Coșul a fost golit.", "The cart was cleared."));
       setIsClearModalOpen(false);
       notifyCartUpdated();
     } catch (error) {
@@ -290,7 +293,7 @@ export default function CartPage() {
   const activeProfileName = activeProfile?.name || user?.name || "";
 
   const groupedCart = cartItems.reduce((groups, item) => {
-    const store = item.store || "Fără magazin";
+    const store = item.store || pick("Fără magazin", "No store");
     if (!groups[store]) groups[store] = [];
     groups[store].push(item);
     return groups;
@@ -308,14 +311,14 @@ export default function CartPage() {
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">Se încarcă coșul...</p>
+        <p className="text-gray-300" role="status">{pick("Se încarcă coșul...", "Loading cart...")}</p>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-[#0b0f14] text-white">
-      <AppHeader actionHref="/barcode-scan" actionLabel="Scanează produs" />
+      <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scanează produs", "Scan product")} />
       <section className="ce-shell-lg ce-page">
         <InlineNotice
           message={message}
@@ -327,7 +330,7 @@ export default function CartPage() {
             href="/dashboard"
             className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
-            <ArrowLeft size={16} /> Înapoi la dashboard
+            <ArrowLeft size={16} /> {pick("Înapoi la dashboard", "Back to dashboard")}
           </Link>
 
           <Link
@@ -335,22 +338,24 @@ export default function CartPage() {
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
           >
             <ScanLine size={17} />
-            Scanează alt produs
+            {pick("Scanează alt produs", "Scan another product")}
           </Link>
         </div>
 
         <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl">
           <p className="mb-3 inline-flex rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-300">
-            Coș inteligent
+            {pick("Coș inteligent", "Smart cart")}
           </p>
 
           <h1 className="text-4xl font-bold md:text-5xl">
-            Lista de cumpărături a lui {activeProfileName}
+            {pick(`Lista de cumpărături a lui ${activeProfileName}`, `${activeProfileName}'s shopping list`)}
           </h1>
 
           <p className="mt-4 max-w-2xl text-gray-300">
-            Organizează produsele pe magazine și bifează-le pe măsură ce le
-            adaugi în coș.
+            {pick(
+              "Organizează produsele pe magazine și bifează-le pe măsură ce le adaugi în coș.",
+              "Organize products by store and check them off as you add them to your basket."
+            )}
           </p>
 
           <div className="mt-6">
@@ -359,21 +364,21 @@ export default function CartPage() {
 
           <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Produse în coș</p>
+              <p className="text-sm text-gray-400">{pick("Produse în coș", "Cart products")}</p>
               <p className="mt-1 text-3xl font-black text-emerald-300">
                 {totalItems}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Bifate</p>
+              <p className="text-sm text-gray-400">{pick("Bifate", "Checked")}</p>
               <p className="mt-1 text-3xl font-black text-emerald-300">
                 {boughtItems}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
-              <p className="text-sm text-gray-400">Magazine</p>
+              <p className="text-sm text-gray-400">{pick("Magazine", "Stores")}</p>
               <p className="mt-1 text-3xl font-black text-emerald-300">
                 {Object.keys(groupedCart).length}
               </p>
@@ -381,13 +386,17 @@ export default function CartPage() {
           </div>
 
           <div className="mt-8 rounded-3xl border border-white/10 bg-black/30 p-5">
-            <h2 className="text-2xl font-bold">Adaugă magazin nou</h2>
+            <h2 className="text-2xl font-bold">{pick("Adaugă magazin nou", "Add a new store")}</h2>
 
             <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+              <label htmlFor="cart-new-store" className="sr-only">
+                {pick("Numele magazinului", "Store name")}
+              </label>
               <input
+                id="cart-new-store"
                 value={newStoreName}
                 onChange={(e) => setNewStoreName(e.target.value)}
-                placeholder="Ex: Magazinul din sat, Piața Tractorul..."
+                placeholder={pick("Exemplu: magazin local, piață...", "Example: local shop, market...")}
                 className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none placeholder:text-gray-500 focus:border-emerald-400"
               />
 
@@ -395,7 +404,7 @@ export default function CartPage() {
                 onClick={addStore}
                 className="rounded-2xl bg-emerald-400 px-6 py-3 font-semibold text-black hover:bg-emerald-300"
               >
-                Adaugă magazin
+                {pick("Adaugă magazin", "Add store")}
               </button>
             </div>
           </div>
@@ -405,9 +414,12 @@ export default function CartPage() {
               <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-cyan-300/25 bg-cyan-300/10 text-cyan-200">
                 <ShoppingCart size={32} />
               </span>
-              <h2 className="mt-4 text-2xl font-bold">Coșul este gol</h2>
+              <h2 className="mt-4 text-2xl font-bold">{pick("Coșul este gol", "Your cart is empty")}</h2>
               <p className="mt-3 text-gray-400">
-                Scanează un produs, alege o alternativă și apasă „Adaugă în coș”.
+                {pick(
+                  "Scanează un produs, alege o alternativă și apasă «Adaugă în coș».",
+                  "Scan a product, choose an alternative and select Add to cart."
+                )}
               </p>
 
               <Link
@@ -415,7 +427,7 @@ export default function CartPage() {
                 className="mt-6 inline-flex items-center justify-center gap-2 rounded-2xl bg-white px-6 py-3 font-black text-black hover:bg-cyan-100"
               >
                 <ScanLine size={18} />
-                Începe scanarea
+                {pick("Începe scanarea", "Start scanning")}
               </Link>
             </div>
           ) : (
@@ -433,7 +445,7 @@ export default function CartPage() {
                           (total, item) => total + (item.quantity || 1),
                           0
                         )}{" "}
-                        produse de cumpărat
+                        {pick("produse de cumpărat", "items to buy")}
                       </p>
                     </div>
                   </div>
@@ -445,7 +457,13 @@ export default function CartPage() {
                         className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 md:grid-cols-[auto_1fr_auto]"
                       >
                         <button
+                          type="button"
                           onClick={() => toggleBought(item)}
+                          aria-label={pick(
+                            `${item.bought ? "Debifează" : "Bifează"} ${item.name}`,
+                            `${item.bought ? "Uncheck" : "Check"} ${item.name}`
+                          )}
+                          aria-pressed={Boolean(item.bought)}
                           className={`h-7 w-7 rounded-lg border ${
                             item.bought
                               ? "border-emerald-400 bg-emerald-400 text-black"
@@ -480,9 +498,9 @@ export default function CartPage() {
 
                               <p className="mt-1 text-sm text-gray-400">
                                 {item.price === "preț necunoscut"
-                                  ? "Verifică prețul în magazin"
-                                  : item.price || "Verifică prețul în magazin"}{" "}
-                                · scor{" "}
+                                  ? pick("Verifică prețul în magazin", "Check the price in store")
+                                  : item.price || pick("Verifică prețul în magazin", "Check the price in store")}{" "}
+                                · {pick("scor", "score")}{" "}
                                 {item.score || "-"} / 10
                               </p>
 
@@ -510,8 +528,8 @@ export default function CartPage() {
                                       className="mt-1 text-sm font-semibold text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70"
                                     >
                                       {expandedReasons[item.id]
-                                        ? "Arată mai puțin"
-                                        : "Citește mai mult"}
+                                        ? pick("Arată mai puțin", "Show less")
+                                        : pick("Citește mai mult", "Read more")}
                                     </button>
                                   )}
                                 </div>
@@ -519,12 +537,14 @@ export default function CartPage() {
 
                               <div className="mt-3 flex items-center gap-2">
                                 <button
+                                  type="button"
                                   onClick={() =>
                                     updateQuantity(
                                       item,
                                       (item.quantity || 1) - 1
                                     )
                                   }
+                                  aria-label={pick(`Scade cantitatea pentru ${item.name}`, `Decrease quantity for ${item.name}`)}
                                   className="rounded-xl border border-white/10 px-3 py-1 font-bold hover:bg-white/10"
                                 >
                                   -
@@ -535,12 +555,14 @@ export default function CartPage() {
                                 </span>
 
                                 <button
+                                  type="button"
                                   onClick={() =>
                                     updateQuantity(
                                       item,
                                       (item.quantity || 1) + 1
                                     )
                                   }
+                                  aria-label={pick(`Mărește cantitatea pentru ${item.name}`, `Increase quantity for ${item.name}`)}
                                   className="rounded-xl border border-white/10 px-3 py-1 font-bold hover:bg-white/10"
                                 >
                                   +
@@ -554,6 +576,7 @@ export default function CartPage() {
                           <select
                             value={item.store}
                             onChange={(e) => changeStore(item, e.target.value)}
+                            aria-label={pick(`Magazin pentru ${item.name}`, `Store for ${item.name}`)}
                             className="rounded-xl border border-white/10 bg-[#0b0f14] px-3 py-2 text-sm text-white outline-none"
                           >
                             {stores.map((storeName) => (
@@ -567,7 +590,7 @@ export default function CartPage() {
                             onClick={() => removeItem(item.id)}
                             className="rounded-xl border border-red-400/30 px-3 py-2 text-sm font-semibold text-red-300 hover:bg-red-400/10"
                           >
-                            Șterge
+                            {pick("Șterge", "Remove")}
                           </button>
                         </div>
                       </div>
@@ -580,7 +603,7 @@ export default function CartPage() {
                 onClick={() => setIsClearModalOpen(true)}
                 className="w-full rounded-2xl border border-red-400/30 px-5 py-4 font-semibold text-red-300 hover:bg-red-400/10"
               >
-                Golește coșul
+                {pick("Golește coșul", "Clear cart")}
               </button>
             </div>
           )}
@@ -589,9 +612,10 @@ export default function CartPage() {
 
       <ConfirmModal
         isOpen={isClearModalOpen}
-        title="Golești coșul?"
-        message="Toate produsele din coș vor fi șterse. Acțiunea nu poate fi anulată."
-        confirmLabel="Golește coșul"
+        title={pick("Golești coșul?", "Clear the cart?")}
+        message={pick("Toate produsele din coș vor fi șterse. Acțiunea nu poate fi anulată.", "All products in the cart will be removed. This action cannot be undone.")}
+        confirmLabel={pick("Golește coșul", "Clear cart")}
+        cancelLabel={pick("Anulează", "Cancel")}
         onCancel={() => setIsClearModalOpen(false)}
         onConfirm={clearCart}
       />

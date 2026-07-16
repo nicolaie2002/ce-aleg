@@ -1,12 +1,14 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Camera, CheckCircle2, Coins, FileText, ScanLine, Sparkles } from "lucide-react";
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 const CATALOG_REWARD_COINS = 10;
 const MAX_CONTRIBUTION_IMAGE_WIDTH = 1400;
@@ -15,31 +17,49 @@ const CONTRIBUTION_IMAGE_QUALITY = 0.82;
 
 const SUBMISSION_STATUS = {
   pending: {
-    label: "În verificare",
-    detail: "Așteaptă verificarea adminului.",
+    ro: "În verificare",
+    en: "Under review",
+    detailRo: "Așteaptă verificarea administratorului.",
+    detailEn: "Waiting for administrator review.",
     badge: "border-yellow-300/35 bg-yellow-300/10 text-yellow-100",
   },
   ai_approved: {
-    label: "Gata de publicat",
-    detail: "Verificarea automata arata bine. Adminul poate publica produsul.",
+    ro: "Gata de publicat",
+    en: "Ready to publish",
+    detailRo: "Verificarea automată arată bine. Administratorul poate publica produsul.",
+    detailEn: "The automated review looks good. An administrator can publish the product.",
     badge: "border-cyan-300/35 bg-cyan-300/10 text-cyan-100",
   },
   approved: {
-    label: "Aprobat",
-    detail: "Produsul a intrat în catalog sau a confirmat un produs existent.",
+    ro: "Aprobat",
+    en: "Approved",
+    detailRo: "Produsul a intrat în catalog sau a confirmat un produs existent.",
+    detailEn: "The product was added to the catalog or matched an existing product.",
     badge: "border-emerald-300/35 bg-emerald-300/10 text-emerald-100",
   },
   needs_review: {
-    label: "Necesita revizie",
-    detail: "Lipsesc informații sau pozele nu sunt destul de clare.",
+    ro: "Necesită revizie",
+    en: "Needs review",
+    detailRo: "Lipsesc informații sau pozele nu sunt destul de clare.",
+    detailEn: "Some information is missing or the photos are not clear enough.",
     badge: "border-red-300/35 bg-red-300/10 text-red-100",
   },
 };
 
-function getSubmissionStatus(status) {
-  return SUBMISSION_STATUS[status] || {
-    label: status || "În verificare",
-    detail: "Propunerea este în coada de verificare.",
+function getSubmissionStatus(status, pick) {
+  const meta = SUBMISSION_STATUS[status];
+
+  if (meta) {
+    return {
+      ...meta,
+      label: pick(meta.ro, meta.en),
+      detail: pick(meta.detailRo, meta.detailEn),
+    };
+  }
+
+  return {
+    label: status || pick("În verificare", "Under review"),
+    detail: pick("Propunerea este în coada de verificare.", "The submission is queued for review."),
     badge: "border-white/10 bg-white/[0.04] text-gray-200",
   };
 }
@@ -106,7 +126,7 @@ async function optimizeContributionImage(file) {
   });
 }
 
-function CaptureField({ id, title, description, file, icon: Icon, onChange, busy = false }) {
+function CaptureField({ id, title, description, file, icon: Icon, onChange, pick, busy = false }) {
   return (
     <label
       htmlFor={id}
@@ -127,10 +147,10 @@ function CaptureField({ id, title, description, file, icon: Icon, onChange, busy
             {file ? <CheckCircle2 size={14} /> : <Camera size={14} />}
             <span className="truncate">
               {busy
-                ? "Optimizez poza..."
+                ? pick("Optimizez poza...", "Optimizing photo...")
                 : file
                   ? `${file.name} ${formatFileSize(file.size)}`
-                  : "Alege sau fa poza"}
+                  : pick("Alege sau fă poza", "Choose or take a photo")}
             </span>
           </span>
         </span>
@@ -149,6 +169,7 @@ function CaptureField({ id, title, description, file, icon: Icon, onChange, busy
 }
 
 function SubmitProductPageContent() {
+  const { pick } = useLocale();
   const searchParams = useSearchParams();
 
   const suggestedName = searchParams.get("name") || "";
@@ -186,6 +207,21 @@ function SubmitProductPageContent() {
   const [frontImage, setFrontImage] = useState(null);
   const [nutritionImage, setNutritionImage] = useState(null);
 
+  const loadSubmissions = useCallback(async (userId) => {
+    try {
+      const response = await fetch(`${API_URL}/submissions/${userId}`);
+      const data = await readApiJson(response);
+
+      if (!response.ok) {
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-au putut încărca propunerile.", "Submissions could not be loaded."));
+      }
+
+      setSubmissions(data);
+    } catch (error) {
+      setMessage(error.message);
+    }
+  }, [pick]);
+
   useEffect(() => {
     queueMicrotask(() => {
       const savedUser = localStorage.getItem("cealeg_user");
@@ -199,22 +235,7 @@ function SubmitProductPageContent() {
       setUser(parsedUser);
       loadSubmissions(parsedUser.id);
     });
-  }, []);
-
-  async function loadSubmissions(userId) {
-    try {
-      const response = await fetch(`${API_URL}/submissions/${userId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Nu s-au putut încărca propunerile.");
-      }
-
-      setSubmissions(data);
-    } catch (error) {
-      setMessage(error.message);
-    }
-  }
+  }, [loadSubmissions]);
 
   function updateField(field, value) {
     setForm({
@@ -241,7 +262,7 @@ function SubmitProductPageContent() {
     }
 
     setImageBusyField(field);
-    setImageNotice("Optimizez poza pentru upload...");
+    setImageNotice(pick("Optimizez poza pentru încărcare...", "Optimizing photo for upload..."));
 
     try {
       const optimizedFile = await optimizeContributionImage(file);
@@ -249,12 +270,12 @@ function SubmitProductPageContent() {
       setSelectedImage(optimizedFile);
       setImageNotice(
         optimizedFile.size < file.size
-          ? `Poza optimizată: ${formatFileSize(file.size)} -> ${formatFileSize(optimizedFile.size)}.`
-          : "Poza adaugata."
+          ? pick(`Poză optimizată: ${formatFileSize(file.size)} -> ${formatFileSize(optimizedFile.size)}.`, `Photo optimized: ${formatFileSize(file.size)} -> ${formatFileSize(optimizedFile.size)}.`)
+          : pick("Poză adăugată.", "Photo added.")
       );
     } catch {
       setSelectedImage(file);
-      setImageNotice("Nu am putut comprima poza, dar o folosesc asa cum este.");
+      setImageNotice(pick("Nu am putut comprima poza, dar o folosim așa cum este.", "The photo could not be compressed, but we will use it as it is."));
     } finally {
       setImageBusyField("");
     }
@@ -262,12 +283,12 @@ function SubmitProductPageContent() {
 
   async function handleAiExtract() {
     if (imageBusyField) {
-      setMessage("Așteaptă câteva secunde până se optimizează poza.");
+      setMessage(pick("Așteaptă câteva secunde până se optimizează poza.", "Wait a few seconds while the photo is optimized."));
       return;
     }
 
     if (!frontImage && !nutritionImage && !form.productName.trim()) {
-      setMessage("Încarcă cel puțin o poză sau scrie un nume aproximativ al produsului.");
+      setMessage(pick("Încarcă cel puțin o poză sau scrie un nume aproximativ al produsului.", "Upload at least one photo or enter an approximate product name."));
       return;
     }
 
@@ -293,10 +314,10 @@ function SubmitProductPageContent() {
         body: formData,
       });
 
-      const result = await response.json();
+      const result = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(result.error || "Nu s-au putut extrage datele automat.");
+        throw new Error(getApiErrorMessage(result, pick, "Nu s-au putut extrage datele automat.", "Data could not be extracted automatically."));
       }
 
       const data = result.data;
@@ -317,9 +338,7 @@ function SubmitProductPageContent() {
 
       setAiResult(data);
 
-      setMessage(
-        `Câmpurile disponibile au fost completate automat. Verifică informațiile înainte de trimitere.`
-      );
+      setMessage(pick("Câmpurile disponibile au fost completate automat. Verifică informațiile înainte de trimitere.", "Available fields were filled automatically. Check the information before submitting."));
     } catch (error) {
       setMessage(error.message);
     } finally {
@@ -336,7 +355,7 @@ function SubmitProductPageContent() {
     }
 
     if (imageBusyField) {
-      setMessage("Așteaptă câteva secunde până se optimizează poza.");
+      setMessage(pick("Așteaptă câteva secunde până se optimizează poza.", "Wait a few seconds while the photo is optimized."));
       return;
     }
 
@@ -373,20 +392,24 @@ function SubmitProductPageContent() {
         body: formData,
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
         if (response.status === 409 && data.item) {
           setLastSubmittedItem(data.item);
-          setMessage(data.message || "Propunerea există deja și este în verificare.");
+          setMessage(
+            data.message
+              ? localizeApiMessage(data.message, pick, data.code)
+              : pick("Propunerea există deja și este în verificare.", "This submission already exists and is under review.")
+          );
           return;
         }
 
-        throw new Error(data.message || data.error || "Nu s-a putut trimite produsul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut trimite produsul.", "The product could not be submitted."));
       }
 
       setLastSubmittedItem(data.item || null);
-      setMessage("Produsul a fost trimis la verificare. După aprobare primești scanare bonus și până la 10 CeCoins automat.");
+      setMessage(pick("Produsul a fost trimis la verificare. După aprobare primești o scanare bonus și până la 10 CeCoins automat.", "The product was submitted for review. After approval, you will automatically receive a bonus scan and up to 10 CeCoins."));
 
       setForm({
         productName: "",
@@ -423,20 +446,20 @@ function SubmitProductPageContent() {
         method: "POST",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut verifică produsul cu AI.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut verifica produsul automat.", "The product could not be reviewed automatically."));
       }
 
-      let details = `${data.message} Grad de verificare: ${data.confidence}/100.`;
+      let details = `${data.message || ""} ${pick("Grad de verificare", "Review confidence")}: ${data.confidence}/100.`;
 
       if (data.problems && data.problems.length > 0) {
-        details += ` Probleme: ${data.problems.join(" | ")}`;
+        details += ` ${pick("Probleme", "Problems")}: ${data.problems.join(" | ")}`;
       }
 
       if (data.warnings && data.warnings.length > 0) {
-        details += ` Atenționări: ${data.warnings.join(" | ")}`;
+        details += ` ${pick("Atenționări", "Warnings")}: ${data.warnings.join(" | ")}`;
       }
 
       setMessage(details);
@@ -452,13 +475,17 @@ function SubmitProductPageContent() {
         method: "POST",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut publica produsul.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut publica produsul.", "The product could not be published."));
       }
 
-      setMessage(data.message || "Produsul a fost publicat în baza oficială.");
+      setMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Produsul a fost publicat în catalog.", "The product was published to the catalog.")
+      );
       loadSubmissions(user.id);
     } catch (error) {
       setMessage(error.message);
@@ -471,14 +498,14 @@ function SubmitProductPageContent() {
         method: "DELETE",
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut șterge propunerea.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut șterge propunerea.", "The submission could not be deleted."));
       }
 
       setSubmissions(submissions.filter((item) => item.id !== id));
-      setMessage("Propunerea a fost ștearsă.");
+      setMessage(pick("Propunerea a fost ștearsă.", "The submission was deleted."));
 
       setTimeout(() => {
         setMessage("");
@@ -496,7 +523,7 @@ function SubmitProductPageContent() {
   if (!user) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">Se încarcă pagina...</p>
+        <p className="text-gray-300" role="status">{pick("Se încarcă pagina...", "Loading page...")}</p>
       </main>
     );
   }
@@ -525,13 +552,13 @@ function SubmitProductPageContent() {
         </div>
 
         {message && (
-          <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
+          <div role="status" className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
             {message}
           </div>
         )}
 
         {imageNotice && (
-          <div className="mb-6 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm font-bold text-cyan-100">
+          <div role="status" className="mb-6 rounded-2xl border border-cyan-300/25 bg-cyan-300/10 p-4 text-sm font-bold text-cyan-100">
             {imageNotice}
           </div>
         )}
@@ -645,6 +672,7 @@ function SubmitProductPageContent() {
                 description="Ambalajul frontal ajută la nume, brand și imagine."
                 file={frontImage}
                 icon={Camera}
+                pick={pick}
                 busy={imageBusyField === "front"}
                 onChange={(file) => handleContributionImageChange("front", file)}
               />
@@ -654,6 +682,7 @@ function SubmitProductPageContent() {
                 description="Eticheta ajută la calorii, zahăr, proteină și grăsimi."
                 file={nutritionImage}
                 icon={FileText}
+                pick={pick}
                 busy={imageBusyField === "nutrition"}
                 onChange={(file) => handleContributionImageChange("nutrition", file)}
               />
@@ -907,7 +936,7 @@ function SubmitProductPageContent() {
           ) : (
             <div className="mt-6 space-y-4">
               {submissions.map((item) => {
-                const statusMeta = getSubmissionStatus(item.status);
+                const statusMeta = getSubmissionStatus(item.status, pick);
 
                 return (
                 <div

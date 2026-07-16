@@ -73,7 +73,7 @@ Configureaza numai ramura providerului activ.
 | `FLASK_DEBUG` | `false` | trebuie sa ramana fals in productie |
 | `ALLOW_DEV_TUNNEL_ORIGINS` | `false` | nu permite origin-uri de tunel in productie |
 | `EXPOSE_DEV_AUTH_LINKS` | `false` | linkuri de verificare/reset numai in dezvoltare explicita |
-| `PASSWORD_MIN_LENGTH` | 12 in example; codul impune minimum 10 | politica parole |
+| `PASSWORD_MIN_LENGTH` | 8 in blueprint, 12 in example; codul impune efectiv minimum 10 | politica parole; aliniaza blueprint-ul deliberat la valoarea aprobata |
 | `PASSWORD_RESET_MAX_AGE` | 3600 secunde | expirarea resetarii |
 | `EMAIL_VERIFICATION_MAX_AGE` | 48 ore in cod | expirarea confirmarii email |
 | `ACCOUNT_DELETE_MAX_AGE` | 24 ore in cod/example | expirarea stergerii contului |

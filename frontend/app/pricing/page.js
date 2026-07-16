@@ -9,7 +9,7 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
-import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
 const fallbackPlans = {
@@ -536,7 +536,7 @@ export default function PricingPage() {
       if (data.updated) {
         setMessageTone("success");
         setMessage(
-          data.message ||
+          (data.message && localizeApiMessage(data.message, pick, data.code)) ||
             pick(
               "Abonamentul a fost actualizat.",
               "Your subscription was updated."
@@ -548,7 +548,7 @@ export default function PricingPage() {
 
       setMessageTone("info");
       setMessage(
-        data.message ||
+        (data.message && localizeApiMessage(data.message, pick, data.code)) ||
           pick(
             "Am notat alegerea ta. Verifică datele de plată sau contactează-ne pentru activare.",
             "We saved your choice. Check payment settings or contact us for activation."

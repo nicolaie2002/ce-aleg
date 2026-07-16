@@ -26,7 +26,7 @@ import { AppHeader } from "../components/AppHeader";
 import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
-import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 const MISSION_ICONS = {
   scan: ScanLine,
@@ -258,7 +258,11 @@ export default function MissionsPage() {
       }
 
       setSummary(data.summary);
-      setMessage(pick(data.message || "Recompensă revendicată.", "Reward claimed."));
+      setMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Recompensă revendicată.", "Reward claimed.")
+      );
     } catch (claimError) {
       setError(claimError.message || pick("Recompensa nu a putut fi revendicată.", "The reward could not be claimed."));
     } finally {

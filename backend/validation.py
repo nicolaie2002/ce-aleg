@@ -259,14 +259,20 @@ def validate_register_payload(
 ) -> ValidationResult:
     data, errors = _payload(value)
     name = _required_text(data, "name", errors, label="Numele", maximum=120)
-    email = _required_text(data, "email", errors, label="Emailul", maximum=254, lower=True)
+    email = _required_text(
+        data, "email", errors, label="Emailul", maximum=254, lower=True
+    )
     password = str(data.get("password") or "")
     age_confirmed = _boolean(data.get("ageConfirmed"))
     accepted_terms = _boolean(data.get("acceptedTerms"))
-    invite_code = _normalize_invite_code(data.get("inviteCode") or data.get("invite_code"))
+    invite_code = _normalize_invite_code(
+        data.get("inviteCode") or data.get("invite_code")
+    )
 
     if email and not EMAIL_PATTERN.fullmatch(email):
-        errors.append(_issue("email", "invalid_email", "Introdu o adresă de email validă."))
+        errors.append(
+            _issue("email", "invalid_email", "Introdu o adresă de email validă.")
+        )
     if not password:
         errors.append(_issue("password", "required", "Parola este obligatorie."))
     elif len(password) < password_min_length:
@@ -309,7 +315,9 @@ def validate_register_payload(
 
 def validate_login_payload(value: Any) -> ValidationResult:
     data, errors = _payload(value)
-    email = _required_text(data, "email", errors, label="Emailul", maximum=254, lower=True)
+    email = _required_text(
+        data, "email", errors, label="Emailul", maximum=254, lower=True
+    )
     password = str(data.get("password") or "")
     if not password:
         errors.append(_issue("password", "required", "Parola este obligatorie."))
@@ -320,9 +328,13 @@ def validate_email_payload(value: Any) -> ValidationResult:
     """Validate forgot-password and resend-verification payloads."""
 
     data, errors = _payload(value)
-    email = _required_text(data, "email", errors, label="Emailul", maximum=254, lower=True)
+    email = _required_text(
+        data, "email", errors, label="Emailul", maximum=254, lower=True
+    )
     if email and not EMAIL_PATTERN.fullmatch(email):
-        errors.append(_issue("email", "invalid_email", "Introdu o adresă de email validă."))
+        errors.append(
+            _issue("email", "invalid_email", "Introdu o adresă de email validă.")
+        )
     return ValidationResult({"email": email}, tuple(errors))
 
 
@@ -356,8 +368,12 @@ def validate_reset_password_payload(
 def validate_subscription_checkout_payload(value: Any) -> ValidationResult:
     data, errors = _payload(value)
     plan = _text(data.get("plan") or "pro", lower=True)
-    raw_interval = _text(data.get("billingInterval") or data.get("interval") or "monthly", lower=True)
-    billing_interval = "yearly" if raw_interval in {"yearly", "annual", "year", "an"} else "monthly"
+    raw_interval = _text(
+        data.get("billingInterval") or data.get("interval") or "monthly", lower=True
+    )
+    billing_interval = (
+        "yearly" if raw_interval in {"yearly", "annual", "year", "an"} else "monthly"
+    )
     if plan not in SUBSCRIPTION_PLANS:
         errors.append(_issue("plan", "invalid_choice", "Plan invalid."))
     return ValidationResult(
@@ -370,7 +386,9 @@ def validate_cecoin_checkout_payload(value: Any) -> ValidationResult:
     data, errors = _payload(value)
     pack_id = _text(data.get("packId"), lower=True)
     if not pack_id:
-        errors.append(_issue("packId", "required", "Pachetul CeCoins este obligatoriu."))
+        errors.append(
+            _issue("packId", "required", "Pachetul CeCoins este obligatoriu.")
+        )
     elif pack_id not in CECOIN_PACKS:
         errors.append(_issue("packId", "invalid_choice", "Pachet CeCoins invalid."))
     return ValidationResult({"packId": pack_id}, tuple(errors))
@@ -378,10 +396,14 @@ def validate_cecoin_checkout_payload(value: Any) -> ValidationResult:
 
 def validate_checkout_sync_payload(value: Any) -> ValidationResult:
     data, errors = _payload(value)
-    session_id = _required_text(data, "sessionId", errors, label="Sesiunea Stripe", maximum=255)
+    session_id = _required_text(
+        data, "sessionId", errors, label="Sesiunea Stripe", maximum=255
+    )
     if session_id and not session_id.startswith("cs_"):
         errors.append(
-            _issue("sessionId", "invalid_stripe_session", "Sesiunea Stripe este invalidă.")
+            _issue(
+                "sessionId", "invalid_stripe_session", "Sesiunea Stripe este invalidă."
+            )
         )
     return ValidationResult({"sessionId": session_id}, tuple(errors))
 
@@ -413,8 +435,13 @@ def validate_analytics_payload(
 
 def validate_support_payload(value: Any) -> ValidationResult:
     data, errors = _payload(value)
-    email = _required_text(data, "email", errors, label="Emailul", maximum=254, lower=True)
-    topic = _optional_text(data, "topic", errors, label="Subiectul", maximum=120) or "Suport"
+    email = _required_text(
+        data, "email", errors, label="Emailul", maximum=254, lower=True
+    )
+    topic = (
+        _optional_text(data, "topic", errors, label="Subiectul", maximum=120)
+        or "Suport"
+    )
     message = _required_text(
         data,
         "message",
@@ -424,7 +451,9 @@ def validate_support_payload(value: Any) -> ValidationResult:
         maximum=4000,
     )
     if email and not EMAIL_PATTERN.fullmatch(email):
-        errors.append(_issue("email", "invalid_email", "Introdu o adresă de email validă."))
+        errors.append(
+            _issue("email", "invalid_email", "Introdu o adresă de email validă.")
+        )
     return ValidationResult(
         {"email": email, "topic": topic, "message": message},
         tuple(errors),
@@ -453,7 +482,10 @@ def validate_alternative_feedback_payload(value: Any) -> ValidationResult:
     scanned_product = _normalized_product(data.get("scannedProduct"))
     store = _optional_text(data, "store", errors, label="Magazinul", maximum=100)
     request_text = _optional_text(data, "request", errors, label="Cerința", maximum=250)
-    reason = _optional_text(data, "reason", errors, label="Motivul", maximum=80) or "wrong_recommendation"
+    reason = (
+        _optional_text(data, "reason", errors, label="Motivul", maximum=80)
+        or "wrong_recommendation"
+    )
     if not product["name"]:
         errors.append(
             _issue(
@@ -477,16 +509,19 @@ def validate_alternative_feedback_payload(value: Any) -> ValidationResult:
 def validate_product_feedback_payload(value: Any) -> ValidationResult:
     data, errors = _payload(value)
     product = _normalized_product(data.get("product"))
-    store = _optional_text(data, "store", errors, label="Magazinul", maximum=100) or product["store"]
+    store = (
+        _optional_text(data, "store", errors, label="Magazinul", maximum=100)
+        or product["store"]
+    )
     reason = _text(data.get("reason") or "other", lower=True)
     details = _optional_text(data, "details", errors, label="Detaliile", maximum=1000)
-    source = _optional_text(data, "source", errors, label="Sursa", maximum=80) or "result"
+    source = (
+        _optional_text(data, "source", errors, label="Sursa", maximum=80) or "result"
+    )
     if reason not in PRODUCT_REPORT_REASONS:
         reason = "other"
     if not product["name"] and not product["barcode"]:
-        errors.append(
-            _issue("product", "required", "Produsul raportat nu este valid.")
-        )
+        errors.append(_issue("product", "required", "Produsul raportat nu este valid."))
     return ValidationResult(
         {
             "product": product,
@@ -527,7 +562,9 @@ def validate_alternatives_payload(value: Any) -> ValidationResult:
                 criteria.append(criterion[:80])
     request_text = _optional_text(data, "request", errors, label="Cerința", maximum=500)
     if not product["name"] and not product["barcode"]:
-        errors.append(_issue("product", "required", "Produsul scanat este obligatoriu."))
+        errors.append(
+            _issue("product", "required", "Produsul scanat este obligatoriu.")
+        )
     return ValidationResult(
         {
             "product": product,
@@ -543,10 +580,18 @@ def validate_analysis_form(value: Any) -> ValidationResult:
     """Normalize non-file fields accepted by the multipart /analyze route."""
 
     data, errors = _payload(value)
-    store = _optional_text(data, "store", errors, label="Magazinul", maximum=100) or "any"
-    product_query = _optional_text(data, "product_query", errors, label="Produsul", maximum=250)
-    label_text = _optional_text(data, "label_text", errors, label="Textul etichetei", maximum=2000)
-    selected_barcode, barcode_errors = validate_barcode_value(data.get("selected_barcode"))
+    store = (
+        _optional_text(data, "store", errors, label="Magazinul", maximum=100) or "any"
+    )
+    product_query = _optional_text(
+        data, "product_query", errors, label="Produsul", maximum=250
+    )
+    label_text = _optional_text(
+        data, "label_text", errors, label="Textul etichetei", maximum=2000
+    )
+    selected_barcode, barcode_errors = validate_barcode_value(
+        data.get("selected_barcode")
+    )
     errors.extend(barcode_errors)
     demo_product_id = _text(data.get("demo_product_id"))
     if demo_product_id and not demo_product_id.isdigit():
@@ -559,7 +604,9 @@ def validate_analysis_form(value: Any) -> ValidationResult:
             "product_query": product_query or label_text,
             "label_text": label_text,
             "selected_barcode": selected_barcode,
-            "demo_product_id": int(demo_product_id) if demo_product_id.isdigit() else None,
+            "demo_product_id": int(demo_product_id)
+            if demo_product_id.isdigit()
+            else None,
         },
         tuple(errors),
     )
@@ -581,7 +628,9 @@ def validate_product_submission_payload(value: Any) -> ValidationResult:
     except (TypeError, ValueError):
         user_id = None
         errors.append(
-            _issue("user_id", "invalid_integer", "user_id trebuie să fie un număr valid.")
+            _issue(
+                "user_id", "invalid_integer", "user_id trebuie să fie un număr valid."
+            )
         )
 
     product_name = _required_text(
@@ -625,9 +674,11 @@ def validate_product_submission_payload(value: Any) -> ValidationResult:
         raw_value = data.get(field)
         parsed = _finite_float(raw_value)
         nutrition[field] = parsed
-        if raw_value not in {None, ""} and parsed is None:
+        if raw_value is not None and raw_value != "" and parsed is None:
             errors.append(
-                _issue(field, "invalid_number", f"{label} trebuie să fie un număr valid.")
+                _issue(
+                    field, "invalid_number", f"{label} trebuie să fie un număr valid."
+                )
             )
         elif parsed is not None and not 0 <= parsed <= maximum:
             errors.append(
@@ -682,4 +733,3 @@ def validate_payload(kind: str, value: Any, **options: Any) -> ValidationResult:
     except KeyError as error:
         raise ValueError(f"Unknown payload validator: {kind}") from error
     return validator(value, **options)
-

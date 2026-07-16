@@ -1,7 +1,9 @@
 # Registru operational al furnizorilor si acordurilor DPA
 
-Data ultimei revizuiri: 2026-07-16  
-Proprietar registru: DE COMPLETAT  
+Data ultimei revizuiri: 2026-07-16
+
+Proprietar registru: DE COMPLETAT
+
 Urmatoarea revizuire: DE COMPLETAT
 
 Acesta este un registru tehnic de lucru, nu consultanta juridica si nu declara

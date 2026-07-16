@@ -1,11 +1,12 @@
 import io
 from types import SimpleNamespace
+from datetime import datetime, timedelta
 
 from werkzeug.security import generate_password_hash
 
 import app as app_module
 from database import db
-from models import Product, User
+from models import ConsentRecord, Product, SearchEvent, User
 from ai_provider import extract_response_text
 
 
@@ -50,6 +51,7 @@ def test_openapi_contract_lists_protected_admin_route(app, client):
 def test_admin_monitoring_rejects_regular_user(app, client):
     with app.app_context():
         user = create_user()
+        user_id = user.id
         cookie = auth_cookie_for(user)
 
     client.set_cookie(app_module.AUTH_COOKIE_NAME, cookie)
@@ -197,3 +199,77 @@ def test_stripe_webhook_is_processed_once(app, client, monkeypatch):
     assert second.status_code == 200
     assert second.get_json()["duplicate"] is True
     assert calls == ["cs_test"]
+
+
+def test_account_export_excludes_auth_secrets_and_other_users(app, client):
+    with app.app_context():
+        user = create_user("owner@example.com")
+        create_user("other@example.com")
+        cookie = auth_cookie_for(user)
+
+    client.set_cookie(app_module.AUTH_COOKIE_NAME, cookie)
+    response = client.get("/account/export")
+    payload = response.get_json()
+
+    assert response.status_code == 200
+    assert payload["account"]["email"] == "owner@example.com"
+    assert "password_hash" not in response.get_data(as_text=True)
+    assert "other@example.com" not in response.get_data(as_text=True)
+
+
+def test_processing_restriction_blocks_mutations_until_lifted(app, client):
+    with app.app_context():
+        user = create_user()
+        user_id = user.id
+        cookie = auth_cookie_for(user)
+
+    client.set_cookie(app_module.AUTH_COOKIE_NAME, cookie)
+    restricted = client.post("/account/restriction", json={"restricted": True})
+    blocked = client.post("/favorites/add", json={"user_id": user_id, "name": "Test"})
+    lifted = client.post("/account/restriction", json={"restricted": False})
+
+    assert restricted.status_code == 200
+    assert blocked.status_code == 423
+    assert blocked.get_json()["code"] == "processing_restricted"
+    assert lifted.status_code == 200
+
+
+def test_authenticated_consent_is_logged(app, client):
+    with app.app_context():
+        user = create_user()
+        user_id = user.id
+        cookie = auth_cookie_for(user)
+
+    client.set_cookie(app_module.AUTH_COOKIE_NAME, cookie)
+    response = client.post("/privacy/consent", json={
+        "type": "analytics",
+        "granted": False,
+        "policyVersion": "2026-07",
+    })
+
+    assert response.status_code == 201
+    with app.app_context():
+        record = ConsentRecord.query.filter_by(user_id=user_id).one()
+        assert record.granted is False
+
+
+def test_retention_supports_dry_run_and_apply(app):
+    with app.app_context():
+        user = create_user()
+        old_search = SearchEvent(
+            user_id=user.id,
+            search_text="old query",
+            result_count=0,
+            source="test",
+            created_at=datetime.utcnow() - timedelta(days=500),
+        )
+        db.session.add(old_search)
+        db.session.commit()
+
+        preview = app_module.run_retention_cleanup(apply_changes=False)
+        assert preview["searchEvents"] == 1
+        assert SearchEvent.query.count() == 1
+
+        applied = app_module.run_retention_cleanup(apply_changes=True)
+        assert applied["searchEvents"] == 1
+        assert SearchEvent.query.count() == 0

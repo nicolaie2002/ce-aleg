@@ -4,7 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { Crown, Plus, Trash2, UserRound, UsersRound } from "lucide-react";
 import { API_URL } from "../config";
-import { readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import { getActiveProfile, setActiveProfile } from "../utils/profilePreferences";
 import { InteractiveSurface } from "./InteractiveSurface";
 import { useLocale } from "./LocaleProvider";
@@ -66,7 +66,14 @@ export function FamilyProfiles({ compact = false }) {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Profilurile nu au putut fi încărcate.", "Profiles could not be loaded."));
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Profilurile nu au putut fi încărcate.",
+            "Profiles could not be loaded."
+          )
+        );
       }
 
       const loadedProfiles = data.profiles || [];
@@ -119,7 +126,14 @@ export function FamilyProfiles({ compact = false }) {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Profilul nu a putut fi creat.", "Profile could not be created."));
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Profilul nu a putut fi creat.",
+            "Profile could not be created."
+          )
+        );
       }
 
       const createdProfile = data.profile;
@@ -147,7 +161,14 @@ export function FamilyProfiles({ compact = false }) {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Profilul nu a putut fi sters.", "Profile could not be deleted."));
+        throw new Error(
+          getApiErrorMessage(
+            data,
+            pick,
+            "Profilul nu a putut fi șters.",
+            "Profile could not be deleted."
+          )
+        );
       }
 
       const nextProfiles = profiles.filter((item) => item.id !== profile.id);

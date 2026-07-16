@@ -10,7 +10,9 @@ import { trackEvent } from "../utils/analytics";
 import { ExpandableText } from "../components/ExpandableText";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
+import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile, getActiveProfilePayload, readProfilePreferences } from "../utils/profilePreferences";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 const criteriaLabels = {
   cheap: "mai ieftin",
@@ -23,6 +25,19 @@ const criteriaLabels = {
   caffeine: "mai multă cafeină",
   different_flavor: "altă aromă",
   value: "raport calitate-preț mai bun",
+};
+
+const criteriaLabelsEn = {
+  cheap: "lower price",
+  protein: "more protein",
+  low_calorie: "fewer calories",
+  low_sugar: "less sugar",
+  vegan: "plant-based",
+  lactose_free: "lactose-free",
+  natural: "simpler ingredients",
+  caffeine: "more caffeine",
+  different_flavor: "different flavor",
+  value: "better value for money",
 };
 
 const goalCriteriaMap = {
@@ -54,7 +69,18 @@ const allergyLabels = {
   sesame: "Susan",
 };
 
-function getStoreName(storeId) {
+const allergyLabelsEn = {
+  gluten: "Gluten",
+  lactose: "Lactose",
+  peanuts: "Peanuts",
+  nuts: "Tree nuts",
+  soy: "Soy",
+  egg: "Egg",
+  fish: "Fish",
+  sesame: "Sesame",
+};
+
+function getStoreName(storeId, pick) {
   const stores = {
     lidl: "Lidl",
     kaufland: "Kaufland",
@@ -62,11 +88,11 @@ function getStoreName(storeId) {
     mega: "Mega Image",
     profi: "Profi",
     penny: "Penny",
-    local: "Market local",
-    any: "Fără magazin ales",
+    local: pick("Magazin local", "Local store"),
+    any: pick("Fără magazin ales", "No store selected"),
   };
 
-  return stores[storeId] || "Fără magazin ales";
+  return stores[storeId] || pick("Fără magazin ales", "No store selected");
 }
 
 function normalizeText(text) {
@@ -837,13 +863,13 @@ const blockedSearchWords = [
   "shit",
 ];
 
-function validateAlternativeSearch(requestText) {
+function validateAlternativeSearch(requestText, pick) {
   const text = normalizeText(requestText).trim();
 
   if (!text) return "";
 
   if (blockedSearchWords.some((word) => text.includes(word))) {
-    return "Foloseste cuvinte normale si spune ce caracteristici vrei la produs.";
+    return pick("Folosește un limbaj potrivit și spune ce caracteristici vrei la produs.", "Use appropriate language and describe the product features you want.");
   }
 
   const words = text
@@ -852,28 +878,29 @@ function validateAlternativeSearch(requestText) {
     .filter((word) => word.length >= 3);
 
   if (words.length === 0) {
-    return "Descrie produsul dorit: de exemplu mai ieftin, fără zahăr sau mai multă proteină.";
+    return pick("Descrie produsul dorit: de exemplu mai ieftin, fără zahăr sau cu mai multă proteină.", "Describe the product you want, for example cheaper, sugar-free or higher in protein.");
   }
 
   if (text.length < 4) {
-    return "Scrie puțin mai clar ce cauți.";
+    return pick("Scrie puțin mai clar ce cauți.", "Describe what you are looking for more clearly.");
   }
 
   return "";
 }
 
-async function readJsonResponse(response, sourceLabel) {
-  const text = await response.text();
+async function readJsonResponse(response, sourceLabel, pick) {
+  const data = await readApiJson(response);
 
-  if (!text) return {};
-
-  try {
-    return JSON.parse(text);
-  } catch {
+  if (data?.code === "invalid_server_response") {
     throw new Error(
-      `${sourceLabel} nu a trimis un răspuns valid. Reîncărcăm recomandările disponibile.`
+      pick(
+        `${sourceLabel} nu a trimis un răspuns valid. Reîncărcăm recomandările disponibile.`,
+        `${sourceLabel} did not return a valid response. We are reloading available recommendations.`
+      )
     );
   }
+
+  return data;
 }
 
 function productSearchText(product) {
@@ -1302,6 +1329,7 @@ function filterProductsByCriteria(
 }
 
 function AlternativesPageContent() {
+  const { locale, pick } = useLocale();
   const searchParams = useSearchParams();
 
   const [user, setUser] = useState(null);
@@ -1328,7 +1356,7 @@ function AlternativesPageContent() {
   const requestParam = searchParams.get("request") || "";
   const storeParam = searchParams.get("store") || "any";
 
-  const storeName = getStoreName(storeParam);
+  const storeName = getStoreName(storeParam, pick);
 
   const selectedCriteriaIds = criteriaParam.split(",").filter(Boolean);
   const customRequest = decodeURIComponent(requestParam);
@@ -1352,7 +1380,7 @@ function AlternativesPageContent() {
 
   const selectedAllergyLabels = Array.isArray(profilePreferences?.allergies)
     ? profilePreferences.allergies
-        .map((item) => allergyLabels[item] || item)
+        .map((item) => (locale === "en" ? allergyLabelsEn[item] : allergyLabels[item]) || item)
         .filter(Boolean)
     : [];
   const selectedAvoidIngredients = splitAvoidIngredients(profilePreferences?.avoidIngredients || "");
@@ -1360,7 +1388,7 @@ function AlternativesPageContent() {
   const currentPlan = billing?.usage?.plan || "free";
   const isPaidPlan = currentPlan === "pro" || currentPlan === "family";
   const searchWarning = isPaidPlan
-    ? validateAlternativeSearch(alternativeSearch)
+    ? validateAlternativeSearch(alternativeSearch, pick)
     : "";
   const searchCriteriaIds =
     isPaidPlan && alternativeSearch.trim() && !searchWarning
@@ -1372,7 +1400,7 @@ function AlternativesPageContent() {
   );
   const combinedCriteriaKey = combinedCriteriaIds.join(",");
   const displayCriteria = combinedCriteriaIds.map(
-    (item) => criteriaLabels[item] || item
+    (item) => (locale === "en" ? criteriaLabelsEn[item] : criteriaLabels[item]) || item
   );
 
   async function loadProducts(
@@ -1405,7 +1433,8 @@ function AlternativesPageContent() {
           );
           const externalData = await readJsonResponse(
             externalResponse,
-            "Open Food Facts"
+            "Open Food Facts",
+            pick
           );
 
           if (
@@ -1420,8 +1449,8 @@ function AlternativesPageContent() {
           }
 
           externalLookupWarning =
-            externalData.message ||
-            "Open Food Facts nu a găsit suficiente variante pentru produsul scanat.";
+            (externalData.message && localizeApiMessage(externalData.message, pick, externalData.code)) ||
+            pick("Open Food Facts nu a găsit suficiente variante pentru produsul scanat.", "Open Food Facts did not find enough options for the scanned product.");
         } catch (externalError) {
           externalLookupWarning = externalError.message;
         }
@@ -1431,16 +1460,16 @@ function AlternativesPageContent() {
         setErrorMessage("");
         setLookupNotice(
           externalLookupWarning ||
-            "Nu am găsit încă suficiente alternative externe pentru produsul scanat."
+            pick("Nu am găsit încă suficiente alternative externe pentru produsul scanat.", "We have not found enough external alternatives for the scanned product yet.")
         );
         return;
       }
 
       const response = await fetch(`${API_URL}/products`);
-      const data = await readJsonResponse(response, "Catalogul local");
+      const data = await readJsonResponse(response, pick("Catalogul local", "Local catalog"), pick);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-au putut incarca produsele.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-au putut încărca produsele.", "Products could not be loaded."));
       }
 
       setProducts(data);
@@ -1453,7 +1482,7 @@ function AlternativesPageContent() {
     } catch (error) {
       setErrorMessage(
         error.message ||
-          "Nu am putut încărca recomandările. Reîncearcă în câteva secunde."
+          pick("Nu am putut încărca recomandările. Reîncearcă în câteva secunde.", "Recommendations could not be loaded. Try again in a few seconds.")
       );
     } finally {
       setIsLoadingProducts(false);
@@ -1603,10 +1632,10 @@ function AlternativesPageContent() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Nu s-a putut adăuga produsul în coș.");
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut adăuga produsul în coș.", "The product could not be added to the cart."));
       }
 
       setAddedProduct(`${product.name} - ${storeName}`);
@@ -1658,18 +1687,16 @@ function AlternativesPageContent() {
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(
-          data.error || "Nu s-a putut salva produsul la favorite."
-        );
+        throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut salva produsul la favorite.", "The product could not be saved to favorites."));
       }
 
       if (data.message === "Produsul este deja la favorite.") {
-        setFavoriteProduct(`${product.name} este deja la favorite.`);
+        setFavoriteProduct(pick(`${product.name} este deja la favorite.`, `${product.name} is already in favorites.`));
       } else {
-        setFavoriteProduct(`${product.name} a fost salvat la favorite.`);
+        setFavoriteProduct(pick(`${product.name} a fost salvat la favorite.`, `${product.name} was saved to favorites.`));
       }
       trackEvent("add_to_favorites", {
         source: "alternatives",
@@ -1715,14 +1742,18 @@ function AlternativesPageContent() {
           reason: "wrong_recommendation",
         }),
       });
-      const data = await readJsonResponse(response, "Raportare alternativă");
+      const data = await readJsonResponse(response, pick("Raportare alternativă", "Alternative report"), pick);
 
       if (!response.ok) {
-        throw new Error(data.error || "Raportarea nu a putut fi trimisă.");
+        throw new Error(getApiErrorMessage(data, pick, "Raportarea nu a putut fi trimisă.", "The report could not be sent."));
       }
 
       setReportedProductKey(actionKey);
-      setReportMessage(data.message || "Raportarea a fost trimisă.");
+      setReportMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Raportarea a fost trimisă.", "The report was sent.")
+      );
       trackEvent("alternative_report", {
         source: "alternatives",
         product: product.name,
@@ -1741,7 +1772,7 @@ function AlternativesPageContent() {
   if (isLoadingProducts) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">Pregătim recomandările potrivite...</p>
+        <p className="text-gray-300" role="status">{pick("Pregătim recomandările potrivite...", "Preparing suitable recommendations...")}</p>
       </main>
     );
   }
@@ -1779,7 +1810,7 @@ function AlternativesPageContent() {
 
         {addedProduct && (
           <div role="status" aria-live="polite" className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-emerald-300">
-            Produs adăugat în coș:{" "}
+            {pick("Produs adăugat în coș", "Product added to cart")}:{" "}
             <span className="font-bold">{addedProduct}</span>
           </div>
         )}

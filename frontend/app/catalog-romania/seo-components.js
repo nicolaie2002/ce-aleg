@@ -162,7 +162,7 @@ export function StepList({ items }) {
   );
 }
 
-export function CategoryCard({ category }) {
+export function CategoryCard({ category, ctaLabel = "Vezi ghidul" }) {
   return (
     <Link
       href={`/catalog-romania/categorii/${category.slug}`}
@@ -182,7 +182,7 @@ export function CategoryCard({ category }) {
         <h3 className="text-lg font-black text-white">{category.name}</h3>
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{category.intro}</p>
         <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-cyan-100">
-          Vezi ghidul
+          {ctaLabel}
           <ArrowRight size={16} />
         </span>
       </div>
@@ -218,7 +218,7 @@ export function StoreCard({ store, ctaLabel = "Vezi pagina magazinului" }) {
   );
 }
 
-export function ProductCard({ product }) {
+export function ProductCard({ product, ctaLabel = "Vezi pagina produsului" }) {
   return (
     <Link
       href={`/catalog-romania/produse/${product.slug}`}
@@ -242,7 +242,7 @@ export function ProductCard({ product }) {
         <h3 className="mt-1 text-lg font-black text-white">{product.name}</h3>
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{product.verdict}</p>
         <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-cyan-100">
-          Vezi pagina produsului
+          {ctaLabel}
           <ArrowRight size={16} />
         </span>
       </div>
@@ -250,7 +250,11 @@ export function ProductCard({ product }) {
   );
 }
 
-export function AlternativeGuideCard({ guide }) {
+export function AlternativeGuideCard({
+  guide,
+  eyebrow = "Ghid alternative",
+  ctaLabel = "Vezi ghidul",
+}) {
   return (
     <Link
       href={`/catalog-romania/alternative/${guide.slug}`}
@@ -267,11 +271,11 @@ export function AlternativeGuideCard({ guide }) {
         />
       </div>
       <div className="p-4">
-        <p className="text-xs font-black uppercase text-emerald-100">Ghid alternative</p>
+        <p className="text-xs font-black uppercase text-emerald-100">{eyebrow}</p>
         <h3 className="mt-1 text-lg font-black text-white">{guide.title}</h3>
         <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-400">{guide.intro}</p>
         <span className="mt-4 inline-flex items-center gap-2 text-sm font-black text-emerald-100">
-          Vezi ghidul
+          {ctaLabel}
           <ArrowRight size={16} />
         </span>
       </div>

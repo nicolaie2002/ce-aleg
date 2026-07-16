@@ -1,13 +1,6 @@
 import { notFound } from "next/navigation";
-import { Barcode, CheckCircle2, Search, Store } from "lucide-react";
 import {
-  CatalogSeoLayout,
-  CategoryStoreLinks,
   JsonLd,
-  PillGrid,
-  SeoCtaBand,
-  SeoSection,
-  StepList,
   buildBreadcrumbJsonLd,
 } from "../../seo-components";
 import {
@@ -16,6 +9,7 @@ import {
   getSeoCategory,
   getStoresForCategory,
 } from "../../seo-data";
+import { CatalogCategoryContent } from "../../CatalogDetailContent";
 
 export const dynamic = "force-dynamic";
 
@@ -77,55 +71,7 @@ export default async function CatalogCategoryPage({ params }) {
         ])}
       />
       <JsonLd data={collectionJsonLd} />
-      <CatalogSeoLayout
-        eyebrow="Ghid categorie"
-        title={`${category.name}: scanează produse și compară alternative.`}
-        description={category.intro}
-        image={category.image}
-        imageAlt={`${category.name} în catalogul Ce aleg?`}
-      >
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.92fr)_minmax(0,1.08fr)]">
-          <SeoSection
-            icon={Barcode}
-            title="Ce merită verificat"
-            description="Când două produse par aproape identice, diferența apare în nutrienți și ingrediente."
-          >
-            <PillGrid items={category.compareSignals} />
-          </SeoSection>
-
-          <SeoSection
-            icon={Search}
-            title="Exemple de căutări"
-            description="Aceste produse sunt bune pentru scanare, căutare manuală sau completarea catalogului."
-          >
-            <PillGrid items={category.examples} tone="emerald" />
-          </SeoSection>
-        </div>
-
-        <SeoSection
-          icon={CheckCircle2}
-          title="Flow recomandat la raft"
-          description={category.advice}
-        >
-          <StepList
-            items={[
-              "Scanează codul de bare sau caută produsul după nume.",
-              "Citește verdictul și compară scorul cu produse similare.",
-              "Dacă produsul lipsește, trimite poze pentru verificare și primești CeCoins după aprobare.",
-            ]}
-          />
-        </SeoSection>
-
-        <SeoSection
-          icon={Store}
-          title={`Magazine unde categoria ${category.name.toLowerCase()} merită urmărită`}
-          description="Legăturile interne ajută utilizatorii să ajungă rapid la magazinul în care fac cumpărături."
-        >
-          <CategoryStoreLinks stores={stores} />
-        </SeoSection>
-
-        <SeoCtaBand />
-      </CatalogSeoLayout>
+      <CatalogCategoryContent category={category} stores={stores} />
     </>
   );
 }

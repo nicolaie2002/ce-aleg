@@ -14,7 +14,7 @@ import {
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
-import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
@@ -66,7 +66,11 @@ export default function SupportPage() {
       }
 
       setStatusTone("success");
-      setStatus(pick(data.message || "Mesajul a fost trimis.", "Your message was sent."));
+      setStatus(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Mesajul a fost trimis.", "Your message was sent.")
+      );
       setMessage("");
       trackEvent("support_message", { topic: topicLabel });
     } catch (error) {

@@ -1,13 +1,9 @@
-import { Barcode, Search } from "lucide-react";
 import {
-  CatalogSeoLayout,
   JsonLd,
-  ProductCard,
-  SeoCtaBand,
-  SeoSection,
   buildBreadcrumbJsonLd,
 } from "../seo-components";
 import { CATALOG_SEO_SITE_URL, SEO_PRODUCTS } from "../seo-data";
+import { CatalogProductsContent } from "../CatalogHubContent";
 
 export const metadata = {
   title: "Produse scanabile: exemple și pagini publice",
@@ -51,45 +47,7 @@ export default function CatalogProductsPage() {
         ])}
       />
       <JsonLd data={collectionJsonLd} />
-      <CatalogSeoLayout
-        eyebrow="Produse publice"
-        title="Produse concrete pe care oamenii le pot caută și scana."
-        description="Aceste pagini sunt exemple publice, bune pentru Google și pentru distribuit în grupuri. Nu promit stoc sau preț live; trimit utilizatorul spre scanare, comparare și contribuție când produsul lipsește."
-        image="/products/iaurt-grecesc.jpg"
-        imageAlt="Produse scanabile în catalogul Ce aleg?"
-      >
-        <SeoSection
-          icon={Barcode}
-          title="Exemple de produse"
-        description="Fiecare pagină are scor orientativ, semnale de verificat, alternative și CTA către scanner."
-        >
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {SEO_PRODUCTS.map((product) => (
-              <ProductCard key={product.slug} product={product} />
-            ))}
-          </div>
-        </SeoSection>
-
-        <SeoSection
-          icon={Search}
-          title="De ce conteaza"
-          description="Căutările organice sunt concrete: oamenii nu caută doar o aplicație, caută produse. Paginile acestea pot prinde termenii lungi și ii trimit spre folosirea aplicatiei."
-        >
-          <div className="grid gap-3 md:grid-cols-3">
-            {[
-              "produs concret + verdict ușor de înțeles",
-              "alternative apropiate pentru aceeași nevoie",
-              "flow clar când produsul lipsește din catalog",
-            ].map((item) => (
-              <div key={item} className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-sm font-bold leading-6 text-gray-200">{item}</p>
-              </div>
-            ))}
-          </div>
-        </SeoSection>
-
-        <SeoCtaBand />
-      </CatalogSeoLayout>
+      <CatalogProductsContent products={SEO_PRODUCTS} />
     </>
   );
 }
