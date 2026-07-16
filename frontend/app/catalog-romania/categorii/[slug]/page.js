@@ -17,12 +17,10 @@ import {
   getStoresForCategory,
 } from "../../seo-data";
 
-export function generateStaticParams() {
-  return SEO_CATEGORIES.map((category) => ({ slug: category.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const category = getSeoCategory(slug);
 
   if (!category) {
@@ -45,7 +43,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function CatalogCategoryPage({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const category = getSeoCategory(slug);
 
   if (!category) {

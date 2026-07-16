@@ -1,5 +1,5 @@
 ﻿from flask import Flask, request, jsonify, send_from_directory, g
-from flask import Response
+from flask import Response, has_request_context
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
@@ -7,11 +7,16 @@ from werkzeug.exceptions import BadRequest
 from PIL import Image, ImageOps
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
+from dotenv import load_dotenv
 import base64
 import csv
+import hashlib
 import hmac
 import json
+import logging
+import math
 import os
+import secrets
 import time
 import re
 import unicodedata
@@ -35,7 +40,20 @@ try:
 except ImportError:
     stripe = None
 
+try:
+    from redis import Redis
+except ImportError:
+    Redis = None
+
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.flask import FlaskIntegration
+except ImportError:
+    sentry_sdk = None
+    FlaskIntegration = None
+
 from database import db
+from ai_provider import get_vision_provider, VisionProviderError, VisionProviderNotConfigured
 from models import (
     User,
     Product,
@@ -48,7 +66,14 @@ from models import (
     Subscription,
     FamilyProfile,
     UsageEvent,
+    StripeWebhookEvent,
+    ConsentRecord,
 )
+
+
+# Load the local file before reading any configuration. Hosted environments keep
+# precedence because override=False is the default.
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 
 OPEN_FOOD_FACTS_ALTERNATIVES_CACHE = {}
@@ -87,6 +112,9 @@ APPROX_RON_EXCHANGE_RATES = {
     "MDL": 0.26,
 }
 RATE_LIMIT_BUCKETS = defaultdict(deque)
+REDIS_CLIENT = None
+REDIS_RETRY_AFTER = 0
+CACHE_METRICS = {"hits": 0, "misses": 0, "writes": 0, "errors": 0}
 APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
 PRODUCTION_MODE = APP_ENV in {"production", "prod"}
 DEFAULT_AUTH_SECRET = "local-development-change-this-secret"
@@ -244,26 +272,6 @@ OFF_FALLBACK_BARCODES_BY_CATEGORY = {
 }
 
 
-def load_local_environment():
-    env_path = os.path.join(os.path.dirname(__file__), ".env")
-
-    if not os.path.exists(env_path):
-        return
-
-    with open(env_path, "r", encoding="utf-8") as env_file:
-        for raw_line in env_file:
-            line = raw_line.strip()
-
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-
-            key, value = line.split("=", 1)
-            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
-
-
-load_local_environment()
-
-
 def read_secret_env(name, default=""):
     value = os.environ.get(name, default).strip().strip("\"'")
     prefixed_name = f"{name}="
@@ -274,6 +282,51 @@ def read_secret_env(name, default=""):
     return value
 
 app = Flask(__name__)
+
+SENTRY_DSN = read_secret_env("SENTRY_DSN")
+
+if SENTRY_DSN and sentry_sdk is not None:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[FlaskIntegration()],
+        environment=APP_ENV,
+        release=get_application_version()["commit"],
+        traces_sample_rate=max(
+            0.0,
+            min(1.0, float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.05"))),
+        ),
+        send_default_pii=False,
+    )
+
+
+class JsonLogFormatter(logging.Formatter):
+    def format(self, record):
+        payload = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+
+        if has_request_context():
+            payload.update({
+                "requestId": getattr(g, "request_id", None),
+                "method": request.method,
+                "path": request.path,
+            })
+
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+
+        return json.dumps(payload, ensure_ascii=False)
+
+
+app.logger.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
+
+if os.environ.get("LOG_FORMAT", "json" if PRODUCTION_MODE else "text").lower() == "json":
+    formatter = JsonLogFormatter()
+    for handler in app.logger.handlers:
+        handler.setFormatter(formatter)
 
 
 def normalize_origin_value(origin):
@@ -380,15 +433,28 @@ SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 SUPABASE_PRODUCT_IMAGES_BUCKET = os.environ.get(
     "SUPABASE_PRODUCT_IMAGES_BUCKET", "product-images"
 )
-app.config["AUTH_SECRET"] = os.environ.get(
-    "AUTH_SECRET", DEFAULT_AUTH_SECRET
-)
+configured_auth_secret = read_secret_env("AUTH_SECRET")
+
+if PRODUCTION_MODE and (
+    not configured_auth_secret
+    or configured_auth_secret == DEFAULT_AUTH_SECRET
+    or len(configured_auth_secret) < 32
+):
+    raise RuntimeError(
+        "AUTH_SECRET must be a unique value of at least 32 characters in production."
+    )
+
+app.config["AUTH_SECRET"] = configured_auth_secret or secrets.token_urlsafe(48)
 SUPABASE_SUBMISSIONS_BUCKET = os.environ.get(
     "SUPABASE_SUBMISSIONS_BUCKET", "product-submissions"
 )
 ALLOW_DEV_TUNNEL_ORIGINS = os.environ.get(
-    "ALLOW_DEV_TUNNEL_ORIGINS", "true"
+    "ALLOW_DEV_TUNNEL_ORIGINS", "false"
 ).lower() == "true"
+EXPOSE_DEV_AUTH_LINKS = (
+    not PRODUCTION_MODE
+    and os.environ.get("EXPOSE_DEV_AUTH_LINKS", "false").lower() == "true"
+)
 
 AUTH_COOKIE_NAME = "cealeg_session"
 AUTH_MAX_AGE = 60 * 60 * 24 * 30
@@ -406,7 +472,14 @@ SUBMISSION_APPROVAL_BONUS_CREDITS = int(
 SUBMISSION_APPROVAL_CECOINS = int(
     os.environ.get("SUBMISSION_APPROVAL_CECOINS", "10")
 )
-PASSWORD_MIN_LENGTH = int(os.environ.get("PASSWORD_MIN_LENGTH", "8"))
+PASSWORD_MIN_LENGTH = max(10, int(os.environ.get("PASSWORD_MIN_LENGTH", "12")))
+SUBMISSION_DAILY_LIMIT = max(1, int(os.environ.get("SUBMISSION_DAILY_LIMIT", "10")))
+SUBMISSION_PENDING_LIMIT = max(1, int(os.environ.get("SUBMISSION_PENDING_LIMIT", "20")))
+TERMS_VERSION = os.environ.get("TERMS_VERSION", "2026-07").strip() or "2026-07"
+SEARCH_RETENTION_DAYS = max(30, int(os.environ.get("SEARCH_RETENTION_DAYS", "180")))
+ANALYTICS_RETENTION_DAYS = max(30, int(os.environ.get("ANALYTICS_RETENTION_DAYS", "365")))
+SCAN_FILE_RETENTION_DAYS = max(1, int(os.environ.get("SCAN_FILE_RETENTION_DAYS", "30")))
+REJECTED_SUBMISSION_RETENTION_DAYS = max(30, int(os.environ.get("REJECTED_SUBMISSION_RETENTION_DAYS", "90")))
 PAYMENT_PROVIDER = os.environ.get("PAYMENT_PROVIDER", "manual").strip().lower()
 FRONTEND_PUBLIC_URL = (
     os.environ.get("FRONTEND_PUBLIC_URL", "").strip().rstrip("/")
@@ -423,6 +496,7 @@ EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Ce aleg?").strip()
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact@cealeg.shop").strip().lower()
 CRON_SECRET = read_secret_env("CRON_SECRET")
+REDIS_URL = read_secret_env("REDIS_URL")
 if not EMAIL_PROVIDER:
     if BREVO_API_KEY:
         EMAIL_PROVIDER = "brevo"
@@ -1150,7 +1224,7 @@ def create_email_verification_token(user):
         "action": "verify_email",
         "user_id": user.id,
         "email": user.email,
-        "password_hash": user.password_hash,
+        "auth_version": int(user.auth_version or 0),
     }
     return get_email_verification_serializer().dumps(payload)
 
@@ -1172,7 +1246,11 @@ def verify_email_verification_token(token):
     if not user:
         return None
 
-    if user.email != payload.get("email") or user.password_hash != payload.get("password_hash"):
+    if (
+        user.email != payload.get("email")
+        or int(user.auth_version or 0) != int(payload.get("auth_version", -1))
+        or user.email_verified
+    ):
         return None
 
     return user
@@ -1210,8 +1288,10 @@ def send_email_verification_email(user):
 
 def create_password_reset_token(user):
     payload = {
+        "action": "reset_password",
         "user_id": user.id,
-        "password_hash": user.password_hash,
+        "email": user.email,
+        "auth_version": int(user.auth_version or 0),
     }
     return get_password_reset_serializer().dumps(payload)
 
@@ -1225,9 +1305,16 @@ def verify_password_reset_token(token):
     except (BadSignature, SignatureExpired):
         return None
 
+    if payload.get("action") != "reset_password":
+        return None
+
     user = db.session.get(User, payload.get("user_id"))
 
-    if not user or user.password_hash != payload.get("password_hash"):
+    if (
+        not user
+        or user.email != payload.get("email")
+        or int(user.auth_version or 0) != int(payload.get("auth_version", -1))
+    ):
         return None
 
     return user
@@ -1268,7 +1355,7 @@ def create_account_deletion_token(user):
         "action": "delete_account",
         "user_id": user.id,
         "email": user.email,
-        "password_hash": user.password_hash,
+        "auth_version": int(user.auth_version or 0),
     }
     return get_account_deletion_serializer().dumps(payload)
 
@@ -1290,7 +1377,10 @@ def verify_account_deletion_token(token):
     if not user:
         return None
 
-    if user.email != payload.get("email") or user.password_hash != payload.get("password_hash"):
+    if (
+        user.email != payload.get("email")
+        or int(user.auth_version or 0) != int(payload.get("auth_version", -1))
+    ):
         return None
 
     return user
@@ -1872,13 +1962,9 @@ def send_subscription_checkout_email_once(user, plan, session, subscription=None
     if not user or not session_id:
         return False
 
-    existing_events = UsageEvent.query.filter_by(
-        user_id=user.id,
-        event_type="subscription_checkout_email",
-        source="stripe_checkout",
-    ).all()
+    idempotency_key = f"stripe:subscription-email:{session_id}"
 
-    if any(parse_usage_metadata(event).get("sessionId") == session_id for event in existing_events):
+    if usage_event_by_idempotency_key(idempotency_key):
         return False
 
     sent = send_subscription_activated_email(user, plan, subscription)
@@ -1887,6 +1973,7 @@ def send_subscription_checkout_email_once(user, plan, session, subscription=None
             user_id=user.id,
             event_type="subscription_checkout_email",
             source="stripe_checkout",
+            idempotency_key=idempotency_key,
             metadata_json=json.dumps({
                 "sessionId": session_id,
                 "plan": plan,
@@ -1895,7 +1982,11 @@ def send_subscription_checkout_email_once(user, plan, session, subscription=None
             }),
         )
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return False
     return sent
 
 
@@ -1997,6 +2088,11 @@ def delete_account_data(user):
     Subscription.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     FamilyProfile.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     UsageEvent.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    ConsentRecord.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    User.query.filter_by(referred_by_user_id=user_id).update(
+        {User.referred_by_user_id: None},
+        synchronize_session=False,
+    )
     db.session.delete(user)
     db.session.commit()
 
@@ -2102,7 +2198,17 @@ def auto_claim_catalog_submission_reward(user, submission, product=None, duplica
     if not user or not submission or SUBMISSION_APPROVAL_CECOINS <= 0:
         return {"claimed": False, "coins": 0, "reason": "disabled"}
 
+    user = lock_user_for_update(user.id)
+
+    if not user:
+        return {"claimed": False, "coins": 0, "reason": "user_missing"}
+
     day_start = get_day_start()
+    idempotency_key = f"mission:{user.id}:catalog-auto:{day_start.date().isoformat()}"
+
+    if usage_event_by_idempotency_key(idempotency_key):
+        return {"claimed": False, "coins": 0, "reason": "daily_already_claimed"}
+
     already_claimed_today = bool(get_mission_claim_events(
         user.id,
         series_id="catalog",
@@ -2131,6 +2237,7 @@ def auto_claim_catalog_submission_reward(user, submission, product=None, duplica
             user_id=user.id,
             event_type="mission_claim",
             source=mission_id,
+            idempotency_key=idempotency_key,
             metadata_json=json.dumps({
                 "reward": reward,
                 "seriesId": "catalog",
@@ -2154,16 +2261,23 @@ def apply_referral_bonus_after_verification(user):
     if not user or not user.referred_by_user_id:
         return False
 
-    already_rewarded = UsageEvent.query.filter(
-        UsageEvent.user_id == user.id,
-        UsageEvent.event_type == "bonus_unlimited",
-        UsageEvent.source == "referral_new_user",
-    ).first()
+    idempotency_key = f"referral:verified:{user.id}"
+    locked_users = (
+        db.session.query(User)
+        .filter(User.id.in_(sorted({user.id, user.referred_by_user_id})))
+        .order_by(User.id)
+    )
 
-    if already_rewarded:
+    if db.engine.dialect.name != "sqlite":
+        locked_users = locked_users.with_for_update()
+
+    locked_by_id = {item.id: item for item in locked_users.all()}
+    user = locked_by_id.get(user.id)
+
+    if not user or usage_event_by_idempotency_key(idempotency_key):
         return False
 
-    inviter = db.session.get(User, user.referred_by_user_id)
+    inviter = locked_by_id.get(user.referred_by_user_id)
 
     if not inviter or inviter.id == user.id:
         return False
@@ -2185,6 +2299,7 @@ def apply_referral_bonus_after_verification(user):
             user_id=inviter.id,
             event_type="referral_cecoin_bonus",
             source="referral_inviter",
+            idempotency_key=idempotency_key,
             metadata_json=json.dumps({
                 "coins": 100,
                 "invitedUserId": user.id,
@@ -2192,7 +2307,11 @@ def apply_referral_bonus_after_verification(user):
             }),
         )
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return False
     clear_leaderboard_cache()
     send_referral_bonus_email(user, inviter)
     send_referral_inviter_email(inviter, user)
@@ -2213,6 +2332,8 @@ def user_to_dict(user):
         "subscriptionStatus": subscription.status,
         "inviteCode": invite_code,
         "bonusScanCredits": max(0, int(user.bonus_scan_credits or 0)),
+        "processingRestricted": bool(getattr(user, "processing_restricted", False)),
+        "analyticsConsent": getattr(user, "analytics_consent", None),
         "bonusUnlimitedUntil": (
             user.bonus_unlimited_until.isoformat() + "Z"
             if user.bonus_unlimited_until
@@ -2252,13 +2373,16 @@ def is_subscription_period_active(subscription):
 
 
 def set_auth_cookie(response, user):
-    token = get_auth_serializer().dumps({"user_id": user.id})
+    token = get_auth_serializer().dumps({
+        "user_id": user.id,
+        "auth_version": int(user.auth_version or 0),
+    })
     response.set_cookie(
         AUTH_COOKIE_NAME,
         token,
         max_age=AUTH_MAX_AGE,
         httponly=True,
-        secure=os.environ.get("COOKIE_SECURE", "false").lower() == "true",
+        secure=PRODUCTION_MODE or os.environ.get("COOKIE_SECURE", "false").lower() == "true",
         samesite="Lax",
         path="/",
     )
@@ -2276,7 +2400,41 @@ def get_current_user():
     except (BadSignature, SignatureExpired):
         return None
 
-    return db.session.get(User, payload.get("user_id"))
+    user = db.session.get(User, payload.get("user_id"))
+
+    if not user:
+        return None
+
+    if int(payload.get("auth_version", -1)) != int(user.auth_version or 0):
+        return None
+
+    return user
+
+
+def lock_user_for_update(user_id):
+    query = db.session.query(User).filter(User.id == int(user_id))
+
+    if db.engine.dialect.name != "sqlite":
+        query = query.with_for_update()
+
+    return query.one_or_none()
+
+
+def lock_catalog_key(value):
+    normalized_value = str(value or "").strip()
+
+    if normalized_value and db.engine.dialect.name == "postgresql":
+        db.session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtext(:catalog_key))"),
+            {"catalog_key": normalized_value[:500]},
+        )
+
+
+def usage_event_by_idempotency_key(idempotency_key):
+    if not idempotency_key:
+        return None
+
+    return UsageEvent.query.filter_by(idempotency_key=idempotency_key).first()
 
 
 def require_auth(handler):
@@ -2309,9 +2467,102 @@ def require_same_user(user_id):
     return g.current_user.is_admin or int(user_id) == g.current_user.id
 
 
-def rate_limit(scope, limit, window_seconds):
-    key = f"{scope}:{request.remote_addr or 'unknown'}"
+def get_redis_client():
+    global REDIS_CLIENT, REDIS_RETRY_AFTER
+
     now = time.time()
+
+    if not REDIS_URL or Redis is None or now < REDIS_RETRY_AFTER:
+        return None
+
+    try:
+        if REDIS_CLIENT is None:
+            REDIS_CLIENT = Redis.from_url(
+                REDIS_URL,
+                socket_connect_timeout=0.35,
+                socket_timeout=0.5,
+                decode_responses=True,
+            )
+            REDIS_CLIENT.ping()
+
+        return REDIS_CLIENT
+    except Exception as error:
+        app.logger.warning("Redis unavailable; using local fallback: %s", error)
+        REDIS_CLIENT = None
+        REDIS_RETRY_AFTER = now + 30
+        CACHE_METRICS["errors"] += 1
+        return None
+
+
+def distributed_cache_key(namespace, key):
+    digest = hashlib.sha256(str(key).encode("utf-8")).hexdigest()
+    return f"cealeg:cache:{namespace}:{digest}"
+
+
+def distributed_cache_get(namespace, key):
+    client = get_redis_client()
+
+    if client is None:
+        return None
+
+    try:
+        cached = client.get(distributed_cache_key(namespace, key))
+        if cached is None:
+            CACHE_METRICS["misses"] += 1
+            return None
+        CACHE_METRICS["hits"] += 1
+        return json.loads(cached)
+    except Exception as error:
+        CACHE_METRICS["errors"] += 1
+        app.logger.warning("Redis cache read failed for %s: %s", namespace, error)
+        return None
+
+
+def distributed_cache_set(namespace, key, value, ttl_seconds):
+    client = get_redis_client()
+
+    if client is None:
+        return False
+
+    try:
+        client.setex(
+            distributed_cache_key(namespace, key),
+            max(1, int(ttl_seconds)),
+            json.dumps(value, ensure_ascii=False),
+        )
+        CACHE_METRICS["writes"] += 1
+        return True
+    except Exception as error:
+        CACHE_METRICS["errors"] += 1
+        app.logger.warning("Redis cache write failed for %s: %s", namespace, error)
+        return False
+
+
+def rate_limit(scope, limit, window_seconds, identity_value=None):
+    remote_address = str(identity_value or request.remote_addr or "unknown")
+    now = time.time()
+    identity = hmac.new(
+        app.config["AUTH_SECRET"].encode("utf-8"),
+        remote_address.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()[:24]
+
+    redis_client = get_redis_client()
+
+    if redis_client is not None:
+        try:
+            window = max(1, int(window_seconds))
+            bucket = int(now // window)
+            redis_key = f"cealeg:rate:{scope}:{identity}:{bucket}"
+            pipeline = redis_client.pipeline(transaction=True)
+            pipeline.incr(redis_key)
+            pipeline.expire(redis_key, window + 2)
+            current_count, _ = pipeline.execute()
+            return int(current_count) <= int(limit)
+        except Exception as error:
+            app.logger.warning("Redis rate limiter unavailable; using local fallback: %s", error)
+
+    key = f"{scope}:{identity}"
     bucket = RATE_LIMIT_BUCKETS[key]
 
     while bucket and now - bucket[0] > window_seconds:
@@ -3019,22 +3270,18 @@ def handle_stripe_cecoin_checkout_completed(session):
         )
         return None
 
+    idempotency_key = f"stripe:cecoins:{session_id}"
+
+    if usage_event_by_idempotency_key(idempotency_key):
+        return None
+
     try:
-        user = db.session.get(User, int(user_id))
+        user = lock_user_for_update(int(user_id))
     except (TypeError, ValueError):
         user = None
 
     if not user:
         app.logger.warning("Stripe CeCoins checkout ignored: user %s not found.", user_id)
-        return None
-
-    existing_events = UsageEvent.query.filter_by(
-        user_id=user.id,
-        event_type="cecoin_purchase",
-        source=pack["id"],
-    ).all()
-
-    if any(parse_usage_metadata(event).get("sessionId") == session_id for event in existing_events):
         return None
 
     customer_id = str(session.get("customer") or "").strip()
@@ -3055,6 +3302,7 @@ def handle_stripe_cecoin_checkout_completed(session):
             user_id=user.id,
             event_type="cecoin_purchase",
             source=pack["id"],
+            idempotency_key=idempotency_key,
             metadata_json=json.dumps({
                 "coins": int(pack["coins"]),
                 "packId": pack["id"],
@@ -3064,7 +3312,11 @@ def handle_stripe_cecoin_checkout_completed(session):
             }),
         )
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return None
     clear_leaderboard_cache()
     send_cecoins_purchase_email(user, pack, session)
     return user
@@ -4300,6 +4552,7 @@ ADMIN_ENDPOINTS = {
     "ai_review_product_submission",
     "approve_product_submission",
     "get_admin_overview",
+    "get_admin_monitoring",
     "get_admin_submissions",
     "get_admin_search_misses",
     "search_admin_products",
@@ -4357,6 +4610,14 @@ AUTH_ENDPOINTS = {
     "update_family_profile",
     "delete_family_profile",
     "request_account_deletion",
+    "get_account_data",
+    "export_account_data",
+    "update_processing_restriction",
+    "record_privacy_consent",
+    "get_account_privacy",
+    "export_account_data",
+    "update_account_consent",
+    "request_processing_restriction",
     "report_alternative_issue",
     "report_product_issue",
 }
@@ -4390,6 +4651,10 @@ ITEM_OWNER_MODELS = {
 @app.before_request
 def enforce_access_controls():
     g.request_id = get_request_id()
+    g.request_started_at = time.perf_counter()
+
+    if sentry_sdk is not None and SENTRY_DSN:
+        sentry_sdk.set_tag("request_id", g.request_id)
     endpoint = request.endpoint
 
     if not endpoint or endpoint == "static":
@@ -4422,8 +4687,10 @@ def enforce_access_controls():
     } and not rate_limit(endpoint, AUTH_RATE_LIMIT, AUTH_RATE_LIMIT_WINDOW):
         return jsonify({"error": "Prea multe încercări. Așteaptă puțin."}), 429
 
+    camera_limit = 6 if endpoint == "identify_product_frame" else 45
+
     if endpoint in {"identify_product_frame", "lookup_barcode"} and not rate_limit(
-        endpoint, 45, 60
+        endpoint, camera_limit, 60
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
@@ -4440,6 +4707,23 @@ def enforce_access_controls():
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
+    endpoint_limits = {
+        "analyze_product": (12, 60),
+        "add_product_submission": (8, 3600),
+        "search_products": (30, 60),
+        "search_products_by_label": (20, 60),
+        "import_barcode_product": (12, 60),
+        "claim_gamification_mission": (20, 60),
+        "redeem_cecoin_reward": (10, 60),
+    }
+    endpoint_limit = endpoint_limits.get(endpoint)
+
+    if endpoint_limit and not rate_limit(endpoint, *endpoint_limit):
+        return jsonify({
+            "error": "Prea multe cereri pentru această acțiune. Reîncearcă mai târziu.",
+            "code": "rate_limit_exceeded",
+        }), 429
+
     needs_auth = (
         endpoint in AUTH_ENDPOINTS
         or endpoint in ADMIN_ENDPOINTS
@@ -4455,6 +4739,33 @@ def enforce_access_controls():
         return jsonify({"error": "Autentificare necesară.", "code": "auth_required"}), 401
 
     g.current_user = user
+
+    restriction_exceptions = {
+        "update_processing_restriction",
+        "export_account_data",
+        "get_account_data",
+        "request_account_deletion",
+        "confirm_account_deletion",
+        "logout",
+        "start_billing_portal",
+    }
+
+    if (
+        user.processing_restricted
+        and request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        and endpoint not in restriction_exceptions
+        and endpoint not in ADMIN_ENDPOINTS
+    ):
+        return jsonify({
+            "error": "Prelucrarea datelor acestui cont este restricționată.",
+            "code": "processing_restricted",
+        }), 423
+
+    if user.processing_restricted and endpoint in RESTRICTED_PROCESSING_ENDPOINTS:
+        return jsonify({
+            "error": "Prelucrarea opțională este restricționată pentru acest cont.",
+            "code": "processing_restricted",
+        }), 423
 
     if endpoint in ADMIN_ENDPOINTS and not user.is_admin:
         return jsonify({"error": "Acces rezervat administratorului.", "code": "admin_required"}), 403
@@ -4516,6 +4827,14 @@ def add_security_headers(response):
         "Content-Security-Policy",
         "default-src 'none'; frame-ancestors 'none'; base-uri 'none'",
     )
+
+    if endpoint == "api_docs":
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; base-uri 'none'; frame-ancestors 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https://validator.swagger.io; connect-src 'self'"
+        )
     response.headers.setdefault(
         "Permissions-Policy",
         "camera=(), microphone=(), geolocation=()",
@@ -4524,6 +4843,11 @@ def add_security_headers(response):
         "X-Request-ID",
         getattr(g, "request_id", uuid4().hex),
     )
+
+    request_started_at = getattr(g, "request_started_at", None)
+    if request_started_at is not None:
+        duration_ms = max(0, (time.perf_counter() - request_started_at) * 1000)
+        response.headers.setdefault("Server-Timing", f"app;dur={duration_ms:.1f}")
 
     if is_sensitive_response:
         response.headers["Cache-Control"] = "no-store, max-age=0"
@@ -4915,6 +5239,16 @@ ALLOWED_ANALYTICS_EVENTS = {
     "login_success",
 }
 
+RESTRICTED_PROCESSING_ENDPOINTS = {
+    "analyze_product",
+    "ai_extract_product_info",
+    "identify_product_frame",
+    "add_product_submission",
+    "report_local_price",
+    "report_alternative_issue",
+    "report_product_issue",
+}
+
 
 @app.route("/analytics/event", methods=["POST"])
 def track_analytics_event():
@@ -4925,6 +5259,9 @@ def track_analytics_event():
         return jsonify({"ok": True, "ignored": True})
 
     user = get_current_user()
+
+    if user and (user.processing_restricted or user.analytics_consent is False):
+        return jsonify({"ok": True, "ignored": True, "reason": "privacy_preference"})
     metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
     safe_metadata = {
         str(key)[:50]: str(value)[:250]
@@ -4959,11 +5296,8 @@ def report_alternative_issue():
     if not alternative_name:
         return jsonify({"error": "Alternativa raportată nu este validă."}), 400
 
-    fix_result = auto_fix_reported_alternative_category(alternative_product)
-    fixed_product = fix_result.get("product") if fix_result else None
-    fixed_product_data = product_to_dict(fixed_product) if fixed_product else alternative_product
-    fixed_category = str((fix_result or {}).get("newCategory") or alternative_product.get("category") or "").strip()
-    fixed_family = str((fix_result or {}).get("family") or get_product_recommendation_family(fixed_product_data)).strip()
+    reported_category = str(alternative_product.get("category") or "").strip()
+    reported_family = str(get_product_recommendation_family(alternative_product)).strip()
 
     metadata = {
         "reason": reason,
@@ -4979,20 +5313,11 @@ def report_alternative_issue():
             "name": alternative_name,
             "barcode": str(alternative_product.get("barcode") or "").strip()[:32],
             "brand": str(alternative_product.get("brand") or "").strip()[:120],
-            "category": (fixed_category or str(alternative_product.get("category") or "").strip())[:120],
+            "category": reported_category[:120],
             "source": str(alternative_product.get("source") or "").strip()[:80],
-            "family": fixed_family,
+            "family": reported_family,
         },
     }
-
-    if fix_result:
-        metadata["autoFix"] = {
-            "fixed": bool(fix_result.get("fixed")),
-            "productId": getattr(fixed_product, "id", None),
-            "oldCategory": str(fix_result.get("oldCategory") or "").strip()[:120],
-            "newCategory": str(fix_result.get("newCategory") or "").strip()[:120],
-            "family": fixed_family,
-        }
 
     record_user_event(user.id, "alternative_report", "alternatives", metadata, commit=False)
     record_search_event(
@@ -5004,15 +5329,6 @@ def report_alternative_issue():
     )
     db.session.commit()
 
-    if fix_result and fix_result.get("fixed"):
-        send_alternative_report_fixed_email(
-            user,
-            scanned_product,
-            alternative_product,
-            fix_result.get("oldCategory"),
-            fix_result.get("newCategory"),
-        )
-
     send_admin_alert(
         "Alternativă raportată",
         "Un utilizator a marcat o recomandare ca nepotrivită.",
@@ -5022,23 +5338,16 @@ def report_alternative_issue():
             f"Alternativă: {alternative_name}",
             f"Magazin: {store or '-'}",
             f"Cerință: {request_text or '-'}",
-            f"Corecție automată: {'da' if fix_result and fix_result.get('fixed') else 'nu'}",
-            f"Categorie nouă: {(fix_result or {}).get('newCategory') or '-'}",
+            "Corecție automată: nu; raportul așteaptă verificarea adminului",
         ],
         alert_key="alternative_report",
         min_interval_seconds=900,
     )
 
-    message = (
-        "Mulțumim. Am verificat alternativa și am actualizat categoria produsului."
-        if fix_result and fix_result.get("fixed")
-        else "Mulțumim. Raportarea a fost salvată pentru verificare."
-    )
-
     return jsonify({
-        "message": message,
-        "fixed": bool(fix_result and fix_result.get("fixed")),
-        "category": (fix_result or {}).get("newCategory"),
+        "message": "Mulțumim. Raportarea a fost salvată pentru verificare.",
+        "fixed": False,
+        "category": reported_category or None,
     })
 
 
@@ -5224,6 +5533,11 @@ def infer_alternative_criteria_from_request(request_text):
 
 
 def get_cached_product_search_results(cache_key):
+    distributed = distributed_cache_get("product-search", cache_key)
+
+    if isinstance(distributed, list):
+        return [dict(item) for item in distributed if isinstance(item, dict)]
+
     cache_item = PRODUCT_SEARCH_RESULT_CACHE.get(cache_key)
 
     if not cache_item:
@@ -5237,6 +5551,12 @@ def get_cached_product_search_results(cache_key):
 
 
 def set_cached_product_search_results(cache_key, results):
+    distributed_cache_set(
+        "product-search",
+        cache_key,
+        results,
+        PRODUCT_SEARCH_RESULT_CACHE_TTL,
+    )
     set_limited_cache_item(
         PRODUCT_SEARCH_RESULT_CACHE,
         cache_key,
@@ -5365,9 +5685,11 @@ def parse_optional_float(value):
         return None
 
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+
+    return parsed if math.isfinite(parsed) else None
 
 
 def validate_barcode(barcode, required=False):
@@ -6315,6 +6637,40 @@ def save_uploaded_file(file, folder):
     return f"/uploads/submissions/{filename}"
 
 
+def save_scan_image(file, user_id):
+    if not file or not allowed_image_file(file.filename):
+        raise ValueError("Format imagine invalid. Sunt acceptate: JPG, JPEG, PNG, WEBP.")
+
+    try:
+        image = ImageOps.exif_transpose(Image.open(file.stream))
+        image.verify()
+        file.stream.seek(0)
+        image = ImageOps.exif_transpose(Image.open(file.stream)).convert("RGB")
+        image.thumbnail((1800, 1800))
+        filename = f"scan_{int(user_id)}_{uuid4().hex}.jpg"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        image.save(filepath, "JPEG", quality=86, optimize=True)
+    except (OSError, ValueError, Image.DecompressionBombError):
+        raise ValueError(
+            "Imaginea nu a putut fi procesată. Încearcă alt fișier JPG, PNG sau WEBP."
+        )
+
+    user_prefix = f"scan_{int(user_id)}_"
+    user_files = []
+
+    for candidate in os.scandir(UPLOAD_FOLDER):
+        if candidate.is_file() and candidate.name.startswith(user_prefix):
+            user_files.append(candidate)
+
+    for old_file in sorted(user_files, key=lambda item: item.stat().st_mtime, reverse=True)[25:]:
+        try:
+            os.remove(old_file.path)
+        except OSError:
+            app.logger.warning("Could not remove expired scan image %s", old_file.name)
+
+    return filename
+
+
 def review_product_submission_with_ai(submission):
     confidence = 100
     problems = []
@@ -6837,6 +7193,38 @@ def ensure_database_columns():
                 "ADD COLUMN IF NOT EXISTS bonus_scan_credits INTEGER NOT NULL DEFAULT 0",
             ),
             (
+                "users auth_version",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS auth_version INTEGER NOT NULL DEFAULT 0",
+            ),
+            (
+                "users processing restricted",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS processing_restricted BOOLEAN NOT NULL DEFAULT FALSE",
+            ),
+            (
+                "users processing restricted at",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS processing_restricted_at TIMESTAMP NULL",
+            ),
+            (
+                "users processing restriction reason",
+                "ALTER TABLE users "
+                "ADD COLUMN IF NOT EXISTS processing_restriction_reason VARCHAR(500)",
+            ),
+            (
+                "usage events idempotency key",
+                "ALTER TABLE usage_events "
+                "ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(180)",
+            ),
+            ("users terms_version", "ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_version VARCHAR(30)"),
+            ("users terms_accepted_at", "ALTER TABLE users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMP NULL"),
+            ("users age_confirmed_at", "ALTER TABLE users ADD COLUMN IF NOT EXISTS age_confirmed_at TIMESTAMP NULL"),
+            ("users analytics_consent", "ALTER TABLE users ADD COLUMN IF NOT EXISTS analytics_consent BOOLEAN NULL"),
+            ("users analytics_consent_at", "ALTER TABLE users ADD COLUMN IF NOT EXISTS analytics_consent_at TIMESTAMP NULL"),
+            ("users processing_restricted", "ALTER TABLE users ADD COLUMN IF NOT EXISTS processing_restricted BOOLEAN NOT NULL DEFAULT FALSE"),
+            ("users processing_restricted_at", "ALTER TABLE users ADD COLUMN IF NOT EXISTS processing_restricted_at TIMESTAMP NULL"),
+            (
                 "cart family_profile_id",
                 "ALTER TABLE cart_items "
                 "ADD COLUMN IF NOT EXISTS family_profile_id INTEGER REFERENCES family_profiles(id)",
@@ -6855,6 +7243,18 @@ def ensure_database_columns():
     add_column_if_missing("users", "referred_by_user_id", "INTEGER")
     add_column_if_missing("users", "bonus_unlimited_until", "DATETIME")
     add_column_if_missing("users", "bonus_scan_credits", "INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing("users", "auth_version", "INTEGER NOT NULL DEFAULT 0")
+    add_column_if_missing("users", "processing_restricted", "BOOLEAN NOT NULL DEFAULT 0")
+    add_column_if_missing("users", "processing_restricted_at", "DATETIME")
+    add_column_if_missing("users", "processing_restriction_reason", "VARCHAR(500)")
+    add_column_if_missing("usage_events", "idempotency_key", "VARCHAR(180)")
+    add_column_if_missing("users", "terms_version", "VARCHAR(30)")
+    add_column_if_missing("users", "terms_accepted_at", "DATETIME")
+    add_column_if_missing("users", "age_confirmed_at", "DATETIME")
+    add_column_if_missing("users", "analytics_consent", "BOOLEAN")
+    add_column_if_missing("users", "analytics_consent_at", "DATETIME")
+    add_column_if_missing("users", "processing_restricted", "BOOLEAN NOT NULL DEFAULT 0")
+    add_column_if_missing("users", "processing_restricted_at", "DATETIME")
     add_column_if_missing("products", "barcode", "VARCHAR(80)")
     add_column_if_missing("products", "ingredients", "TEXT")
     add_column_if_missing("product_submissions", "barcode", "VARCHAR(80)")
@@ -6936,6 +7336,11 @@ def ensure_database_indexes():
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_users_invite_code "
             "ON users (invite_code)",
         ),
+        (
+            "usage event idempotency",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_usage_events_idempotency_key "
+            "ON usage_events (idempotency_key) WHERE idempotency_key IS NOT NULL",
+        ),
     ]
 
     for label, statement in common_indexes:
@@ -7000,6 +7405,96 @@ def get_version():
         "ok": True,
         **get_application_version(),
     })
+
+
+def flask_rule_to_openapi(rule):
+    parameters = []
+
+    def replace_parameter(match):
+        converter = (match.group(1) or "string").strip()
+        name = match.group(2)
+        schema_type = "integer" if converter == "int" else "string"
+        parameters.append({
+            "name": name,
+            "in": "path",
+            "required": True,
+            "schema": {"type": schema_type},
+        })
+        return "{" + name + "}"
+
+    path = re.sub(r"<(?:([^:>]+):)?([^>]+)>", replace_parameter, rule)
+    return path, parameters
+
+
+@app.route("/openapi.json", methods=["GET"])
+@app.route("/api/openapi.json", methods=["GET"])
+def get_openapi_spec():
+    paths = {}
+
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+
+        path, parameters = flask_rule_to_openapi(rule.rule)
+        operations = paths.setdefault(path, {})
+
+        for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+            requires_admin = rule.endpoint in ADMIN_ENDPOINTS
+            requires_auth = requires_admin or rule.endpoint in AUTH_ENDPOINTS or rule.endpoint in USER_PATH_ENDPOINTS
+            operation = {
+                "operationId": rule.endpoint,
+                "summary": rule.endpoint.replace("_", " ").capitalize(),
+                "parameters": parameters,
+                "responses": {
+                    "200": {"description": "Successful response"},
+                    "400": {"description": "Invalid request"},
+                    "500": {"description": "Internal server error"},
+                },
+            }
+
+            if requires_auth:
+                operation["security"] = [{"sessionCookie": []}]
+                operation["responses"]["401"] = {"description": "Authentication required"}
+
+            if requires_admin:
+                operation["responses"]["403"] = {"description": "Administrator access required"}
+
+            operations[method.lower()] = operation
+
+    return jsonify({
+        "openapi": "3.1.0",
+        "info": {
+            "title": "Ce aleg? API",
+            "version": get_application_version()["shortCommit"],
+            "description": "Production API contract for the Ce aleg? web application.",
+            "contact": {"email": CONTACT_EMAIL},
+        },
+        "servers": [{"url": request.host_url.rstrip("/")}],
+        "paths": paths,
+        "components": {
+            "securitySchemes": {
+                "sessionCookie": {
+                    "type": "apiKey",
+                    "in": "cookie",
+                    "name": AUTH_COOKIE_NAME,
+                },
+            },
+        },
+    })
+
+
+@app.route("/docs", methods=["GET"])
+@app.route("/api/docs", methods=["GET"])
+def api_docs():
+    spec_url = "/api/openapi.json" if request.path.startswith("/api/") else "/openapi.json"
+    return Response(
+        f"""<!doctype html>
+<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+<title>Ce aleg? API</title><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\"></head>
+<body><div id=\"swagger-ui\"></div><script src=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js\"></script>
+<script>SwaggerUIBundle({{url:{json.dumps(spec_url)},dom_id:'#swagger-ui',deepLinking:true}});</script></body></html>""",
+        mimetype="text/html",
+    )
 
 
 @app.route("/readiness", methods=["GET"])
@@ -7299,6 +7794,9 @@ def register():
         email_verified=False,
         email_verified_at=None,
         referred_by_user_id=inviter.id if inviter else None,
+        terms_version=TERMS_VERSION,
+        terms_accepted_at=datetime.utcnow(),
+        age_confirmed_at=datetime.utcnow(),
     )
 
     db.session.add(new_user)
@@ -7314,7 +7812,7 @@ def register():
     if not verification_sent:
         app.logger.warning("Verification email was not sent for user %s", new_user.id)
 
-    if not verification_sent and not PRODUCTION_MODE:
+    if not verification_sent and EXPOSE_DEV_AUTH_LINKS:
         email_status["devVerificationLink"] = verification_url
 
     response = jsonify({
@@ -7341,6 +7839,7 @@ def verify_email():
     was_already_verified = bool(user.email_verified)
     user.email_verified = True
     user.email_verified_at = datetime.utcnow()
+    user.auth_version = int(user.auth_version or 0) + 1
     db.session.commit()
 
     referralRewardApplied = False
@@ -7370,12 +7869,17 @@ def resend_email_verification():
     if not email:
         return jsonify({"error": "Emailul este obligatoriu."}), 400
 
+    if not rate_limit("resend-verification-email", 3, 3600, email):
+        return jsonify({
+            "message": "Dacă există un cont neconfirmat cu acest email, trimitem un nou link de confirmare.",
+        })
+
     user = User.query.filter_by(email=email).first()
     dev_verification_link = None
 
     if user and not user.email_verified:
         sent, verification_url = send_email_verification_email(user)
-        if not sent and not PRODUCTION_MODE:
+        if not sent and EXPOSE_DEV_AUTH_LINKS:
             dev_verification_link = verification_url
 
     response = {
@@ -7430,12 +7934,17 @@ def forgot_password():
     if not email:
         return jsonify({"error": "Emailul este obligatoriu."}), 400
 
+    if not rate_limit("forgot-password-email", 3, 3600, email):
+        return jsonify({
+            "message": "Dacă există un cont cu acest email, vei primi un link pentru resetarea parolei.",
+        })
+
     user = User.query.filter_by(email=email).first()
     dev_reset_link = None
 
     if user:
         sent, reset_url = send_password_reset_email(user)
-        if not sent and not PRODUCTION_MODE:
+        if not sent and EXPOSE_DEV_AUTH_LINKS:
             dev_reset_link = reset_url
 
     response = {
@@ -7471,6 +7980,7 @@ def reset_password():
         }), 400
 
     user.password_hash = generate_password_hash(password)
+    user.auth_version = int(user.auth_version or 0) + 1
     if not user.email_verified:
         user.email_verified = True
         user.email_verified_at = datetime.utcnow()
@@ -7501,13 +8011,141 @@ def request_account_deletion():
         "emailConfigured": is_email_configured(),
     }
 
-    if not sent and not PRODUCTION_MODE:
+    if not sent and EXPOSE_DEV_AUTH_LINKS:
         response["devDeletionLink"] = deletion_url
         response["message"] = (
             "Emailul nu a putut fi trimis în mediul local. Folosește linkul de test pentru confirmare."
         )
 
     return jsonify(response)
+
+
+@app.route("/account/privacy", methods=["GET"])
+def get_account_privacy():
+    user = g.current_user
+    return jsonify({
+        "termsVersion": user.terms_version,
+        "termsAcceptedAt": admin_iso(user.terms_accepted_at),
+        "ageConfirmedAt": admin_iso(user.age_confirmed_at),
+        "analyticsConsent": user.analytics_consent,
+        "analyticsConsentAt": admin_iso(user.analytics_consent_at),
+        "processingRestricted": bool(user.processing_restricted),
+        "processingRestrictedAt": admin_iso(user.processing_restricted_at),
+    })
+
+
+@app.route("/account/consent", methods=["POST"])
+def update_account_consent():
+    data = request.get_json(silent=True) or {}
+
+    if not isinstance(data.get("analytics"), bool):
+        return jsonify({"error": "Valoarea analytics trebuie să fie true sau false."}), 400
+
+    user = g.current_user
+    user.analytics_consent = data["analytics"]
+    user.analytics_consent_at = datetime.utcnow()
+    record_user_event(
+        user.id,
+        "privacy_consent",
+        "account",
+        {"analytics": bool(data["analytics"]), "termsVersion": TERMS_VERSION},
+    )
+    db.session.commit()
+    return jsonify({
+        "message": "Preferința de consimțământ a fost salvată.",
+        "analyticsConsent": user.analytics_consent,
+        "analyticsConsentAt": admin_iso(user.analytics_consent_at),
+    })
+
+
+@app.route("/account/restriction", methods=["POST"])
+def request_processing_restriction():
+    data = request.get_json(silent=True) or {}
+    restricted = data.get("restricted", True)
+
+    if not isinstance(restricted, bool):
+        return jsonify({"error": "Valoarea restricted trebuie să fie true sau false."}), 400
+
+    user = g.current_user
+    user.processing_restricted = restricted
+    user.processing_restricted_at = datetime.utcnow() if restricted else None
+    record_user_event(
+        user.id,
+        "privacy_restriction",
+        "account",
+        {"restricted": restricted},
+    )
+    db.session.commit()
+    return jsonify({
+        "message": (
+            "Prelucrarea opțională a datelor a fost restricționată."
+            if restricted
+            else "Restricția de prelucrare a fost ridicată."
+        ),
+        "processingRestricted": restricted,
+    })
+
+
+@app.route("/account/data-export", methods=["GET"])
+def export_account_data():
+    user = g.current_user
+    subscription = Subscription.query.filter_by(user_id=user.id).first()
+    usage_events = UsageEvent.query.filter_by(user_id=user.id).order_by(UsageEvent.created_at.asc()).all()
+    search_events = SearchEvent.query.filter_by(user_id=user.id).order_by(SearchEvent.created_at.asc()).all()
+    prices = PriceObservation.query.filter_by(user_id=user.id).order_by(PriceObservation.observed_at.asc()).all()
+    export = {
+        "generatedAt": datetime.utcnow().isoformat() + "Z",
+        "formatVersion": 1,
+        "account": {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "emailVerified": bool(user.email_verified),
+            "createdAt": admin_iso(user.created_at),
+            "termsVersion": user.terms_version,
+            "termsAcceptedAt": admin_iso(user.terms_accepted_at),
+            "ageConfirmedAt": admin_iso(user.age_confirmed_at),
+            "analyticsConsent": user.analytics_consent,
+            "analyticsConsentAt": admin_iso(user.analytics_consent_at),
+            "processingRestricted": bool(user.processing_restricted),
+        },
+        "subscription": ({
+            "plan": subscription.plan,
+            "status": subscription.status,
+            "provider": subscription.provider,
+            "currentPeriodStart": admin_iso(subscription.current_period_start),
+            "currentPeriodEnd": admin_iso(subscription.current_period_end),
+        } if subscription else None),
+        "familyProfiles": [family_profile_to_dict(item) for item in FamilyProfile.query.filter_by(user_id=user.id).all()],
+        "scanHistory": [scan_history_item_to_dict(item) for item in ScanHistory.query.filter_by(user_id=user.id).all()],
+        "favorites": [favorite_item_to_dict(item) for item in Favorite.query.filter_by(user_id=user.id).all()],
+        "cart": [cart_item_to_dict(item) for item in CartItem.query.filter_by(user_id=user.id).all()],
+        "submissions": [product_submission_to_dict(item) for item in ProductSubmission.query.filter_by(user_id=user.id).all()],
+        "priceObservations": [{
+            "barcode": item.product_barcode,
+            "store": item.store,
+            "price": item.price,
+            "currency": item.currency,
+            "observedAt": admin_iso(item.observed_at),
+        } for item in prices],
+        "searches": [{
+            "query": item.search_text,
+            "store": item.store,
+            "resultCount": item.result_count,
+            "source": item.source,
+            "createdAt": admin_iso(item.created_at),
+        } for item in search_events],
+        "activity": [{
+            "type": item.event_type,
+            "source": item.source,
+            "metadata": parse_usage_metadata(item),
+            "createdAt": admin_iso(item.created_at),
+        } for item in usage_events],
+    }
+    response = jsonify(export)
+    response.headers["Content-Disposition"] = "attachment; filename=cealeg-account-data.json"
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    return response
 
 
 @app.route("/account/delete/confirm", methods=["POST"])
@@ -7976,7 +8614,48 @@ def stripe_webhook():
         return jsonify({"error": "Semnatura Stripe invalida."}), 400
 
     event_type = event.get("type")
+    event_id = str(event.get("id") or "").strip()
     event_object = (event.get("data") or {}).get("object") or {}
+
+    if not event_id:
+        return jsonify({"error": "Evenimentul Stripe nu are identificator."}), 400
+
+    webhook_record = StripeWebhookEvent.query.filter_by(
+        provider_event_id=event_id,
+    ).first()
+    retry_before = datetime.utcnow() - timedelta(minutes=10)
+
+    if webhook_record and webhook_record.status == "processed":
+        return jsonify({"received": True, "duplicate": True})
+
+    if (
+        webhook_record
+        and webhook_record.status == "processing"
+        and webhook_record.updated_at > retry_before
+    ):
+        return jsonify({"received": True, "processing": True}), 202
+
+    if webhook_record:
+        webhook_record.status = "processing"
+        webhook_record.event_type = event_type or "unknown"
+        webhook_record.attempts = int(webhook_record.attempts or 0) + 1
+        webhook_record.last_error = None
+        webhook_record.updated_at = datetime.utcnow()
+    else:
+        webhook_record = StripeWebhookEvent(
+            provider_event_id=event_id,
+            event_type=event_type or "unknown",
+            status="processing",
+            attempts=1,
+            updated_at=datetime.utcnow(),
+        )
+        db.session.add(webhook_record)
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"received": True, "duplicate": True}), 202
 
     try:
         if event_type == "checkout.session.completed":
@@ -7997,8 +8676,16 @@ def stripe_webhook():
             "invoice.payment_action_required",
         }:
             sync_stripe_subscription_by_id(get_invoice_subscription_id(event_object))
-    except Exception:
+    except Exception as error:
         db.session.rollback()
+        failed_record = StripeWebhookEvent.query.filter_by(
+            provider_event_id=event_id,
+        ).first()
+        if failed_record:
+            failed_record.status = "failed"
+            failed_record.last_error = str(error)[:2000]
+            failed_record.updated_at = datetime.utcnow()
+            db.session.commit()
         app.logger.exception(
             "Stripe webhook handler failed for event %s",
             event_type,
@@ -8007,6 +8694,16 @@ def stripe_webhook():
             "code": "stripe_webhook_handler_failed",
             "error": "Evenimentul Stripe nu a putut fi procesat momentan.",
         }), 500
+
+    processed_record = StripeWebhookEvent.query.filter_by(
+        provider_event_id=event_id,
+    ).first()
+    if processed_record:
+        processed_record.status = "processed"
+        processed_record.processed_at = datetime.utcnow()
+        processed_record.updated_at = datetime.utcnow()
+        processed_record.last_error = None
+        db.session.commit()
 
     return jsonify({"received": True})
 
@@ -8060,7 +8757,12 @@ def get_gamification_leaderboard():
 def claim_gamification_mission():
     data = request.get_json(silent=True) or {}
     mission_id = str(data.get("missionId") or "").strip()
-    missions = build_mission_statuses(g.current_user.id)
+    locked_user = lock_user_for_update(g.current_user.id)
+
+    if not locked_user:
+        return jsonify({"error": "Contul nu mai este disponibil."}), 404
+
+    missions = build_mission_statuses(locked_user.id)
     mission = next((item for item in missions if item["id"] == mission_id), None)
 
     if not mission:
@@ -8082,10 +8784,18 @@ def claim_gamification_mission():
         }), 400
 
     reward = mission.get("reward") or {}
+    claim_scope = get_day_start().date().isoformat() if mission.get("daily") else "once"
+    idempotency_key = f"mission:{locked_user.id}:{mission_id}:{claim_scope}"
+
+    if usage_event_by_idempotency_key(idempotency_key):
+        return jsonify({
+            "error": "Recompensa a fost deja revendicată.",
+            "summary": get_gamification_summary_for_user(locked_user),
+        }), 409
 
     if reward.get("bonusScans"):
         add_bonus_scan_credits(
-            g.current_user,
+            locked_user,
             int(reward.get("bonusScans") or 0),
             "mission_reward",
             {"missionId": mission_id},
@@ -8093,7 +8803,7 @@ def claim_gamification_mission():
 
     if reward.get("bonusDays"):
         extend_bonus_unlimited(
-            g.current_user,
+            locked_user,
             int(reward.get("bonusDays") or 0),
             "mission_reward",
             {"missionId": mission_id},
@@ -8101,9 +8811,10 @@ def claim_gamification_mission():
 
     db.session.add(
         UsageEvent(
-            user_id=g.current_user.id,
+            user_id=locked_user.id,
             event_type="mission_claim",
             source=mission_id,
+            idempotency_key=idempotency_key,
             metadata_json=json.dumps({
                 "reward": reward,
                 "seriesId": mission.get("seriesId"),
@@ -8119,13 +8830,20 @@ def claim_gamification_mission():
             }),
         )
     )
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({
+            "error": "Recompensa a fost deja revendicată.",
+            "summary": get_gamification_summary_for_user(locked_user),
+        }), 409
     clear_leaderboard_cache()
 
     return jsonify({
         "message": "Recompensă revendicată.",
         "reward": reward,
-        "summary": get_gamification_summary_for_user(g.current_user),
+        "summary": get_gamification_summary_for_user(locked_user),
     })
 
 
@@ -8138,7 +8856,12 @@ def redeem_cecoin_reward():
     if not item:
         return jsonify({"error": "Recompensă invalidă."}), 400
 
-    current_coins = calculate_user_coins(g.current_user.id)
+    locked_user = lock_user_for_update(g.current_user.id)
+
+    if not locked_user:
+        return jsonify({"error": "Contul nu mai este disponibil."}), 404
+
+    current_coins = calculate_user_coins(locked_user.id)
     cost = int(item.get("cost") or 0)
 
     if current_coins < cost:
@@ -8151,7 +8874,7 @@ def redeem_cecoin_reward():
 
     if item.get("bonusScans"):
         add_bonus_scan_credits(
-            g.current_user,
+            locked_user,
             int(item["bonusScans"]),
             "cecoin_shop",
             {"itemId": item_id},
@@ -8159,7 +8882,7 @@ def redeem_cecoin_reward():
 
     if item.get("bonusDays"):
         extend_bonus_unlimited(
-            g.current_user,
+            locked_user,
             int(item["bonusDays"]),
             "cecoin_shop",
             {"itemId": item_id},
@@ -8167,7 +8890,7 @@ def redeem_cecoin_reward():
 
     db.session.add(
         UsageEvent(
-            user_id=g.current_user.id,
+            user_id=locked_user.id,
             event_type="cecoin_spend",
             source=item_id,
             metadata_json=json.dumps({
@@ -8183,12 +8906,12 @@ def redeem_cecoin_reward():
     )
     db.session.commit()
     clear_leaderboard_cache()
-    send_cecoin_reward_email(g.current_user, item)
+    send_cecoin_reward_email(locked_user, item)
 
     return jsonify({
         "message": "Recompensa a fost activată.",
         "item": item,
-        "summary": get_gamification_summary_for_user(g.current_user),
+        "summary": get_gamification_summary_for_user(locked_user),
     })
 
 
@@ -8404,8 +9127,13 @@ def csv_response(filename, headers, rows):
     writer = csv.DictWriter(buffer, fieldnames=headers, extrasaction="ignore")
     writer.writeheader()
 
+    def safe_cell(value):
+        if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+            return "'" + value
+        return value
+
     for row in rows:
-        writer.writerow({header: row.get(header, "") for header in headers})
+        writer.writerow({header: safe_cell(row.get(header, "")) for header in headers})
 
     return Response(
         buffer.getvalue(),
@@ -8825,6 +9553,16 @@ def get_admin_monitoring():
             "blockers": readiness.get("blockers", []),
             "warnings": readiness.get("warnings", []),
             "renderNote": "Dacă Render anunță health check timeout, verifică Logs și Metrics pentru cold start, conexiuni DB sau request-uri lente.",
+        },
+        "cache": {
+            "distributed": bool(REDIS_URL),
+            "connected": get_redis_client() is not None,
+            **CACHE_METRICS,
+            "hitRate": round(
+                CACHE_METRICS["hits"]
+                / max(1, CACHE_METRICS["hits"] + CACHE_METRICS["misses"]),
+                4,
+            ),
         },
         "scanIssues": {
             "total": issue_query.count(),
@@ -9455,6 +10193,52 @@ def get_cron_recategorize_min_id(limit):
     return 1 + ((day_number * safe_limit) % max(1, int(max_product_id)))
 
 
+def purge_expired_data():
+    now = datetime.utcnow()
+    search_cutoff = now - timedelta(days=SEARCH_RETENTION_DAYS)
+    analytics_cutoff = now - timedelta(days=ANALYTICS_RETENTION_DAYS)
+    submission_cutoff = now - timedelta(days=REJECTED_SUBMISSION_RETENTION_DAYS)
+    deleted_searches = SearchEvent.query.filter(SearchEvent.created_at < search_cutoff).delete(
+        synchronize_session=False
+    )
+    deleted_analytics = UsageEvent.query.filter(
+        UsageEvent.event_type.like("ui_%"),
+        UsageEvent.created_at < analytics_cutoff,
+    ).delete(synchronize_session=False)
+    rejected_submissions = ProductSubmission.query.filter(
+        ProductSubmission.status.in_(["rejected", "ai_rejected"]),
+        ProductSubmission.created_at < submission_cutoff,
+    ).all()
+
+    for submission in rejected_submissions:
+        delete_submission_file(submission.front_image)
+        delete_submission_file(submission.nutrition_image)
+        db.session.delete(submission)
+
+    deleted_scan_files = 0
+    scan_file_cutoff = time.time() - SCAN_FILE_RETENTION_DAYS * 86400
+
+    for entry in os.scandir(UPLOAD_FOLDER):
+        try:
+            if (
+                entry.is_file(follow_symlinks=False)
+                and entry.name.startswith("scan_")
+                and entry.stat(follow_symlinks=False).st_mtime < scan_file_cutoff
+            ):
+                os.remove(entry.path)
+                deleted_scan_files += 1
+        except OSError as error:
+            app.logger.warning("Could not purge scan file %s: %s", entry.name, error)
+
+    db.session.commit()
+    return {
+        "searchEvents": int(deleted_searches or 0),
+        "analyticsEvents": int(deleted_analytics or 0),
+        "rejectedSubmissions": len(rejected_submissions),
+        "scanFiles": deleted_scan_files,
+    }
+
+
 @app.route("/internal/cron/maintenance", methods=["POST"])
 def run_cron_maintenance():
     if not cron_request_is_authorized():
@@ -9465,11 +10249,13 @@ def run_cron_maintenance():
     digest_limit = max(1, min(int(data.get("digestLimit") or 100), 250))
     send_digest = str(data.get("sendDigest", "true")).lower() in {"1", "true", "yes", "on"}
     run_recategorize = str(data.get("recategorize", "true")).lower() in {"1", "true", "yes", "on"}
+    run_retention = str(data.get("retention", "true")).lower() in {"1", "true", "yes", "on"}
     result = {
         "ok": True,
         "generatedAt": datetime.utcnow().isoformat() + "Z",
         "recategorize": None,
         "missionDigest": None,
+        "retention": None,
     }
 
     if run_recategorize:
@@ -9486,6 +10272,9 @@ def run_cron_maintenance():
             apply_changes=is_email_configured(),
         )
         result["missionDigest"]["emailConfigured"] = is_email_configured()
+
+    if run_retention:
+        result["retention"] = purge_expired_data()
 
     return jsonify(result)
 
@@ -9703,13 +10492,15 @@ def seed_products():
 @app.route("/products", methods=["GET"])
 def get_products():
     store = request.args.get("store")
+    limit = min(max(request.args.get("limit", default=200, type=int) or 200, 1), 500)
+    offset = max(request.args.get("offset", default=0, type=int) or 0, 0)
 
     query = Product.query
 
     if store:
         query = query.filter_by(store=store)
 
-    products = query.order_by(Product.score.desc()).all()
+    products = query.order_by(Product.score.desc()).offset(offset).limit(limit).all()
 
     return jsonify([product_to_dict(product) for product in products])
 
@@ -9718,7 +10509,7 @@ def get_products():
 def search_products():
     query_text = request.args.get("q", "").strip()
     store_id = request.args.get("store", "").strip()
-    user_id = request.args.get("user_id", type=int)
+    current_user = get_current_user()
 
     if not query_text:
         return jsonify({"error": "Parametrul q este obligatoriu."}), 400
@@ -9773,7 +10564,7 @@ def search_products():
         store=store_name,
         result_count=len(results),
         source=source,
-        user_id=user_id,
+        user_id=current_user.id if current_user else None,
     )
     db.session.commit()
 
@@ -10092,10 +10883,10 @@ def analyze_product():
     if not product_query and label_text:
         product_query = label_text
 
-    safe_original_name = secure_filename(image.filename) or "product.jpg"
-    filename = f"scan_{uuid4().hex}_{safe_original_name}"
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
-    image.save(filepath)
+    try:
+        filename = save_scan_image(image, g.current_user.id)
+    except ValueError as error:
+        return jsonify({"error": str(error), "code": "invalid_scan_image"}), 400
 
     selected_product = None
     store_name = get_store_name_from_id(store_id)
@@ -10552,6 +11343,11 @@ def get_submission_image(filename):
 @app.route("/uploads/scans/<path:filename>", methods=["GET"])
 @require_auth
 def get_scan_image(filename):
+    expected_prefix = f"scan_{g.current_user.id}_"
+
+    if not g.current_user.is_admin and not filename.startswith(expected_prefix):
+        return jsonify({"error": "Nu poți accesa această imagine."}), 403
+
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
@@ -10649,7 +11445,31 @@ def add_product_submission():
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
 
+    pending_count = ProductSubmission.query.filter(
+        ProductSubmission.user_id == user.id,
+        ProductSubmission.status.in_(["pending", "ai_approved"]),
+    ).count()
+    submitted_today = ProductSubmission.query.filter(
+        ProductSubmission.user_id == user.id,
+        ProductSubmission.created_at >= get_day_start(),
+    ).count()
+
+    if pending_count >= SUBMISSION_PENDING_LIMIT:
+        return jsonify({
+            "error": "Ai prea multe propuneri în verificare. Așteaptă aprobarea lor înainte să mai trimiți.",
+            "code": "submission_pending_limit",
+            "limit": SUBMISSION_PENDING_LIMIT,
+        }), 429
+
+    if submitted_today >= SUBMISSION_DAILY_LIMIT:
+        return jsonify({
+            "error": "Ai atins limita zilnică de propuneri. Revino mâine.",
+            "code": "submission_daily_limit",
+            "limit": SUBMISSION_DAILY_LIMIT,
+        }), 429
+
     if barcode:
+        lock_catalog_key(f"submission:{barcode}")
         existing_product = find_existing_catalog_entry_by_barcode(barcode)
 
         if existing_product:
@@ -14416,9 +15236,11 @@ def get_alternative_numeric_value(product, field):
     value = product.get(field)
 
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+
+    return parsed if math.isfinite(parsed) else None
 
 
 def build_alternative_normalization_stats(products):
@@ -15008,6 +15830,11 @@ OFF_ALTERNATIVE_FIELDS = (
 
 
 def fetch_off_products(params, cache_key):
+    distributed = distributed_cache_get("off-search", cache_key)
+
+    if isinstance(distributed, list):
+        return distributed
+
     cache_item = OPEN_FOOD_FACTS_ALTERNATIVES_CACHE.get(cache_key)
     now = time.time()
 
@@ -15031,6 +15858,12 @@ def fetch_off_products(params, cache_key):
     )
     response.raise_for_status()
     products = response.json().get("products", [])
+    distributed_cache_set(
+        "off-search",
+        cache_key,
+        products,
+        OPEN_FOOD_FACTS_ALTERNATIVES_CACHE_TTL,
+    )
     set_limited_cache_item(
         OPEN_FOOD_FACTS_ALTERNATIVES_CACHE,
         cache_key,
@@ -15050,6 +15883,11 @@ def fetch_off_product_by_barcode(barcode):
         return None
 
     cache_key = f"product:{barcode}"
+    distributed = distributed_cache_get("off-product", cache_key)
+
+    if isinstance(distributed, dict) and "found" in distributed:
+        return distributed.get("product") if distributed.get("found") else None
+
     cache_item = OPEN_FOOD_FACTS_PRODUCT_CACHE.get(cache_key)
     now = time.time()
 
@@ -15066,6 +15904,12 @@ def fetch_off_product_by_barcode(barcode):
     )
 
     if response.status_code == 404:
+        distributed_cache_set(
+            "off-product",
+            cache_key,
+            {"found": False, "product": None},
+            OPEN_FOOD_FACTS_PRODUCT_CACHE_TTL,
+        )
         set_limited_cache_item(
             OPEN_FOOD_FACTS_PRODUCT_CACHE,
             cache_key,
@@ -15094,6 +15938,12 @@ def fetch_off_product_by_barcode(barcode):
             "product": product,
         },
         OPEN_FOOD_FACTS_CACHE_MAX_ITEMS,
+    )
+    distributed_cache_set(
+        "off-product",
+        cache_key,
+        {"found": bool(product), "product": product},
+        OPEN_FOOD_FACTS_PRODUCT_CACHE_TTL,
     )
     return product
 
@@ -15248,13 +16098,12 @@ def fetch_off_text_search_products(query_text):
         if terms and terms not in search_variants:
             search_variants.append(terms)
 
+    search_variants = search_variants[:2]
+
     if not search_variants:
         return []
 
-    endpoints = [
-        "https://ro.openfoodfacts.org/cgi/search.pl",
-        "https://world.openfoodfacts.org/cgi/search.pl",
-    ]
+    endpoints = ["https://world.openfoodfacts.org/cgi/search.pl"]
     merged_products = []
     seen_barcodes = set()
     last_error = None
@@ -15263,10 +16112,14 @@ def fetch_off_text_search_products(query_text):
     for endpoint in endpoints:
         for search_terms in search_variants:
             cache_key = f"legacy-text:{endpoint}:{search_terms}"
+            distributed = distributed_cache_get("off-text", cache_key)
             cache_item = OPEN_FOOD_FACTS_ALTERNATIVES_CACHE.get(cache_key)
             now = time.time()
 
-            if (
+            if isinstance(distributed, list):
+                products = distributed
+                successful_request = True
+            elif (
                 cache_item
                 and now - cache_item["created_at"]
                 < OPEN_FOOD_FACTS_ALTERNATIVES_CACHE_TTL
@@ -15276,7 +16129,7 @@ def fetch_off_text_search_products(query_text):
             else:
                 products = None
 
-                for attempt in range(2):
+                for attempt in range(1):
                     try:
                         response = requests.get(
                             endpoint,
@@ -15285,7 +16138,7 @@ def fetch_off_text_search_products(query_text):
                                 "search_simple": 1,
                                 "action": "process",
                                 "json": 1,
-                                "page_size": 40,
+                                "page_size": 20,
                                 "fields": OFF_ALTERNATIVE_FIELDS,
                             },
                             headers={
@@ -15295,11 +16148,17 @@ def fetch_off_text_search_products(query_text):
                                 ),
                                 "Accept": "application/json",
                             },
-                            timeout=15,
+                            timeout=(2.5, 6),
                         )
                         response.raise_for_status()
                         products = response.json().get("products", [])
                         successful_request = True
+                        distributed_cache_set(
+                            "off-text",
+                            cache_key,
+                            products,
+                            OPEN_FOOD_FACTS_ALTERNATIVES_CACHE_TTL,
+                        )
                         set_limited_cache_item(
                             OPEN_FOOD_FACTS_ALTERNATIVES_CACHE,
                             cache_key,
@@ -15312,9 +16171,6 @@ def fetch_off_text_search_products(query_text):
                         break
                     except requests.RequestException as error:
                         last_error = error
-
-                        if attempt == 0:
-                            time.sleep(0.35)
 
                 if products is None:
                     app.logger.warning(
@@ -16058,6 +16914,7 @@ def fetch_off_seed_products(product_data, category_tag=None):
 
 
 def save_product_to_local_database(product_data):
+    lock_catalog_key(f"product:{product_data['barcode']}")
     existing_product = Product.query.filter_by(
         barcode=product_data["barcode"]
     ).first()
@@ -16093,40 +16950,12 @@ def save_product_to_local_database(product_data):
 
 @app.route("/barcode/import", methods=["POST"])
 def import_barcode_product():
-    data = request.get_json(silent=True)
-
-    if not data:
-        return jsonify({"error": "Nu ai trimis date JSON."}), 400
-
+    data = request.get_json(silent=True) or {}
     barcode = str(data.get("barcode") or "").strip()
-    name = str(data.get("name") or "").strip()
+    barcode_error = validate_barcode(barcode, required=True)
 
-    category = str(data.get("category") or "Altele").strip() or "Altele"
-    ingredients = str(data.get("ingredients") or "").strip()
-    calories = parse_optional_float(data.get("calories"))
-    protein = parse_optional_float(data.get("protein"))
-    sugar = parse_optional_float(data.get("sugar"))
-    fat = parse_optional_float(data.get("fat"))
-    price = parse_optional_float(data.get("price"))
-
-    validation_errors = [
-        validate_barcode(barcode, required=True),
-        validate_text_length(name, "Numele produsului", 150, 2),
-        validate_text_length(category, "Categoria", 100, 2),
-        validate_text_length(ingredients, "Ingredientele", 5000),
-        validate_nutrition_values(calories, protein, sugar, fat),
-    ]
-
-    if data.get("price") not in (None, "") and price is None:
-        validation_errors.append("Prețul trebuie să fie un număr valid.")
-
-    validation_errors = [error for error in validation_errors if error]
-
-    if validation_errors:
-        return jsonify({
-            "error": validation_errors[0],
-            "errors": validation_errors,
-        }), 400
+    if barcode_error:
+        return jsonify({"error": barcode_error}), 400
 
     existing_product = Product.query.filter_by(barcode=barcode).first()
 
@@ -16136,42 +16965,26 @@ def import_barcode_product():
             "product": product_to_dict(existing_product),
         })
 
-    score = calculate_product_score(
-        category, calories, protein, sugar, fat, ingredients
-    )
-    tag = generate_product_tag(
-        category, calories, protein, sugar, fat, ingredients
-    )
-    reason = generate_product_reason(
-        category, calories, protein, sugar, fat, ingredients
-    )
+    try:
+        off_product = fetch_off_product_by_barcode(barcode)
+    except requests.RequestException as error:
+        app.logger.warning("Open Food Facts import failed for %s: %s", barcode, error)
+        return jsonify({
+            "error": "Catalogul extern nu este disponibil momentan.",
+            "code": "external_catalog_unavailable",
+        }), 502
 
-    product = Product(
-        name=name,
-        store=str(data.get("store") or "Open Food Facts").strip(),
-        category=category,
-        barcode=barcode,
-        score=score,
-        tag=tag,
-        image=data.get("image"),
-        price=price,
-        price_text=str(data.get("priceText") or "preț necunoscut").strip(),
-        calories=calories,
-        protein=protein,
-        sugar=sugar,
-        fat=fat,
-        vegan=bool(data.get("vegan", False)),
-        lactose_free=bool(data.get("lactoseFree", False)),
-        natural=bool(data.get("natural", False)),
-        reason=reason,
-        ingredients=ingredients,
-    )
+    if not off_product:
+        return jsonify({
+            "error": "Produsul nu există în sursa verificată. Trimite-l ca propunere cu fotografii.",
+            "code": "verified_source_product_not_found",
+        }), 404
 
-    db.session.add(product)
-    db.session.commit()
+    product_data = build_product_from_open_food_facts(barcode, off_product)
+    product = save_product_to_local_database(product_data)
 
     return jsonify({
-        "message": "Produs salvat în baza locală.",
+        "message": "Produs importat din sursa verificată.",
         "product": product_to_dict(product),
     }), 201
 
@@ -16189,9 +17002,12 @@ def identify_product_frame():
         }), 402
 
     vision_enabled = os.environ.get("ENABLE_OPENAI_VISION", "false").lower() == "true"
-    api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+    try:
+        vision_provider = get_vision_provider()
+    except VisionProviderNotConfigured:
+        vision_provider = None
 
-    if not vision_enabled or not api_key:
+    if not vision_enabled or not vision_provider or not vision_provider.configured:
         return jsonify({
             "error": "Identificarea vizuală nu este configurată încă.",
             "code": "vision_not_configured",
@@ -16210,13 +17026,16 @@ def identify_product_frame():
     if len(frame_bytes) > 2 * 1024 * 1024:
         return jsonify({"error": "Cadrul video este prea mare."}), 400
 
-    mime_type = frame.mimetype or "image/jpeg"
+    try:
+        image = ImageOps.exif_transpose(Image.open(BytesIO(frame_bytes))).convert("RGB")
+        image.thumbnail((1280, 1280))
+        normalized_frame = BytesIO()
+        image.save(normalized_frame, "JPEG", quality=82, optimize=True)
+        frame_bytes = normalized_frame.getvalue()
+    except (OSError, ValueError, Image.DecompressionBombError):
+        return jsonify({"error": "Cadrul video nu conține o imagine validă."}), 400
 
-    if mime_type not in {"image/jpeg", "image/png", "image/webp"}:
-        return jsonify({"error": "Formatul cadrului video nu este acceptat."}), 400
-
-    image_base64 = base64.b64encode(frame_bytes).decode("ascii")
-    model = os.environ.get("OPENAI_VISION_MODEL", "gpt-4.1-mini").strip()
+    mime_type = "image/jpeg"
 
     prompt = """
 Analizează cadrul camerei dintr-un supermarket.
@@ -16237,48 +17056,15 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
 """
 
     try:
-        response = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "input": [{
-                    "role": "user",
-                    "content": [
-                        {"type": "input_text", "text": prompt},
-                        {
-                            "type": "input_image",
-                            "image_url": f"data:{mime_type};base64,{image_base64}",
-                            "detail": "low",
-                        },
-                    ],
-                }],
-            },
-            timeout=30,
-        )
-
-        if response.status_code >= 400:
-            app.logger.warning(
-                "OpenAI vision returned status %s: %s",
-                response.status_code,
-                response.text[:500],
-            )
-            return jsonify({
-                "error": "Serviciul vision nu a putut analiza cadrul.",
-            }), 502
-
         vision_result = parse_json_object(
-            extract_openai_output_text(response.json())
+            vision_provider.analyze(frame_bytes, mime_type, prompt)
         )
     except (json.JSONDecodeError, ValueError):
         return jsonify({
             "error": "Serviciul vision a returnat un răspuns invalid."
         }), 502
-    except requests.RequestException as error:
-        app.logger.warning("OpenAI vision request failed: %s", error)
+    except VisionProviderError as error:
+        app.logger.warning("Vision provider request failed: %s", error)
         return jsonify({
             "error": "Serviciul vision nu este disponibil momentan.",
             "code": "vision_unavailable",
@@ -16291,8 +17077,11 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
             or "Nu am identificat sigur produsul. Întoarce ambalajul spre codul de bare.",
         })
 
-    product_name = str(vision_result.get("product_name") or "").strip()
+    product_name = str(vision_result.get("product_name") or "").strip()[:150]
     barcode = str(vision_result.get("barcode") or "").strip()
+
+    if validate_barcode(barcode):
+        barcode = ""
     local_product = None
     match_score = 0
 

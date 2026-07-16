@@ -5,6 +5,7 @@ import gzip
 import hashlib
 import io
 import json
+import math
 import os
 import sys
 import time
@@ -24,6 +25,7 @@ from models import Product
 
 
 DEFAULT_OFF_CSV_URL = "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz"
+MAX_IMPORT_SOURCE_BYTES = int(os.environ.get("MAX_IMPORT_SOURCE_MB", "20480")) * 1024 * 1024
 
 ROMANIA_TOKENS = {
     "ro",
@@ -126,9 +128,11 @@ def parse_float(value):
         return None
 
     try:
-        return float(str(value).strip().replace(",", "."))
-    except ValueError:
+        parsed = float(str(value).strip().replace(",", "."))
+    except (TypeError, ValueError):
         return None
+
+    return parsed if math.isfinite(parsed) else None
 
 
 def parse_int(value):
@@ -190,8 +194,13 @@ def open_text_source(source):
                 timeout=(15, 90),
             )
             response.raise_for_status()
+            content_length = int(response.headers.get("Content-Length") or 0)
+            if content_length and content_length > MAX_IMPORT_SOURCE_BYTES:
+                raise ValueError("Sursa depășește limita MAX_IMPORT_SOURCE_MB.")
             binary_file = response.raw
         else:
+            if os.path.getsize(source) > MAX_IMPORT_SOURCE_BYTES:
+                raise ValueError("Sursa depășește limita MAX_IMPORT_SOURCE_MB.")
             binary_file = open(source, "rb")
 
         if str(source).lower().endswith(".gz"):
@@ -231,6 +240,9 @@ def iter_csv_rows(text_file, delimiter="auto"):
 
 def iter_jsonl_rows(text_file):
     for raw_line in text_file:
+        if len(raw_line) > 1_000_000:
+            continue
+
         line = raw_line.strip()
 
         if not line:
@@ -276,7 +288,9 @@ def row_to_off_product(row):
                 break
 
         if value is not None:
-            nutriments[target_key] = value
+            maximum = 1000 if target_key == "energy-kcal" else 100
+            if 0 <= value <= maximum:
+                nutriments[target_key] = value
 
     product["nutriments"] = nutriments
 
@@ -544,7 +558,7 @@ def import_export(
 
 
 def main():
-    csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
+    csv.field_size_limit(min(sys.maxsize, 1_000_000))
 
     parser = argparse.ArgumentParser(
         description="Importa produse din exportul Open Food Facts, cu filtru pentru Romania."

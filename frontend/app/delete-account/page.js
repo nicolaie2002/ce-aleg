@@ -7,13 +7,14 @@ import { API_URL } from "../config";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
+import {
+  clearAuthenticatedSession,
+  useConsumedAuthToken,
+} from "../utils/authStorage";
 
 export default function DeleteAccountPage() {
   const { pick } = useLocale();
-  const [token] = useState(() => {
-    if (typeof window === "undefined") return "";
-    return new URLSearchParams(window.location.search).get("token") || "";
-  });
+  const token = useConsumedAuthToken();
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -35,9 +36,7 @@ export default function DeleteAccountPage() {
         throw new Error(data.error || pick("Contul nu a putut fi sters.", "The account could not be deleted."));
       }
 
-      localStorage.removeItem("cealeg_user");
-      localStorage.removeItem("cealeg_preferences");
-      localStorage.removeItem("cealeg_email_status");
+      clearAuthenticatedSession();
       setSuccessMessage(data.message || pick("Contul a fost sters.", "The account has been deleted."));
     } catch (error) {
       setErrorMessage(error.message || pick("A aparut o eroare.", "An error occurred."));
@@ -97,7 +96,7 @@ export default function DeleteAccountPage() {
                 )}
               </p>
 
-              {!token && (
+              {token === "" && (
                 <div className="mt-6 rounded-lg border border-yellow-300/30 bg-yellow-300/10 p-4 text-yellow-100">
                   {pick(
                     "Linkul de confirmare lipsește. Deschide linkul primit pe email.",

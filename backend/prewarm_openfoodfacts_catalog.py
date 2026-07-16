@@ -484,6 +484,7 @@ def prewarm(categories, limit_per_category, page_size, country, delay, dry_run):
                     try:
                         result = import_off_product(raw_product, dry_run=dry_run)
                     except Exception as error:
+                        db.session.rollback()
                         print(f"{category}: product failed ({error})")
                         totals["failed"] += 1
                         failed += 1

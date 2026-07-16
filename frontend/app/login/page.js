@@ -10,6 +10,7 @@ import { PasswordField } from "../components/PasswordField";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
+import { clearAuthenticatedSession, storeAuthenticatedUser } from "../utils/authStorage";
 
 function getSafeDestination() {
   const nextPath = new URLSearchParams(window.location.search).get("next");
@@ -60,11 +61,12 @@ export default function LoginPage() {
         throw new Error(getApiErrorMessage(data, pick, "Autentificare esuata.", "Sign-in failed."));
       }
 
-      localStorage.setItem("cealeg_user", JSON.stringify(data.user));
+      storeAuthenticatedUser(data.user);
       const destination = getSafeDestination();
       const sessionResponse = await fetch(`${API_URL}/auth/me`, { cache: "no-store" });
 
       if (!sessionResponse.ok) {
+        clearAuthenticatedSession();
         throw new Error(
           pick(
             "Sesiunea nu a fost salvată corect. Reîncearcă după refresh.",

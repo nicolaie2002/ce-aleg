@@ -287,8 +287,13 @@ export default function MissionsPage() {
 
   if (isLoading && !summary) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white">
-        <p className="text-gray-300">{pick("Se încarcă misiunile...", "Loading missions...")}</p>
+      <main
+        className="flex min-h-screen items-center justify-center bg-[#0b0f14] text-white"
+        aria-busy="true"
+      >
+        <p className="text-gray-300" role="status" aria-live="polite">
+          {pick("Se încarcă misiunile...", "Loading missions...")}
+        </p>
       </main>
     );
   }
@@ -303,13 +308,15 @@ export default function MissionsPage() {
             <h1 className="mt-4 text-2xl font-black">
               {pick("Misiunile nu s-au încărcat", "Missions did not load")}
             </h1>
-            <p className="mt-3 text-sm leading-6 text-gray-300">{error}</p>
+            <p className="mt-3 text-sm leading-6 text-gray-300" role="alert">
+              {error}
+            </p>
             <button
               type="button"
               onClick={() => void loadSummary()}
-              className="mt-5 inline-flex items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-black text-black hover:bg-cyan-100"
+              className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-black text-black hover:bg-cyan-100"
             >
-              <RefreshCw size={17} />
+              <RefreshCw size={17} aria-hidden="true" />
               {pick("Reîncearcă", "Try again")}
             </button>
           </div>
@@ -374,7 +381,15 @@ export default function MissionsPage() {
                 <span>{pick("Progres", "Progress")}</span>
                 <span>{completedMissions}/{totalMissions}</span>
               </div>
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-white/10">
+              <div
+                className="mt-4 h-3 overflow-hidden rounded-full bg-white/10"
+                role="progressbar"
+                aria-label={pick("Progresul misiunilor", "Mission progress")}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress)}
+                aria-valuetext={`${completedMissions} / ${totalMissions}`}
+              >
                 <div className="h-full rounded-full bg-cyan-200" style={{ width: `${progress}%` }} />
               </div>
               <p className="mt-3 text-xs font-bold text-gray-400">
@@ -399,7 +414,10 @@ export default function MissionsPage() {
         <InlineNotice message={message} tone="success" className="mt-5" />
         <InlineNotice message={error} tone="warning" className="mt-5" />
 
-        <section className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+        <section
+          className="mt-8 rounded-2xl border border-white/10 bg-white/[0.04] p-5"
+          aria-busy={isLoading}
+        >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="inline-flex items-center gap-2 text-sm font-black text-cyan-200">
@@ -416,9 +434,9 @@ export default function MissionsPage() {
               type="button"
               onClick={() => void loadSummary()}
               disabled={isLoading}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm font-black text-white hover:bg-white/10"
             >
-              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+              <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} aria-hidden="true" />
               {isLoading ? pick("Actualizez...", "Refreshing...") : pick("Actualizează", "Refresh")}
             </button>
           </div>
@@ -449,10 +467,10 @@ export default function MissionsPage() {
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <p className="inline-flex min-w-0 items-center gap-2 text-sm font-black text-white">
+                      <h3 className="inline-flex min-w-0 items-center gap-2 text-sm font-black text-white">
                         <MissionIcon size={17} className="shrink-0 text-cyan-200" />
                         <span className="truncate">{getLocalizedMissionTitle(mission, pick)}</span>
-                      </p>
+                      </h3>
                       {isClaimable && (
                         <span className="shrink-0 rounded-full bg-cyan-200 px-2 py-1 text-[11px] font-black text-black">
                           {pick("Gata", "Ready")}
@@ -474,7 +492,15 @@ export default function MissionsPage() {
                         <span>{mission.current}/{mission.target}</span>
                         <span>{missionProgress}%</span>
                       </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"
+                        role="progressbar"
+                        aria-label={`${getLocalizedMissionTitle(mission, pick)}: ${pick("progres", "progress")}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(missionProgress)}
+                        aria-valuetext={`${mission.current} / ${mission.target}`}
+                      >
                         <div className="h-full rounded-full bg-cyan-200" style={{ width: `${missionProgress}%` }} />
                       </div>
                     </div>
@@ -486,7 +512,7 @@ export default function MissionsPage() {
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <Link
                         href={getMissionHref(mission)}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/10"
+                        className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-white/10 px-3 py-2 text-xs font-black text-white hover:bg-white/10"
                       >
                         {pick("Continuă", "Continue")}
                         <ArrowRight size={14} />
@@ -495,7 +521,7 @@ export default function MissionsPage() {
                         type="button"
                         onClick={() => claimMission(mission.id)}
                         disabled={!isClaimable || claimingMissionId === mission.id}
-                        className={`rounded-lg px-3 py-2 text-xs font-black ${
+                        className={`min-h-11 rounded-lg px-3 py-2 text-xs font-black ${
                           isClaimable
                             ? "bg-white text-black hover:bg-cyan-100"
                             : "cursor-not-allowed border border-white/10 text-gray-500"
@@ -575,21 +601,25 @@ export default function MissionsPage() {
                   {pick("Poziția ta", "Your rank")}: #{currentUserRank}
                 </p>
               )}
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 space-y-2" aria-busy={isLeaderboardLoading}>
                 {isLeaderboardLoading ? (
-                  <p className="inline-flex w-full items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-gray-400">
-                    <RefreshCw size={15} className="animate-spin" />
+                  <p
+                    className="inline-flex w-full items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-3 text-sm text-gray-400"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <RefreshCw size={15} className="animate-spin" aria-hidden="true" />
                     {pick("Se încarcă separat clasamentul...", "Loading the leaderboard separately...")}
                   </p>
                 ) : leaderboardError ? (
                   <div className="rounded-lg border border-yellow-300/20 bg-yellow-300/[0.06] p-3">
-                    <p className="text-sm leading-6 text-gray-300">{leaderboardError}</p>
+                    <p className="text-sm leading-6 text-gray-300" role="alert">{leaderboardError}</p>
                     <button
                       type="button"
                       onClick={() => void loadLeaderboard()}
-                      className="mt-3 inline-flex items-center gap-2 text-sm font-black text-cyan-100 hover:text-white"
+                      className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-black text-cyan-100 hover:text-white"
                     >
-                      <RefreshCw size={14} />
+                      <RefreshCw size={14} aria-hidden="true" />
                       {pick("Reîncearcă", "Try again")}
                     </button>
                   </div>

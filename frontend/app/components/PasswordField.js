@@ -20,7 +20,7 @@ export function PasswordField({
   return (
     <label className="block text-sm font-semibold text-gray-300">
       <span className="flex items-center gap-2">
-        <LockKeyhole size={15} className="text-emerald-300" />
+        <LockKeyhole size={15} className="text-emerald-300" aria-hidden="true" />
         {label}
       </span>
 
@@ -50,7 +50,7 @@ export function PasswordField({
               : pick("Arată parola", "Show password")
           }
         >
-          {isVisible ? <EyeOff size={18} /> : <Eye size={18} />}
+          {isVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
         </button>
       </span>
     </label>

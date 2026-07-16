@@ -1,6 +1,8 @@
 import argparse
 import csv
 import hashlib
+import math
+import os
 import sys
 
 from app import (
@@ -44,9 +46,11 @@ def parse_float(value):
         return None
 
     try:
-        return float(str(value).strip().replace(",", ".").replace(" lei", ""))
-    except ValueError:
+        parsed = float(str(value).strip().replace(",", ".").replace(" lei", ""))
+    except (TypeError, ValueError):
         return None
+
+    return parsed if math.isfinite(parsed) else None
 
 
 def normalize_headers(headers):
@@ -113,8 +117,11 @@ def existing_keys():
     return {key for key in keys if key}
 
 
-def import_feed(source, fallback_store, dry_run, batch_size):
+def import_feed(source, fallback_store, dry_run, batch_size, max_rows, max_file_mb):
     saved = skipped = duplicates = failed = pending = 0
+
+    if os.path.getsize(source) > max_file_mb * 1024 * 1024:
+        raise ValueError(f"Fișierul depășește limita de {max_file_mb} MB.")
 
     with app.app_context():
         seen_keys = existing_keys()
@@ -126,6 +133,9 @@ def import_feed(source, fallback_store, dry_run, batch_size):
             normalized_headers = normalize_headers(reader.fieldnames)
 
             for index, row in enumerate(reader, start=2):
+                if max_rows and index - 1 > max_rows:
+                    break
+
                 try:
                     raw_barcode = read_value(row, normalized_headers, "barcode")
                     barcode = raw_barcode if raw_barcode and not validate_barcode(raw_barcode) else ""
@@ -149,6 +159,19 @@ def import_feed(source, fallback_store, dry_run, batch_size):
                     sugar = parse_float(read_value(row, normalized_headers, "sugar"))
                     fat = parse_float(read_value(row, normalized_headers, "fat"))
                     price = parse_float(read_value(row, normalized_headers, "price"))
+
+                    nutrition_values = [calories, protein, sugar, fat]
+                    nutrition_limits = [1000, 100, 100, 100]
+                    if any(
+                        value is not None and (value < 0 or value > maximum)
+                        for value, maximum in zip(nutrition_values, nutrition_limits)
+                    ):
+                        skipped += 1
+                        continue
+
+                    if price is not None and (price < 0 or price > 1_000_000):
+                        skipped += 1
+                        continue
                     score = calculate_product_score(category, calories, protein, sugar, fat, ingredients)
                     tag = generate_product_tag(category, calories, protein, sugar, fat, ingredients)
                     reason = generate_product_reason(category, calories, protein, sugar, fat, ingredients)
@@ -175,7 +198,7 @@ def import_feed(source, fallback_store, dry_run, batch_size):
                             lactose_free=False,
                             natural=False,
                             reason=reason,
-                            ingredients=ingredients,
+                            ingredients=clip(ingredients, 5000),
                         ))
                         pending += 1
 
@@ -201,7 +224,7 @@ def import_feed(source, fallback_store, dry_run, batch_size):
 
 
 def main():
-    csv.field_size_limit(min(sys.maxsize, 2_147_483_647))
+    csv.field_size_limit(min(sys.maxsize, 1_000_000))
 
     parser = argparse.ArgumentParser(
         description="Importa un CSV de la retailer/partener in catalogul Ce aleg?."
@@ -209,6 +232,8 @@ def main():
     parser.add_argument("--source", required=True, help="Fisier CSV local.")
     parser.add_argument("--store", default="Catalog partener")
     parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument("--max-rows", type=int, default=1_000_000)
+    parser.add_argument("--max-file-mb", type=int, default=2048)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -217,6 +242,8 @@ def main():
         fallback_store=args.store,
         dry_run=args.dry_run,
         batch_size=max(1, min(args.batch_size, 500)),
+        max_rows=max(1, args.max_rows),
+        max_file_mb=max(1, args.max_file_mb),
     )
 
 

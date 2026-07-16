@@ -21,6 +21,8 @@ import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
 
+const MAX_CAMERA_SESSION_MS = 2 * 60 * 1000;
+
 function productToResult(product) {
   return {
     id: product.id,
@@ -81,6 +83,7 @@ function hasValidGs1Checksum(barcode) {
 function isReliableScannedBarcode(barcode) {
   return (
     /^\d+$/.test(barcode) &&
+    !/^(\d)\1+$/.test(barcode) &&
     [8, 12, 13, 14].includes(barcode.length) &&
     hasValidGs1Checksum(barcode)
   );
@@ -112,6 +115,8 @@ export default function LiveAssistantPage() {
   const streamRef = useRef(null);
   const scannerControlsRef = useRef(null);
   const recognitionRef = useRef(null);
+  const cameraSessionTimerRef = useRef(null);
+  const analysisAbortControllerRef = useRef(null);
   const barcodeCandidateRef = useRef({ code: "", count: 0 });
   const detectedBarcodeRef = useRef(false);
   const analyzingRef = useRef(false);
@@ -219,12 +224,21 @@ export default function LiveAssistantPage() {
   }, [pick]);
 
   const stopCamera = useCallback(() => {
+    if (cameraSessionTimerRef.current) {
+      window.clearTimeout(cameraSessionTimerRef.current);
+      cameraSessionTimerRef.current = null;
+    }
+
+    analysisAbortControllerRef.current?.abort();
+    analysisAbortControllerRef.current = null;
+    analyzingRef.current = false;
     scannerControlsRef.current?.stop?.();
     scannerControlsRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     detectedBarcodeRef.current = false;
     barcodeCandidateRef.current = { code: "", count: 0 };
+    setIsAnalyzing(false);
     setIsCameraOn(false);
   }, []);
 
@@ -241,6 +255,15 @@ export default function LiveAssistantPage() {
       return;
     }
 
+    if (document.hidden) {
+      setError(pick(
+        "Revino la această pagină înainte să pornești camera.",
+        "Return to this page before starting the camera."
+      ));
+      return;
+    }
+
+    stopCamera();
     setError("");
     setCandidate(null);
     setBillingGate(null);
@@ -255,12 +278,6 @@ export default function LiveAssistantPage() {
             "Looking for the barcode. Keep the product close, sharp and well lit."
           )
     );
-    scannerControlsRef.current?.stop?.();
-    scannerControlsRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    detectedBarcodeRef.current = false;
-    barcodeCandidateRef.current = { code: "", count: 0 };
-
     try {
       const reader = createBarcodeReader();
       scannerControlsRef.current = await reader.decodeFromVideoDevice(
@@ -275,9 +292,17 @@ export default function LiveAssistantPage() {
       streamRef.current = videoRef.current?.srcObject || null;
 
       setIsCameraOn(true);
+      cameraSessionTimerRef.current = window.setTimeout(() => {
+        stopCamera();
+        setMessage(pick(
+          "Camera s-a oprit automat după două minute. O poți porni din nou când ești gata.",
+          "The camera stopped automatically after two minutes. Start it again when you are ready."
+        ));
+      }, MAX_CAMERA_SESSION_MS);
       const devices = await navigator.mediaDevices.enumerateDevices();
       setCameraDevices(devices.filter((device) => device.kind === "videoinput"));
     } catch {
+      stopCamera();
       setError(pick("Camera nu a putut fi pornită. Verifică permisiunea din browser.", "The camera could not start. Check your browser permission."));
     }
   }
@@ -289,6 +314,22 @@ export default function LiveAssistantPage() {
     },
     [stopCamera]
   );
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (!document.hidden || (!isCameraOn && !recognitionRef.current)) return;
+
+      recognitionRef.current?.stop?.();
+      stopCamera();
+      setMessage(pick(
+        "Camera s-a oprit cât timp pagina nu este vizibilă.",
+        "The camera stopped while the page was hidden."
+      ));
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [isCameraOn, pick, stopCamera]);
 
   async function switchCamera() {
     if (!hasLiveAssistantAccess) {
@@ -359,8 +400,37 @@ export default function LiveAssistantPage() {
   }
 
   async function lookupBarcode(barcode) {
-    const response = await fetch(`${API_URL}/barcode/lookup/${barcode}`);
-    const data = await response.json();
+    const normalizedBarcode = normalizeDetectedBarcode(barcode);
+
+    if (!isReliableScannedBarcode(normalizedBarcode)) {
+      detectedBarcodeRef.current = false;
+      barcodeCandidateRef.current = { code: "", count: 0 };
+      setError(pick(
+        "Codul de bare nu este valid. Încadrează-l din nou, complet și clar.",
+        "The barcode is not valid. Frame the complete code clearly and try again."
+      ));
+      return;
+    }
+
+    setError("");
+
+    let response;
+    let data;
+
+    try {
+      response = await fetch(
+        `${API_URL}/barcode/lookup/${encodeURIComponent(normalizedBarcode)}`
+      );
+      data = await response.json().catch(() => ({}));
+    } catch {
+      detectedBarcodeRef.current = false;
+      barcodeCandidateRef.current = { code: "", count: 0 };
+      setError(pick(
+        "Produsul nu a putut fi căutat acum. Verifică internetul și încearcă din nou.",
+        "The product could not be looked up. Check your connection and try again."
+      ));
+      return;
+    }
 
     if (data.code === "scan_limit_reached") {
       setBillingGate(data);
@@ -397,7 +467,12 @@ export default function LiveAssistantPage() {
       return;
     }
 
-    if (!cloudVision || !videoRef.current || analyzingRef.current) return;
+    if (
+      document.hidden ||
+      !cloudVision ||
+      !videoRef.current ||
+      analyzingRef.current
+    ) return;
 
     const video = videoRef.current;
     if (!video.videoWidth || !video.videoHeight) return;
@@ -407,6 +482,8 @@ export default function LiveAssistantPage() {
     setError("");
 
     try {
+      const abortController = new AbortController();
+      analysisAbortControllerRef.current = abortController;
       const canvas = canvasRef.current;
       const scale = Math.min(1, 960 / video.videoWidth);
       canvas.width = Math.round(video.videoWidth * scale);
@@ -418,6 +495,7 @@ export default function LiveAssistantPage() {
       const response = await fetch(`${API_URL}/ai/identify-product-frame`, {
         method: "POST",
         body: form,
+        signal: abortController.signal,
       });
       const data = await response.json();
 
@@ -445,8 +523,11 @@ export default function LiveAssistantPage() {
       setCandidate(data.candidate);
       setMessage(data.candidate?.message || "Am recunoscut ambalajul. Arată și codul de bare pentru confirmare.");
     } catch (requestError) {
-      setError(requestError.message);
+      if (requestError.name !== "AbortError") {
+        setError(requestError.message);
+      }
     } finally {
+      analysisAbortControllerRef.current = null;
       analyzingRef.current = false;
       setIsAnalyzing(false);
     }

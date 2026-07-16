@@ -1,28 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { BarChart3, X } from "lucide-react";
 import { useLocale } from "./LocaleProvider";
+import {
+  ANALYTICS_CONSENT_EVENT,
+  ANALYTICS_CONSENT_KEY,
+} from "../utils/analytics";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "";
 const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
 const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "";
 const HAS_ANALYTICS_PROVIDER = Boolean(GA_ID || META_PIXEL_ID || TIKTOK_PIXEL_ID);
-const CONSENT_KEY = "cealeg_analytics_consent";
-
 function saveConsent(value) {
-  localStorage.setItem(CONSENT_KEY, value);
-  window.dispatchEvent(new Event("cealeg:analytics-consent"));
+  localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
+
+  const granted = value === "accepted";
+  window.gtag?.("consent", "update", {
+    analytics_storage: granted ? "granted" : "denied",
+    ad_storage: granted ? "granted" : "denied",
+    ad_user_data: granted ? "granted" : "denied",
+    ad_personalization: granted ? "granted" : "denied",
+  });
+
+  if (granted) {
+    window.fbq?.("grantConsent");
+    window.ttq?.grantConsent?.();
+  } else {
+    window.fbq?.("revokeConsent");
+    window.ttq?.revokeConsent?.();
+  }
+
+  window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT));
 }
 
 export function CookieConsentBanner() {
   const { pick } = useLocale();
+  const titleId = useId();
   const [choice, setChoice] = useState("loading");
 
   useEffect(() => {
     queueMicrotask(() => {
-      setChoice(localStorage.getItem(CONSENT_KEY) || "pending");
+      setChoice(localStorage.getItem(ANALYTICS_CONSENT_KEY) || "pending");
     });
   }, []);
 
@@ -42,14 +62,18 @@ export function CookieConsentBanner() {
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-[90] px-3 pb-3 sm:px-5 sm:pb-5">
-      <div className="mx-auto max-w-5xl rounded-2xl border border-[color:var(--surface-edge)] bg-[var(--surface-strong)] p-4 text-foreground shadow-[0_24px_80px_rgba(0,0,0,.45)] backdrop-blur-xl">
+      <div
+        className="mx-auto max-w-5xl rounded-2xl border border-[color:var(--surface-edge)] bg-[var(--surface-strong)] p-4 text-foreground shadow-[0_24px_80px_rgba(0,0,0,.45)] backdrop-blur-xl"
+        role="region"
+        aria-labelledby={titleId}
+      >
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex gap-3">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-300/12 text-cyan-200">
               <BarChart3 size={21} />
             </span>
             <div>
-              <h2 className="text-base font-black">
+              <h2 id={titleId} className="text-base font-black">
                 {pick("Ajută-ne să îmbunătățim site-ul", "Help us improve the site")}
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">

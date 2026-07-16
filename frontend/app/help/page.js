@@ -295,11 +295,14 @@ export default function HelpPage() {
               {pick("Cauta in ajutor", "Search help")}
             </label>
             <div className="mt-3 flex items-center gap-3 rounded-lg border border-white/10 bg-black/30 px-3">
-              <Search size={18} className="text-cyan-200" />
+              <Search size={18} className="text-cyan-200" aria-hidden="true" />
               <input
                 id="help-search"
+                type="search"
+                autoComplete="off"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
+                aria-controls="help-results"
                 placeholder={pick("Ex: camera, parola, CeCoins", "Example: camera, password, CeCoins")}
                 className="min-h-12 w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-gray-500"
               />
@@ -312,21 +315,27 @@ export default function HelpPage() {
             <p className="mb-3 text-xs font-black uppercase tracking-[0.14em] text-gray-400">
               {pick("Cuprins", "Contents")}
             </p>
-            <nav className="grid gap-1">
+            <nav className="grid gap-1" aria-label={pick("Cuprins ajutor", "Help contents")}>
               {visibleSections.map((section) => (
                 <a
                   key={section.id}
                   href={`#${section.id}`}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-gray-300 hover:bg-white/[0.07] hover:text-white"
+                  className="flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-gray-300 hover:bg-white/[0.07] hover:text-white"
                 >
-                  <section.icon size={16} className="text-cyan-200" />
+                  <section.icon size={16} className="text-cyan-200" aria-hidden="true" />
                   {pick(section.titleRo, section.titleEn)}
                 </a>
               ))}
             </nav>
           </aside>
 
-          <div className="space-y-5">
+          <div id="help-results" className="space-y-5">
+            <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {pick(
+                `${visibleSections.length} secțiuni găsite`,
+                `${visibleSections.length} sections found`
+              )}
+            </p>
             {visibleSections.length ? (
               visibleSections.map((section) => {
                 const Icon = section.icon;
@@ -335,14 +344,15 @@ export default function HelpPage() {
                   <section
                     key={section.id}
                     id={section.id}
+                    aria-labelledby={`${section.id}-title`}
                     className="scroll-mt-24 rounded-lg border border-white/10 bg-[#101820]/82 p-5 shadow-xl shadow-black/15"
                   >
                     <div className="mb-5 flex items-start gap-3">
                       <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-cyan-300/25 bg-cyan-300/10 text-cyan-100">
-                        <Icon size={21} />
+                        <Icon size={21} aria-hidden="true" />
                       </span>
                       <div>
-                        <h2 className="text-2xl font-black text-white">
+                        <h2 id={`${section.id}-title`} className="text-2xl font-black text-white">
                           {pick(section.titleRo, section.titleEn)}
                         </h2>
                         <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-400">
@@ -367,7 +377,10 @@ export default function HelpPage() {
                 );
               })
             ) : (
-              <div className="rounded-lg border border-white/10 bg-white/[0.04] p-6 text-gray-300">
+              <div
+                className="rounded-lg border border-white/10 bg-white/[0.04] p-6 text-gray-300"
+                role="status"
+              >
                 <p className="font-black text-white">{pick("Niciun rezultat", "No results")}</p>
                 <p className="mt-2 text-sm">
                   {pick(

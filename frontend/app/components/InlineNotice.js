@@ -29,8 +29,10 @@ export function InlineNotice({ message, tone = "success", className = "" }) {
     <div
       className={`flex items-start gap-3 rounded-lg border p-4 text-sm leading-6 ${selectedTone.classes} ${className}`}
       role={tone === "error" ? "alert" : "status"}
+      aria-live={tone === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
     >
-      <Icon className="mt-0.5 shrink-0" size={18} />
+      <Icon className="mt-0.5 shrink-0" size={18} aria-hidden="true" />
       <span>{message}</span>
     </div>
   );

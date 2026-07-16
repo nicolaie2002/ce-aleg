@@ -20,7 +20,7 @@ export function ExpandableText({ text, fallback = "", className = "", maxLength 
         {content}
       </p>
       {canExpand && (
-        <button type="button" onClick={() => setIsExpanded((current) => !current)} aria-controls={contentId} aria-expanded={isExpanded} className="mt-1 text-sm font-semibold text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70">
+        <button type="button" onClick={() => setIsExpanded((current) => !current)} aria-controls={contentId} aria-expanded={isExpanded} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-emerald-300 hover:text-emerald-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300/70">
           {isExpanded ? pick("Arată mai puțin", "Show less") : pick("Citește mai mult", "Read more")}
         </button>
       )}

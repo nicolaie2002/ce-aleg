@@ -86,6 +86,12 @@ services:
         value: contact@cealeg.shop
       - key: CRON_SECRET
         sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.05"
       - key: EMAIL_USE_TLS
         value: "true"
       - key: EMAIL_USE_SSL

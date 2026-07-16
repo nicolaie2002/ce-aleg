@@ -1,45 +1,159 @@
-name: Project checks
+name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches: [main]
   pull_request:
-    branches: ["main"]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  backend:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-      - run: pip install -r requirements.txt
-      - run: python -m py_compile app.py database.py models.py migrate_sqlite_to_supabase.py
+  frontend-quality:
+    name: Frontend quality
+    uses: ./.github/workflows/test-frontend.yml
+    secrets: inherit
 
-  frontend:
+  backend-quality:
+    name: Backend quality
+    uses: ./.github/workflows/test-backend.yml
+    secrets: inherit
+
+  security-scan:
+    name: Dependency and filesystem security scan
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Scan repository with Trivy
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run build
-        env:
-          BACKEND_URL: http://127.0.0.1:5001
-          NEXT_PUBLIC_API_URL: /api/backend
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Upload Trivy SARIF
+        if: >-
+          ${{ always() && hashFiles('trivy-results.sarif') != '' &&
+          github.actor != 'dependabot[bot]' &&
+          (github.event_name != 'pull_request' ||
+          github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy-results.sarif
+
+  frontend-container:
+    name: Build and smoke-test frontend image
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: frontend-quality
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          load: true
+          tags: ce-aleg-frontend:ci
+          build-args: |
+            BACKEND_URL=http://127.0.0.1:5001
+            NEXT_PUBLIC_API_URL=/api/backend
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
+
+      - name: Start frontend container
+        run: docker run --detach --name ce-aleg-frontend-ci --publish 3000:3000 ce-aleg-frontend:ci
+
+      - name: Wait for frontend healthcheck
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            status="$(docker inspect --format '{{.State.Health.Status}}' ce-aleg-frontend-ci 2>/dev/null || true)"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ]; then
+              break
+            fi
+            sleep 2
+          done
+          docker logs ce-aleg-frontend-ci
+          exit 1
+
+      - name: Stop frontend container
+        if: always()
+        run: docker rm --force ce-aleg-frontend-ci 2>/dev/null || true
+
+  backend-container:
+    name: Build and smoke-test backend image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: backend-quality
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          load: true
+          tags: ce-aleg-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Start backend container
+        run: >-
+          docker run --detach --name ce-aleg-backend-ci
+          --publish 5001:5001
+          --env APP_ENV=test
+          --env AUTH_SECRET=ci-only-auth-secret-with-at-least-32-characters
+          --env ALLOW_DEV_TUNNEL_ORIGINS=false
+          ce-aleg-backend:ci
+
+      - name: Wait for backend healthcheck
+        shell: bash
+        run: |
+          for attempt in {1..30}; do
+            status="$(docker inspect --format '{{.State.Health.Status}}' ce-aleg-backend-ci 2>/dev/null || true)"
+            if [ "$status" = "healthy" ]; then
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ]; then
+              break
+            fi
+            sleep 2
+          done
+          docker logs ce-aleg-backend-ci
+          exit 1
+
+      - name: Stop backend container
+        if: always()
+        run: docker rm --force ce-aleg-backend-ci 2>/dev/null || true

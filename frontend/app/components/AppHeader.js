@@ -162,11 +162,15 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
     <>
       <header className="ce-header sticky top-0 z-40 border-b border-white/10 shadow-[0_18px_55px_rgba(0,0,0,0.18)] backdrop-blur-xl">
         <div className="ce-shell flex min-h-16 items-center justify-between gap-3 py-3">
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
+          <Link
+            href="/dashboard"
+            className="flex min-w-0 items-center gap-3"
+            aria-label={pick("Ce aleg? - Panou", "Ce aleg? - Dashboard")}
+          >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-[0_0_24px_rgba(52,211,153,0.22)]">
               <Image
                 src="/icon.png"
-                alt="Ce aleg?"
+                alt=""
                 width={80}
                 height={80}
                 className="h-full w-full object-cover"
@@ -212,7 +216,7 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
               title={pick("Ajutor", "Help")}
               aria-label={pick("Ajutor", "Help")}
               aria-current={pathname === "/help" ? "page" : undefined}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-black transition ${
+              className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-black transition ${
                 pathname === "/help"
                   ? "border-cyan-200/60 bg-cyan-200 text-black"
                   : "border-white/12 bg-white/[0.04] text-cyan-100 hover:-translate-y-0.5 hover:bg-white/[0.08]"
@@ -223,8 +227,9 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
             </Link>
             <Link
               href="/pricing"
+              aria-label={pick("Planuri", "Plans")}
               aria-current={pathname === "/pricing" ? "page" : undefined}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-yellow-300/35 bg-yellow-300/10 px-3 py-2 text-sm font-black text-yellow-200 shadow-[0_0_24px_rgba(250,204,21,0.12)] transition hover:-translate-y-0.5 hover:border-yellow-200/60 hover:bg-yellow-300/20"
+              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-yellow-300/35 bg-yellow-300/10 px-3 py-2 text-sm font-black text-yellow-200 shadow-[0_0_24px_rgba(250,204,21,0.12)] transition hover:-translate-y-0.5 hover:border-yellow-200/60 hover:bg-yellow-300/20"
             >
               <Crown size={16} />
               <span className="hidden sm:inline">{pick("Planuri", "Plans")}</span>

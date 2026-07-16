@@ -33,6 +33,7 @@ import { InlineNotice } from "../components/InlineNotice";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile } from "../utils/profilePreferences";
+import { clearAuthenticatedSession, storeAuthenticatedUser } from "../utils/authStorage";
 import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
@@ -258,12 +259,12 @@ export default function DashboardPage() {
     queueMicrotask(async () => {
       const response = await fetch(`${API_URL}/auth/me`);
       if (!response.ok) {
-        localStorage.removeItem("cealeg_user");
+        clearAuthenticatedSession();
         window.location.assign("/login");
         return;
       }
       const data = await response.json();
-      localStorage.setItem("cealeg_user", JSON.stringify(data.user));
+      storeAuthenticatedUser(data.user);
       currentUserId = data.user.id;
       setUser(data.user);
 
@@ -343,7 +344,7 @@ export default function DashboardPage() {
 
   async function logout() {
     await fetch(`${API_URL}/logout`, { method: "POST" }).catch(() => null);
-    localStorage.removeItem("cealeg_user");
+    clearAuthenticatedSession();
     window.location.assign("/");
   }
 

@@ -90,7 +90,7 @@ export default function SupportPage() {
       <section className="ce-shell ce-page">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
         >
           <ArrowLeft size={16} />
           {pick("Pagina principală", "Home")}
@@ -112,7 +112,7 @@ export default function SupportPage() {
               )}
             </p>
 
-            <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-7 space-y-4" aria-busy={isSending}>
               <div>
                 <label htmlFor="support-email" className="text-sm font-black text-gray-200">
                   Email
@@ -120,9 +120,11 @@ export default function SupportPage() {
                 <input
                   id="support-email"
                   type="email"
+                  name="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   required
+                  autoComplete="email"
                   placeholder="nume@email.ro"
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
                 />
@@ -134,6 +136,7 @@ export default function SupportPage() {
                 </label>
                 <select
                   id="support-topic"
+                  name="topic"
                   value={topic}
                   onChange={(event) => setTopic(event.target.value)}
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
@@ -152,6 +155,7 @@ export default function SupportPage() {
                 </label>
                 <textarea
                   id="support-message"
+                  name="message"
                   value={message}
                   onChange={(event) => setMessage(event.target.value)}
                   required
@@ -166,7 +170,12 @@ export default function SupportPage() {
               </div>
 
               {status && (
-                <p className={`rounded-2xl border p-4 text-sm ${statusClass}`}>
+                <p
+                  className={`rounded-2xl border p-4 text-sm ${statusClass}`}
+                  role={statusTone === "error" ? "alert" : "status"}
+                  aria-live={statusTone === "error" ? "assertive" : "polite"}
+                  aria-atomic="true"
+                >
                   {status}
                 </p>
               )}
@@ -174,16 +183,24 @@ export default function SupportPage() {
               <button
                 type="submit"
                 disabled={isSending}
+                aria-disabled={isSending}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-cyan-100 disabled:cursor-wait disabled:opacity-70 sm:w-auto"
               >
-                {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                {isSending ? (
+                  <Loader2 size={18} className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Send size={18} aria-hidden="true" />
+                )}
                 {isSending ? pick("Se trimite...", "Sending...") : pick("Trimite mesajul", "Send message")}
               </button>
             </form>
 
             <p className="mt-5 text-sm text-gray-400">
               {pick("Poți scrie și direct la", "You can also email us directly at")}{" "}
-              <a href={`mailto:${CONTACT_EMAIL}`} className="font-bold text-cyan-200 hover:text-white">
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
+                className="inline-flex min-h-11 items-center font-bold text-cyan-200 hover:text-white"
+              >
                 {CONTACT_EMAIL}
               </a>
               .

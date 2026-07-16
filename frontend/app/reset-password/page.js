@@ -10,6 +10,10 @@ import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
 import {
+  storeAuthenticatedUser,
+  useConsumedAuthToken,
+} from "../utils/authStorage";
+import {
   PASSWORD_MIN_LENGTH,
   getPasswordStrength,
   getPasswordStrengthLabel,
@@ -20,6 +24,7 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const token = useConsumedAuthToken();
   const strength = useMemo(() => getPasswordStrength(password), [password]);
 
   async function handleSubmit(event) {
@@ -28,7 +33,13 @@ export default function ResetPasswordPage() {
     setErrorMessage("");
 
     try {
-      const token = new URLSearchParams(window.location.search).get("token") || "";
+      if (!token) {
+        throw new Error(pick(
+          "Linkul de resetare lipsește sau nu mai este valid.",
+          "The reset link is missing or is no longer valid."
+        ));
+      }
+
       const response = await fetch(`${API_URL}/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -40,7 +51,7 @@ export default function ResetPasswordPage() {
         throw new Error(getApiErrorMessage(data, pick, "Parola nu a putut fi schimbata.", "The password could not be changed."));
       }
 
-      localStorage.setItem("cealeg_user", JSON.stringify(data.user));
+      storeAuthenticatedUser(data.user);
       window.location.assign("/dashboard");
     } catch (error) {
       setErrorMessage(error.message || pick("A aparut o eroare.", "An error occurred."));
@@ -110,9 +121,9 @@ export default function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={!token || isLoading}
               className={`inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-4 font-black ${
-                isLoading
+                !token || isLoading
                   ? "cursor-not-allowed bg-white/10 text-gray-400"
                   : "bg-emerald-400 text-black hover:bg-emerald-300"
               }`}

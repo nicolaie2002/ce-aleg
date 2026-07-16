@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Bot, CircleCheck, CircleDashed, Database, Languages, ScanText } from "lucide-react";
 import { API_URL } from "../config";
+import { useLocale } from "./LocaleProvider";
 
 const fallbackItems = [
   { key: "localOcr", label: "Citire coduri si etichete", enabled: true },
@@ -16,7 +17,16 @@ const icons = {
   openFoodFacts: Database,
 };
 
+const statusLabels = {
+  localOcr: ["OCR local pentru coduri și etichete", "Local OCR for barcodes and labels"],
+  localTranslation: ["Traducere locală", "Local translation"],
+  cloudVision: ["Identificare vizuală opțională", "Optional visual identification"],
+  openFoodFacts: ["Catalog Open Food Facts", "Open Food Facts catalog"],
+  freeMode: ["Scanare și recomandări în modul gratuit", "Scanning and recommendations in free mode"],
+};
+
 export function AiStatusPanel({ compact = false }) {
+  const { pick } = useLocale();
   const [items, setItems] = useState(fallbackItems);
 
   useEffect(() => {
@@ -48,7 +58,10 @@ export function AiStatusPanel({ compact = false }) {
   }, []);
 
   return (
-    <section className="border-y border-white/10 bg-white/[0.035]">
+    <section
+      className="border-y border-white/10 bg-white/[0.035]"
+      aria-label={pick("Starea serviciilor de scanare", "Scan service status")}
+    >
       <div className={`ce-shell ${compact ? "py-3" : "py-5"}`}>
         {!compact && (
           <div className="mb-4">
@@ -65,20 +78,27 @@ export function AiStatusPanel({ compact = false }) {
           {items.map((item) => {
             const Icon = icons[item.key] || Bot;
             const StateIcon = item.enabled ? CircleCheck : CircleDashed;
+            const localizedLabel = statusLabels[item.key]
+              ? pick(...statusLabels[item.key])
+              : item.label;
 
             return (
               <div
                 key={item.key}
                 className="flex items-center gap-3 rounded-lg border border-white/10 bg-black/20 px-3 py-3"
               >
-                <Icon size={18} className="shrink-0 text-emerald-300" />
+                <Icon size={18} className="shrink-0 text-emerald-300" aria-hidden="true" />
                 <span className="min-w-0 flex-1 text-xs font-semibold text-gray-200">
-                  {item.label}
+                  {localizedLabel}
                 </span>
                 <StateIcon
                   size={16}
                   className={item.enabled ? "text-emerald-300" : "text-gray-500"}
+                  aria-hidden="true"
                 />
+                <span className="sr-only">
+                  {item.enabled ? pick("disponibil", "available") : pick("indisponibil", "unavailable")}
+                </span>
               </div>
             );
           })}

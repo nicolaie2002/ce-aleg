@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { Crown, Plus, Trash2, UserRound, UsersRound } from "lucide-react";
 import { API_URL } from "../config";
@@ -31,6 +31,8 @@ function profileInitials(name) {
 
 export function FamilyProfiles({ compact = false }) {
   const { pick } = useLocale();
+  const newNameId = useId();
+  const colorGroupId = useId();
   const [profiles, setProfiles] = useState([]);
   const [activeProfile, setActiveProfileState] = useState(null);
   const [enabled, setEnabled] = useState(false);
@@ -160,7 +162,11 @@ export function FamilyProfiles({ compact = false }) {
   }
 
   return (
-    <InteractiveSurface className={`ce-family-panel rounded-2xl border p-5 shadow-2xl ${compact ? "" : "md:p-6"}`}>
+    <InteractiveSurface
+      as="section"
+      aria-busy={isLoading || isCreating}
+      className={`ce-family-panel rounded-2xl border p-5 shadow-2xl ${compact ? "" : "md:p-6"}`}
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="flex items-center gap-2 text-sm font-black text-cyan-200">
@@ -179,9 +185,17 @@ export function FamilyProfiles({ compact = false }) {
         </span>
       </div>
 
-      <div className="mt-5 flex gap-3 overflow-x-auto pb-2">
+      <div
+        className="mt-5 flex gap-3 overflow-x-auto pb-2"
+        role="group"
+        aria-label={pick("Alege profilul activ", "Choose the active profile")}
+      >
         {isLoading ? (
-          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-gray-300">
+          <div
+            className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-5 text-sm text-gray-300"
+            role="status"
+            aria-live="polite"
+          >
             {pick("Se încarcă profilurile...", "Loading profiles...")}
           </div>
         ) : (
@@ -194,6 +208,8 @@ export function FamilyProfiles({ compact = false }) {
                 <button
                   type="button"
                   onClick={() => selectProfile(profile)}
+                  aria-pressed={selected}
+                  aria-label={`${profile.name}${selected ? `, ${pick("profil activ", "active profile")}` : ""}`}
                   className={`flex w-28 flex-col items-center gap-3 rounded-2xl border p-3 text-center transition hover:-translate-y-1 ${
                     selected
                       ? "border-cyan-200 bg-cyan-300/12 shadow-[0_0_32px_rgba(103,232,249,.18)]"
@@ -215,8 +231,8 @@ export function FamilyProfiles({ compact = false }) {
                   <button
                     type="button"
                     onClick={() => deleteProfile(profile)}
-                    className="absolute -right-2 -top-2 hidden rounded-full border border-red-300/35 bg-[#180b0b] p-1.5 text-red-200 shadow-xl hover:bg-red-400 hover:text-black group-hover:inline-flex"
-                    aria-label={pick("Șterge profilul", "Delete profile")}
+                    className="absolute -right-1 -top-1 inline-flex h-11 w-11 items-center justify-center rounded-full border border-red-300/35 bg-[#180b0b] text-red-200 opacity-70 shadow-xl hover:bg-red-400 hover:text-black focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+                    aria-label={`${pick("Șterge profilul", "Delete profile")} ${profile.name}`}
                   >
                     <Trash2 size={14} />
                   </button>
@@ -229,7 +245,12 @@ export function FamilyProfiles({ compact = false }) {
 
       {enabled ? (
         <form onSubmit={createProfile} className="mt-4 grid gap-3 rounded-xl border border-white/10 bg-black/18 p-3 md:grid-cols-[minmax(0,1fr)_auto_auto]">
+          <label htmlFor={newNameId} className="sr-only">
+            {pick("Numele membrului nou", "New member name")}
+          </label>
           <input
+            id={newNameId}
+            name="family-profile-name"
             value={newName}
             onChange={(event) => setNewName(event.target.value)}
             disabled={!canAddProfile}
@@ -237,7 +258,10 @@ export function FamilyProfiles({ compact = false }) {
             className="min-h-11 rounded-lg border border-white/10 bg-black/30 px-4 text-white outline-none placeholder:text-gray-500 focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-50"
             maxLength={80}
           />
-          <div className="flex gap-2">
+          <div className="flex gap-2" role="group" aria-labelledby={colorGroupId}>
+            <span id={colorGroupId} className="sr-only">
+              {pick("Culoarea profilului", "Profile color")}
+            </span>
             {COLOR_OPTIONS.map((color) => (
               <button
                 key={color}
@@ -246,7 +270,8 @@ export function FamilyProfiles({ compact = false }) {
                 className={`h-11 w-11 rounded-lg bg-gradient-to-br ${PROFILE_COLORS[color]} ${
                   newColor === color ? "ring-2 ring-white" : "opacity-75 hover:opacity-100"
                 }`}
-                aria-label={color}
+                aria-label={`${pick("Culoare", "Color")}: ${color}`}
+                aria-pressed={newColor === color}
               />
             ))}
           </div>
@@ -279,7 +304,10 @@ export function FamilyProfiles({ compact = false }) {
       )}
 
       {message && (
-        <p className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 p-3 text-sm text-red-100">
+        <p
+          className="mt-3 rounded-lg border border-red-300/30 bg-red-400/10 p-3 text-sm text-red-100"
+          role="alert"
+        >
           {message}
         </p>
       )}

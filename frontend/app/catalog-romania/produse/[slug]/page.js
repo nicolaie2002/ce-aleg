@@ -25,7 +25,7 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const product = getSeoProduct(slug);
 
   if (!product) {
@@ -48,7 +48,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function CatalogProductPage({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const product = getSeoProduct(slug);
 
   if (!product) {

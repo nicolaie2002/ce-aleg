@@ -24,7 +24,7 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const guide = getSeoAlternativeGuide(slug);
 
   if (!guide) {
@@ -47,7 +47,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function AlternativeGuidePage({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const guide = getSeoAlternativeGuide(slug);
 
   if (!guide) {

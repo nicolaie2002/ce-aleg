@@ -1,15 +1,22 @@
+import { withSentryConfig } from "@sentry/nextjs";
+
 const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5001";
 const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 const isProduction = process.env.NODE_ENV === "production";
-let publicApiOrigin = "";
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
 
-try {
-  publicApiOrigin = publicApiUrl.startsWith("http")
-    ? new URL(publicApiUrl).origin
-    : "";
-} catch {
-  publicApiOrigin = "";
+function getHttpOrigin(value) {
+  if (!value?.startsWith("http")) return "";
+
+  try {
+    return new URL(value).origin;
+  } catch {
+    return "";
+  }
 }
+
+const publicApiOrigin = getHttpOrigin(publicApiUrl);
+const sentryOrigin = getHttpOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN || "");
 
 const scriptSources = [
   "'self'",
@@ -44,6 +51,9 @@ const contentSecurityPolicy = [
     "https://region1.google-analytics.com",
     "https://www.googletagmanager.com",
     "https://*.supabase.co",
+    "https://*.ingest.sentry.io",
+    "https://*.ingest.us.sentry.io",
+    sentryOrigin,
     publicApiOrigin,
   ].join(" "),
   "media-src 'self' blob:",
@@ -70,7 +80,6 @@ const nextConfig = {
     "192.168.0.199",
     "192.168.0.200",
     "cealeg-frontend-niko.loca.lt",
-    "*.loca.lt",
   ],
   async redirects() {
     return [
@@ -152,4 +161,22 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: sentryAuthToken,
+  silent: !process.env.CI,
+  widenClientFileUpload: Boolean(sentryAuthToken),
+  sourcemaps: sentryAuthToken
+    ? { deleteSourcemapsAfterUpload: true }
+    : { disable: true },
+  webpack: {
+    automaticVercelMonitors: true,
+    reactComponentAnnotation: {
+      enabled: true,
+    },
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+});

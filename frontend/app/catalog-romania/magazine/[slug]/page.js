@@ -16,7 +16,7 @@ export function generateStaticParams() {
 }
 
 export async function generateMetadata({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const store = getSeoStore(slug);
 
   if (!store) {
@@ -39,7 +39,7 @@ export async function generateMetadata({ params }) {
 }
 
 export default async function CatalogStorePage({ params }) {
-  const { slug } = await params;
+  const { slug } = params;
   const store = getSeoStore(slug);
 
   if (!store) {

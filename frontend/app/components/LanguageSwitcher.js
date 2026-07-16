@@ -9,6 +9,7 @@ export function LanguageSwitcher({ compact = false }) {
   return (
     <div
       className="inline-flex items-center gap-1 rounded-lg border border-white/15 bg-black/25 p-1"
+      role="group"
       aria-label={pick("Selecteaza limba", "Select language")}
       title={pick("Schimba limba", "Change language")}
       suppressHydrationWarning
@@ -19,12 +20,13 @@ export function LanguageSwitcher({ compact = false }) {
           key={option}
           type="button"
           onClick={() => setLocale(option)}
-          className={`rounded-md px-2 py-1 text-xs font-black uppercase ${
+          className={`min-h-9 min-w-9 rounded-md px-2 py-1 text-xs font-black uppercase ${
             locale === option
               ? "bg-emerald-400 text-black"
               : "text-gray-300 hover:bg-white/10 hover:text-white"
           }`}
           aria-pressed={locale === option}
+          aria-label={option === "ro" ? "Română" : "English"}
           suppressHydrationWarning
         >
           {option}

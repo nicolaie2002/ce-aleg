@@ -1,0 +1,61 @@
+name: Frontend tests
+
+on:
+  workflow_call:
+    secrets:
+      CODECOV_TOKEN:
+        required: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Node 22 quality, tests, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm exec -- tsc --noEmit
+
+      - name: Run frontend tests
+        run: npm run test:ci -- --runInBand --passWithNoTests
+
+      - name: Upload frontend coverage
+        if: ${{ !cancelled() && env.CODECOV_TOKEN != '' && hashFiles('frontend/coverage/lcov.info') != '' }}
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: frontend/coverage/lcov.info
+          flags: frontend
+          fail_ci_if_error: false
+
+      - name: Build production bundle
+        env:
+          BACKEND_URL: http://127.0.0.1:5001
+          NEXT_PUBLIC_API_URL: /api/backend
+        run: npm run build

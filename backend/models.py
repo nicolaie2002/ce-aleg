@@ -17,6 +17,17 @@ class User(db.Model):
     referred_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True)
     bonus_unlimited_until = db.Column(db.DateTime, nullable=True)
     bonus_scan_credits = db.Column(db.Integer, default=0, nullable=False)
+    auth_version = db.Column(db.Integer, default=0, nullable=False)
+    processing_restricted = db.Column(db.Boolean, default=False, nullable=False)
+    processing_restricted_at = db.Column(db.DateTime, nullable=True)
+    processing_restriction_reason = db.Column(db.String(500), nullable=True)
+    terms_version = db.Column(db.String(30), nullable=True)
+    terms_accepted_at = db.Column(db.DateTime, nullable=True)
+    age_confirmed_at = db.Column(db.DateTime, nullable=True)
+    analytics_consent = db.Column(db.Boolean, nullable=True)
+    analytics_consent_at = db.Column(db.DateTime, nullable=True)
+    processing_restricted = db.Column(db.Boolean, default=False, nullable=False)
+    processing_restricted_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -220,7 +231,37 @@ class UsageEvent(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     event_type = db.Column(db.String(40), nullable=False, index=True)
     source = db.Column(db.String(40), nullable=True)
+    idempotency_key = db.Column(db.String(180), nullable=True, unique=True, index=True)
     metadata_json = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
 
     user = db.relationship("User", backref="usage_events")
+
+
+class StripeWebhookEvent(db.Model):
+    __tablename__ = "stripe_webhook_events"
+
+    id = db.Column(db.Integer, primary_key=True)
+    provider_event_id = db.Column(db.String(180), nullable=False, unique=True, index=True)
+    event_type = db.Column(db.String(100), nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="processing", index=True)
+    attempts = db.Column(db.Integer, nullable=False, default=1)
+    last_error = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    processed_at = db.Column(db.DateTime, nullable=True)
+
+
+class ConsentRecord(db.Model):
+    __tablename__ = "consent_records"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    consent_type = db.Column(db.String(80), nullable=False, index=True)
+    granted = db.Column(db.Boolean, nullable=False)
+    policy_version = db.Column(db.String(40), nullable=False)
+    source = db.Column(db.String(80), nullable=False, default="web")
+    request_identity_hash = db.Column(db.String(64), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    user = db.relationship("User", backref="consent_records")

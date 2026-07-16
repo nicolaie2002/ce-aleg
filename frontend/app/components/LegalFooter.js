@@ -35,11 +35,15 @@ export function LegalFooter() {
       <div className="ce-shell py-10">
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
           <div className="max-w-xl">
-            <Link href="/" className="inline-flex items-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-3"
+              aria-label={pick("Ce aleg? - Pagina principală", "Ce aleg? - Home")}
+            >
               <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl shadow-[0_0_30px_rgba(52,211,153,.22)]">
                 <Image
                   src="/icon.png"
-                  alt="Ce aleg?"
+                  alt=""
                   width={96}
                   height={96}
                   className="h-full w-full object-cover"
@@ -70,7 +74,7 @@ export function LegalFooter() {
             </h2>
             <div className="mt-4 space-y-3">
               {productLinks.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={href} className="flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white">
+                <Link key={href} href={href} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white">
                   <Icon size={15} className="text-cyan-200" />
                   {label}
                 </Link>
@@ -84,7 +88,7 @@ export function LegalFooter() {
             </h2>
             <div className="mt-4 space-y-3">
               {accountLinks.map(({ href, label, icon: Icon }) => (
-                <Link key={href} href={href} className="flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white">
+                <Link key={href} href={href} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white">
                   <Icon size={15} className="text-cyan-200" />
                   {label}
                 </Link>
@@ -98,7 +102,7 @@ export function LegalFooter() {
             </h2>
             <a
               href="mailto:contact@cealeg.shop"
-              className="mt-4 flex items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white"
+              className="mt-4 flex min-h-11 items-center gap-2 text-sm font-semibold text-gray-300 hover:text-white"
             >
               <Mail size={15} className="text-cyan-200" />
               contact@cealeg.shop

@@ -1,7 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, MailCheck } from "lucide-react";
 import { API_URL } from "../config";
@@ -9,27 +8,43 @@ import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
 import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
+import {
+  storeAuthenticatedUser,
+  useConsumedAuthToken,
+} from "../utils/authStorage";
 
 function VerifyEmailContent() {
   const { pick } = useLocale();
-  const searchParams = useSearchParams();
-  const token = searchParams.get("token") || "";
+  const token = useConsumedAuthToken();
+  const verificationRequestRef = useRef(null);
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState(
-    pick("Confirmam emailul...", "Confirming your email...")
+    pick("Confirmăm emailul...", "Confirming your email...")
   );
 
   useEffect(() => {
     let isMounted = true;
+    let redirectTimer = null;
 
-    async function verifyEmail() {
-      if (!token) {
+    if (token === null) {
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    if (!token) {
+      queueMicrotask(() => {
+        if (!isMounted) return;
         setStatus("error");
         setMessage(pick("Linkul de confirmare lipsește.", "The confirmation link is missing."));
-        return;
-      }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
 
-      try {
+    if (!verificationRequestRef.current) {
+      verificationRequestRef.current = (async () => {
         const response = await fetch(`${API_URL}/auth/verify-email`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -38,32 +53,52 @@ function VerifyEmailContent() {
         const data = await readApiJson(response);
 
         if (!response.ok) {
-          throw new Error(getApiErrorMessage(data, pick, "Emailul nu a putut fi confirmat.", "The email could not be confirmed."));
+          throw new Error(getApiErrorMessage(
+            data,
+            pick,
+            "Emailul nu a putut fi confirmat.",
+            "The email could not be confirmed."
+          ));
         }
 
-        localStorage.setItem("cealeg_user", JSON.stringify(data.user));
+        storeAuthenticatedUser(data.user);
         if (data.emailStatus) {
           localStorage.setItem("cealeg_email_status", JSON.stringify(data.emailStatus));
         }
 
+        return data;
+      })();
+    }
+
+    verificationRequestRef.current
+      .then((data) => {
         if (!isMounted) return;
+
         setStatus("success");
-        setMessage(data.message ? localizeApiMessage(data.message, pick) : pick("Email confirmat.", "Email confirmed."));
-        window.setTimeout(() => {
+        setMessage(
+          data.message
+            ? localizeApiMessage(data.message, pick)
+            : pick("Email confirmat.", "Email confirmed.")
+        );
+        redirectTimer = window.setTimeout(() => {
           const onboardingDone = localStorage.getItem("cealeg_onboarding_completed") === "1";
           window.location.assign(onboardingDone ? "/dashboard" : "/onboarding");
         }, 900);
-      } catch (error) {
+      })
+      .catch((error) => {
         if (!isMounted) return;
         setStatus("error");
-        setMessage(error.message || pick("Emailul nu a putut fi confirmat.", "The email could not be confirmed."));
-      }
-    }
-
-    void verifyEmail();
+        setMessage(
+          error.message || pick(
+            "Emailul nu a putut fi confirmat.",
+            "The email could not be confirmed."
+          )
+        );
+      });
 
     return () => {
       isMounted = false;
+      if (redirectTimer) window.clearTimeout(redirectTimer);
     };
   }, [pick, token]);
 
@@ -97,7 +132,7 @@ function VerifyEmailContent() {
               ? pick("Cont activat.", "Account activated.")
               : isError
                 ? pick("Nu am putut confirma emailul.", "We could not confirm the email.")
-                : pick("Se verifica linkul.", "Checking the link.")}
+                : pick("Se verifică linkul.", "Checking the link.")}
           </h1>
           <p className="mt-4 max-w-xl leading-7 text-gray-300">{message}</p>
 
@@ -122,9 +157,5 @@ function VerifyEmailContent() {
 }
 
 export default function VerifyEmailPage() {
-  return (
-    <Suspense fallback={null}>
-      <VerifyEmailContent />
-    </Suspense>
-  );
+  return <VerifyEmailContent />;
 }
