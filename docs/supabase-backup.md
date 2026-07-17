@@ -1,75 +1,90 @@
 # Backup Supabase pentru Ce aleg?
 
-Ultima actualizare: 4 iulie 2026
+Ultima actualizare: 17 iulie 2026
 
-Scop: să avem o copie recuperabilă a bazei de date dacă se strică o migrare, se șterg date greșit sau apare o problemă la provider.
+## Strategie fara cost suplimentar
 
-## Ce trebuie salvat
+Supabase recomanda proiectelor Free sa exporte regulat datele. Backupul automat al
+bazei nu include obiectele din Storage, de aceea jobul nostru salveaza separat:
 
-- baza Postgres: utilizatori, produse, coșuri, favorite, istoric, abonamente, misiuni, CeCoins
-- fișierele din Supabase Storage: imagini produse și contribuții
-- variabilele de mediu: nu se pun în Git; se păstrează separat, într-un manager de parole
+- un dump logic PostgreSQL in format custom;
+- obiectele din `product-images` si `product-submissions`;
+- manifestul dumpului si checksum SHA-256 pentru fiecare fisier;
+- o arhiva criptata AES-256, pastrata ca artifact privat GitHub timp de 30 zile.
 
-## Recomandare
+Workflow-ul este `.github/workflows/backup.yml` si ruleaza zilnic la 02:17 UTC.
+Foloseste numai GitHub Actions si exporturile Supabase disponibile pe planul Free.
+Nu activam PITR sau add-on-uri platite.
 
-- Dacă planul Supabase permite backup/PITR, activează backup-ul din dashboard.
-- Chiar dacă există backup la provider, fă export manual înainte de modificări mari: migrare, import masiv, schimbări la abonamente sau gamification.
-- Păstrează minimum 3 copii recente: ultima zi, ultima săptămână, ultima lună.
+## Secrete GitHub necesare
 
-## Export manual Postgres pe Windows
+- `BACKUP_DATABASE_URL`: conexiune directa sau session pooler, nu transaction pooler;
+- `SUPABASE_URL`;
+- `SUPABASE_SERVICE_ROLE_KEY`;
+- `BACKUP_ENCRYPTION_KEY`: parola lunga, diferita de celelalte secrete.
 
-Rulează din PowerShell, cu `DATABASE_URL` setat în sesiune. Nu lipi cheia în Git sau în screenshot-uri publice.
+Valorile se configureaza in GitHub Actions Secrets si nu se pun in repository,
+loguri, issue-uri sau capturi de ecran.
 
-```powershell
-cd D:\proiecte\ce_aleg
-New-Item -ItemType Directory -Force backups
-$stamp = Get-Date -Format "yyyyMMdd-HHmm"
-pg_dump "$env:DATABASE_URL" --format=custom --no-owner --no-acl --file "backups\cealeg-$stamp.dump"
+## Crearea payloadului
+
+Workflow-ul apeleaza:
+
+```bash
+bash scripts/backup-supabase.sh backup
 ```
 
-Dacă `pg_dump` nu există, instalează PostgreSQL client tools sau folosește terminalul oferit de provider.
+Scriptul refuza sa suprascrie un dump existent. Foloseste clientul PostgreSQL
+local sau, in GitHub Actions, imaginea gratuita `postgres:17-alpine`.
 
-## Verificare backup
+## Validare si restaurare
 
-Un backup care nu poate fi restaurat nu este backup. Testează periodic restaurarea într-o bază separată, niciodată peste producție.
+Descarca arhiva si fisierul `.sha256` dintr-un run reusit. Verifica mai intai
+checksumul arhivei, apoi ruleaza validarea fara scrieri:
 
-```powershell
-pg_restore --list "backups\cealeg-YYYYMMDD-HHMM.dump" | Select-Object -First 20
+```bash
+sha256sum --check cealeg-backup.tar.gz.enc.sha256
+export BACKUP_ENCRYPTION_KEY='valoarea-din-managerul-de-parole'
+bash scripts/restore-supabase.sh cealeg-backup.tar.gz.enc
 ```
 
-## Restaurare într-o bază de test
+Dry-run-ul decripteaza intr-un director temporar, blocheaza cai periculoase,
+verifica toate checksumurile si inspecteaza dumpul cu `pg_restore --list`.
 
-```powershell
-createdb cealeg_restore_test
-pg_restore --dbname cealeg_restore_test --no-owner --no-acl "backups\cealeg-YYYYMMDD-HHMM.dump"
+Aplicarea este permisa numai pe o baza separata si necesita toate garzile:
+
+```bash
+export RESTORE_TEST_DATABASE_URL='postgresql://...baza-de-test...'
+export RESTORE_TARGET_LABEL='quarterly-restore-test'
+export RESTORE_CONFIRM_DISPOSABLE_TARGET='YES_I_UNDERSTAND'
+bash scripts/restore-supabase.sh cealeg-backup.tar.gz.enc --apply
 ```
 
-## Supabase Storage
+Pentru Storage pe proiectul de test se adauga
+`RESTORE_SUPABASE_URL` si `RESTORE_SUPABASE_SERVICE_ROLE_KEY`. Scriptul refuza
+o adresa de restaurare identica cu `DATABASE_URL` sau `BACKUP_DATABASE_URL`.
 
-Pentru imaginile din bucket-uri:
+## Frecventa verificarii
 
-- `product-images`
-- `product-submissions`
+- zilnic: confirma ca workflow-ul s-a terminat cu succes;
+- lunar: valideaza o arhiva prin dry-run;
+- trimestrial: restaureaza intr-un proiect/baza disposable si ruleaza smoke tests;
+- inainte de importuri sau migrari mari: confirma un backup recent.
 
-Exportă periodic fișierele prin dashboard, CLI sau script separat. Nu șterge imaginile vechi până nu confirmi că produsele încă au imagini valide.
+Un artifact existent nu dovedeste recuperarea. Dovada finala este un restore drill
+reusit, consemnat privat cu run ID, data, durata si rezultatele verificarilor.
 
-## Când facem backup obligatoriu
+## Limite importante
 
-- înainte de importuri mari de produse
-- înainte de modificări la schema bazei de date
-- înainte de schimbări la Stripe/webhook/subscription logic
-- înainte de ștergeri sau curățări automate
-- înainte de lansări majore de funcții
+- artifactele GitHub sunt separate de Supabase, dar au cote de stocare; verifica
+  periodic ca jobul nu a fost oprit de cota planului gratuit;
+- stergerea proiectului Supabase este ireversibila si poate elimina backupurile
+  pastrate de provider;
+- rolurile/parolele custom si anumite setari trebuie verificate separat dupa restore;
+- fisierele decriptate contin date personale si trebuie sterse dupa test.
 
-## Note de securitate
+Referinte oficiale:
 
-- Backup-urile pot conține date personale; nu le urca pe GitHub.
-- Păstrează backup-urile local criptat sau într-un storage securizat.
-- Accesul la backup-uri trebuie limitat doar la administrator.
-- Dacă un backup ajunge public accidental, tratează situația ca incident de securitate.
-
-## Referințe utile
-
-- Supabase database backups: https://supabase.com/docs/guides/platform/backups
-- Supabase CLI: https://supabase.com/docs/reference/cli/introduction
-- PostgreSQL pg_dump: https://www.postgresql.org/docs/current/app-pgdump.html
+- <https://supabase.com/docs/guides/platform/backups>
+- <https://supabase.com/docs/reference/cli/supabase-db-dump>
+- <https://www.postgresql.org/docs/current/app-pgdump.html>

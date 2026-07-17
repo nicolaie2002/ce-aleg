@@ -325,3 +325,47 @@ def test_swagger_ui_escapes_title_and_serializes_spec_url():
     assert "&lt;Ce aleg?&gt;" in document
     assert 'url:"/api/openapi.json?value=\\"quoted\\""' in document
     assert "SwaggerUIBundle" in document
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "expected_field"),
+    [
+        (
+            "/register",
+            {
+                "name": "",
+                "email": "invalid",
+                "password": "short",
+                "ageConfirmed": False,
+                "acceptedTerms": False,
+            },
+            "name",
+        ),
+        (
+            "/support/contact",
+            {"email": "invalid", "message": "short"},
+            "message",
+        ),
+    ],
+)
+def test_public_routes_return_the_common_structured_validation_error(
+    client, path, payload, expected_field
+):
+    response = client.post(path, json=payload)
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert body["code"] == "validation_error"
+    assert isinstance(body["errors"], list)
+    assert expected_field in {issue["field"] for issue in body["errors"]}
+    assert all({"field", "code", "message"} <= set(issue) for issue in body["errors"])
+
+
+def test_query_validation_and_authentication_order_are_consistent(client):
+    missing_query = client.get("/products/search")
+    signed_out_checkout = client.post("/billing/checkout", json={"plan": "invalid"})
+
+    assert missing_query.status_code == 400
+    assert missing_query.get_json()["code"] == "validation_error"
+    assert signed_out_checkout.status_code == 401
+    assert signed_out_checkout.get_json()["code"] == "auth_required"

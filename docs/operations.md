@@ -24,11 +24,16 @@ inseamna ca aceasta este activa; starea se confirma in mediul de productie.
 
 ## Fise de incident
 
+- [Raspuns general la incident](runbooks/incident-response.md)
 - [Deploy esuat](runbooks/deploy-failure.md)
 - [Indisponibilitate baza de date sau Supabase](runbooks/database-supabase-outage.md)
+- [Restaurare baza de date si Storage](runbooks/database-restore.md)
 - [Stripe Checkout si webhook](runbooks/stripe-webhook.md)
+- [Esec Stripe webhook](runbooks/stripe-webhook-failure.md)
 - [Livrare email](runbooks/email-delivery.md)
 - [Import si calitate catalog](runbooks/catalog-import.md)
+- [Calitatea catalogului degradata](runbooks/catalog-quality-degraded.md)
+- [Rate limit depasit](runbooks/rate-limit-exceeded.md)
 - [Incident de securitate](runbooks/security-incident.md)
 - [Rollback](runbooks/rollback.md)
 

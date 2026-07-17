@@ -30,7 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict, deque
 from functools import wraps
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 try:
@@ -53,8 +53,12 @@ except ImportError:
 from database import db
 from app_factory import create_app
 from ai_provider import get_vision_provider, VisionProviderError, VisionProviderNotConfigured
+from api_docs import build_openapi_spec, render_swagger_ui
 from catalog_quality import build_catalog_quality_report
 from config import DEFAULT_AUTH_SECRET, RuntimeConfig, read_secret_env
+from time_utils import utcnow
+from routes import register_blueprints, route
+from validation import validate_payload
 from models import (
     User,
     Product,
@@ -330,7 +334,7 @@ if SENTRY_DSN and sentry_sdk is not None:
 class JsonLogFormatter(logging.Formatter):
     def format(self, record):
         payload = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": utcnow().isoformat() + "Z",
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
@@ -1831,7 +1835,7 @@ def product_correction_email_recently_sent(user_id, product, cooldown_days=14):
     if not user_id or not product:
         return True
 
-    since = datetime.utcnow() - timedelta(days=cooldown_days)
+    since = utcnow() - timedelta(days=cooldown_days)
     product_id = product.id
     product_barcode = str(product.barcode or "").strip()
     recent_events = (
@@ -1863,7 +1867,7 @@ def collect_product_correction_recipients(product, limit=25):
         return []
 
     recipients = {}
-    since = datetime.utcnow() - timedelta(days=120)
+    since = utcnow() - timedelta(days=120)
     report_events = (
         UsageEvent.query
         .filter(
@@ -2020,7 +2024,7 @@ def send_subscription_checkout_email_once(user, plan, session, subscription=None
                 "sessionId": session_id,
                 "plan": plan,
                 "sent": bool(sent),
-                "sentAt": datetime.utcnow().isoformat() + "Z",
+                "sentAt": utcnow().isoformat() + "Z",
             }),
         )
     )
@@ -2107,7 +2111,7 @@ def cancel_subscription_before_account_deletion(user):
             stripe.Subscription.delete(subscription.provider_subscription_id)
 
         subscription.status = "canceled"
-        subscription.updated_at = datetime.utcnow()
+        subscription.updated_at = utcnow()
         return True, None
     except Exception as error:
         app.logger.warning("Stripe subscription cancel before account deletion failed: %s", error)
@@ -2180,7 +2184,7 @@ def find_inviter_by_code(code):
 
 
 def bonus_unlimited_is_active(user, now=None):
-    now = now or datetime.utcnow()
+    now = now or utcnow()
     return bool(user.bonus_unlimited_until and user.bonus_unlimited_until > now)
 
 
@@ -2188,7 +2192,7 @@ def extend_bonus_unlimited(user, days=INVITE_BONUS_DAYS, source="invite", metada
     if not user or days <= 0:
         return
 
-    now = datetime.utcnow()
+    now = utcnow()
     current_end = user.bonus_unlimited_until if bonus_unlimited_is_active(user, now) else now
     user.bonus_unlimited_until = current_end + timedelta(days=days)
     db.session.add(
@@ -2291,7 +2295,7 @@ def auto_claim_catalog_submission_reward(user, submission, product=None, duplica
                 "daily": True,
                 "current": 1,
                 "target": 1,
-                "claimedAt": datetime.utcnow().isoformat() + "Z",
+                "claimedAt": utcnow().isoformat() + "Z",
                 "dayStart": day_start.isoformat() + "Z",
                 "autoClaimed": True,
                 "submissionId": submission.id,
@@ -2350,7 +2354,7 @@ def apply_referral_bonus_after_verification(user):
             metadata_json=json.dumps({
                 "coins": 100,
                 "invitedUserId": user.id,
-                "awardedAt": datetime.utcnow().isoformat() + "Z",
+                "awardedAt": utcnow().isoformat() + "Z",
             }),
         )
     )
@@ -2417,7 +2421,7 @@ def is_subscription_period_active(subscription):
     if subscription.status not in {"active", "trialing", "past_due"}:
         return False
 
-    if subscription.current_period_end and subscription.current_period_end <= datetime.utcnow():
+    if subscription.current_period_end and subscription.current_period_end <= utcnow():
         return False
 
     return True
@@ -2850,13 +2854,13 @@ def get_publication_readiness():
 
 
 def get_week_start(reference=None):
-    reference = reference or datetime.utcnow()
+    reference = reference or utcnow()
     start = reference - timedelta(days=reference.weekday())
     return start.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def get_day_start(reference=None):
-    reference = reference or datetime.utcnow()
+    reference = reference or utcnow()
     return reference.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -2865,7 +2869,7 @@ def get_next_day_start(reference=None):
 
 
 def get_month_start(reference=None):
-    reference = reference or datetime.utcnow()
+    reference = reference or utcnow()
     return reference.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
@@ -2988,7 +2992,7 @@ def clear_stale_stripe_customer(subscription):
         subscription.id,
     )
     subscription.provider_customer_id = None
-    subscription.updated_at = datetime.utcnow()
+    subscription.updated_at = utcnow()
     db.session.commit()
 
 
@@ -3065,7 +3069,7 @@ def datetime_from_unix(timestamp):
         return None
 
     try:
-        return datetime.utcfromtimestamp(int(timestamp))
+        return datetime.fromtimestamp(int(timestamp), timezone.utc).replace(tzinfo=None)
     except (TypeError, ValueError, OSError):
         return None
 
@@ -3099,7 +3103,7 @@ def update_local_subscription_from_stripe(
     )
     subscription.current_period_start = current_period_start
     subscription.current_period_end = current_period_end
-    subscription.updated_at = datetime.utcnow()
+    subscription.updated_at = utcnow()
     db.session.commit()
     return subscription
 
@@ -3385,7 +3389,7 @@ def handle_stripe_cecoin_checkout_completed(session):
         ):
             subscription.provider = "stripe"
             subscription.provider_customer_id = customer_id
-            subscription.updated_at = datetime.utcnow()
+            subscription.updated_at = utcnow()
 
     db.session.add(
         UsageEvent(
@@ -3780,7 +3784,7 @@ def calculate_scan_streak_days(user_id, since=None):
     if not scan_dates:
         return 0
 
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     yesterday = today - timedelta(days=1)
 
     if today in scan_dates:
@@ -3955,7 +3959,7 @@ def get_bulk_user_gamification_metrics(user_ids, since=None):
         if scan_day and user_id in scan_dates_by_user:
             scan_dates_by_user[user_id].add(scan_day)
 
-    today = datetime.utcnow().date()
+    today = utcnow().date()
     yesterday = today - timedelta(days=1)
 
     for user_id, metrics in metrics_by_user.items():
@@ -4413,7 +4417,7 @@ def build_mission_nudge_items(user, limit=3, min_progress=60):
 
 
 def mission_digest_was_recently_sent(user_id, cooldown_days=MISSION_DIGEST_COOLDOWN_DAYS):
-    since = datetime.utcnow() - timedelta(days=max(1, int(cooldown_days or 1)))
+    since = utcnow() - timedelta(days=max(1, int(cooldown_days or 1)))
     return bool(
         UsageEvent.query.filter(
             UsageEvent.user_id == user_id,
@@ -4509,7 +4513,7 @@ def build_mission_digest_batch(limit=100, apply_changes=False):
                     {
                         "missionIds": [item["id"] for item in nudges],
                         "topProgress": nudges[0]["progress"],
-                        "sentAt": datetime.utcnow().isoformat() + "Z",
+                        "sentAt": utcnow().isoformat() + "Z",
                     },
                     commit=False,
                 )
@@ -4803,6 +4807,10 @@ ITEM_OWNER_MODELS = {
 }
 
 
+def endpoint_name(value):
+    return str(value or "").rsplit(".", 1)[-1]
+
+
 @app.before_request
 def enforce_access_controls():
     g.request_id = get_request_id()
@@ -4810,7 +4818,7 @@ def enforce_access_controls():
 
     if sentry_sdk is not None and SENTRY_DSN:
         sentry_sdk.set_tag("request_id", g.request_id)
-    endpoint = request.endpoint
+    endpoint = endpoint_name(request.endpoint)
 
     if not endpoint or endpoint == "static":
         return None
@@ -4886,7 +4894,7 @@ def enforce_access_controls():
     )
 
     if not needs_auth:
-        return None
+        return validate_endpoint_input(endpoint)
 
     user = get_current_user()
 
@@ -4953,12 +4961,12 @@ def enforce_access_controls():
         if user_id and not require_same_user(user_id):
             return jsonify({"error": "Nu poți trimite produse pentru alt cont."}), 403
 
-    return None
+    return validate_endpoint_input(endpoint)
 
 
 @app.after_request
 def add_security_headers(response):
-    endpoint = request.endpoint
+    endpoint = endpoint_name(request.endpoint)
     is_sensitive_response = (
         endpoint in AUTH_ENDPOINTS
         or endpoint in ADMIN_ENDPOINTS
@@ -5428,8 +5436,56 @@ RESTRICTED_PROCESSING_ENDPOINTS = {
     "report_product_issue",
 }
 
+REQUEST_VALIDATOR_RULES = {
+    "register": ("register", "json"),
+    "login": ("login", "json"),
+    "verify_email": ("token", "json"),
+    "resend_email_verification": ("email", "json"),
+    "forgot_password": ("email", "json"),
+    "reset_password": ("reset_password", "json"),
+    "start_checkout": ("subscription_checkout", "json"),
+    "start_cecoin_checkout": ("cecoin_checkout", "json"),
+    "sync_cecoin_checkout_session": ("checkout_sync", "json"),
+    "track_analytics_event": ("analytics", "json"),
+    "contact_support": ("support", "json"),
+    "report_alternative_issue": ("alternative_feedback", "json"),
+    "report_product_issue": ("product_feedback", "json"),
+    "search_products": ("product_search", "query"),
+    "import_barcode_product": ("barcode_import", "json"),
+    "get_open_food_facts_alternatives": ("alternatives", "json"),
+    "analyze_product": ("analysis", "form"),
+    "add_product_submission": ("product_submission", "form"),
+}
 
-@app.route("/analytics/event", methods=["POST"])
+
+def validate_endpoint_input(endpoint):
+    rule = REQUEST_VALIDATOR_RULES.get(endpoint)
+
+    if not rule:
+        return None
+
+    validator_name, source = rule
+    if source == "query":
+        raw_data = request.args.to_dict(flat=True)
+    elif source == "form":
+        raw_data = request.form.to_dict(flat=True)
+    else:
+        raw_data = request.get_json(silent=True)
+
+    options = {}
+    if validator_name in {"register", "reset_password"}:
+        options["password_min_length"] = PASSWORD_MIN_LENGTH
+
+    result = validate_payload(validator_name, raw_data, **options)
+
+    if not result.ok:
+        return jsonify(result.error_payload()), 400
+
+    g.validated_data = result.data
+    return None
+
+
+@route("/analytics/event", methods=["POST"])
 def track_analytics_event():
     data = request.get_json(silent=True) or {}
     event_name = str(data.get("name") or "").strip().lower().replace(" ", "_")
@@ -5460,7 +5516,7 @@ def track_analytics_event():
     return jsonify({"ok": True})
 
 
-@app.route("/feedback/alternative", methods=["POST"])
+@route("/feedback/alternative", methods=["POST"])
 def report_alternative_issue():
     user = g.current_user
     data = request.get_json(silent=True) or {}
@@ -5541,7 +5597,7 @@ PRODUCT_REPORT_REASONS = {
 }
 
 
-@app.route("/feedback/product", methods=["POST"])
+@route("/feedback/product", methods=["POST"])
 def report_product_issue():
     user = g.current_user
     data = request.get_json(silent=True) or {}
@@ -5608,7 +5664,7 @@ def report_product_issue():
     })
 
 
-@app.route("/support/contact", methods=["POST"])
+@route("/support/contact", methods=["POST"])
 def contact_support():
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
@@ -7636,7 +7692,7 @@ def ensure_invite_codes_for_existing_users():
 # Main routes
 # =========================
 
-@app.route("/", methods=["GET"])
+@route("/", methods=["GET"])
 def home():
     return jsonify({
         "message": "Backend Ce Aleg funcționează.",
@@ -7644,7 +7700,7 @@ def home():
     })
 
 
-@app.route("/health", methods=["GET"])
+@route("/health", methods=["GET"])
 def health():
     return jsonify({
         "ok": True,
@@ -7652,7 +7708,7 @@ def health():
     })
 
 
-@app.route("/version", methods=["GET"])
+@route("/version", methods=["GET"])
 def get_version():
     return jsonify({
         "ok": True,
@@ -7679,29 +7735,80 @@ def flask_rule_to_openapi(rule):
     return path, parameters
 
 
-@app.route("/openapi.json", methods=["GET"])
-@app.route("/api/openapi.json", methods=["GET"])
+@route("/openapi.json", methods=["GET"])
+@route("/api/openapi.json", methods=["GET"])
 def get_openapi_spec():
-    paths = {}
+    version = get_application_version()["shortCommit"]
+    document = build_openapi_spec(
+        server_url=request.host_url.rstrip("/"),
+        version=version,
+        contact_email=CONTACT_EMAIL,
+        auth_cookie_name=AUTH_COOKIE_NAME,
+        password_min_length=PASSWORD_MIN_LENGTH,
+    )
+    paths = document["paths"]
+    operation_ids = {
+        operation.get("operationId")
+        for path_item in paths.values()
+        for operation in path_item.values()
+        if isinstance(operation, dict) and operation.get("operationId")
+    }
 
     for rule in app.url_map.iter_rules():
         if rule.endpoint == "static":
             continue
 
+        normalized_endpoint = endpoint_name(rule.endpoint)
         path, parameters = flask_rule_to_openapi(rule.rule)
         operations = paths.setdefault(path, {})
 
         for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
-            requires_admin = rule.endpoint in ADMIN_ENDPOINTS
-            requires_auth = requires_admin or rule.endpoint in AUTH_ENDPOINTS or rule.endpoint in USER_PATH_ENDPOINTS
+            method_name = method.lower()
+
+            if method_name in operations:
+                continue
+
+            requires_admin = normalized_endpoint in ADMIN_ENDPOINTS
+            requires_auth = (
+                requires_admin
+                or normalized_endpoint in AUTH_ENDPOINTS
+                or normalized_endpoint in USER_PATH_ENDPOINTS
+            )
+            operation_id = f"{normalized_endpoint}_{method_name}"
+
+            if operation_id in operation_ids:
+                path_suffix = re.sub(r"[^A-Za-z0-9]+", "_", path).strip("_")
+                operation_id = f"{operation_id}_{path_suffix or 'root'}"
+
+            suffix = 2
+            unique_operation_id = operation_id
+            while unique_operation_id in operation_ids:
+                unique_operation_id = f"{operation_id}_{suffix}"
+                suffix += 1
+            operation_ids.add(unique_operation_id)
+
             operation = {
-                "operationId": rule.endpoint,
-                "summary": rule.endpoint.replace("_", " ").capitalize(),
+                "operationId": unique_operation_id,
+                "summary": normalized_endpoint.replace("_", " ").capitalize(),
                 "parameters": parameters,
                 "responses": {
                     "200": {"description": "Successful response"},
-                    "400": {"description": "Invalid request"},
-                    "500": {"description": "Internal server error"},
+                    "400": {
+                        "description": "Invalid request",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Error"}
+                            }
+                        },
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Error"}
+                            }
+                        },
+                    },
                 },
             }
 
@@ -7712,50 +7819,27 @@ def get_openapi_spec():
             if requires_admin:
                 operation["responses"]["403"] = {"description": "Administrator access required"}
 
-            operations[method.lower()] = operation
+            operations[method_name] = operation
 
-    return jsonify({
-        "openapi": "3.1.0",
-        "info": {
-            "title": "Ce aleg? API",
-            "version": get_application_version()["shortCommit"],
-            "description": "Production API contract for the Ce aleg? web application.",
-            "contact": {"email": CONTACT_EMAIL},
-        },
-        "servers": [{"url": request.host_url.rstrip("/")}],
-        "paths": paths,
-        "components": {
-            "securitySchemes": {
-                "sessionCookie": {
-                    "type": "apiKey",
-                    "in": "cookie",
-                    "name": AUTH_COOKIE_NAME,
-                },
-            },
-        },
-    })
+    return jsonify(document)
 
 
-@app.route("/docs", methods=["GET"])
-@app.route("/api/docs", methods=["GET"])
+@route("/docs", methods=["GET"])
+@route("/api/docs", methods=["GET"])
 def api_docs():
     spec_url = "/api/openapi.json" if request.path.startswith("/api/") else "/openapi.json"
     return Response(
-        f"""<!doctype html>
-<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
-<title>Ce aleg? API</title><link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\"></head>
-<body><div id=\"swagger-ui\"></div><script src=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js\"></script>
-<script>SwaggerUIBundle({{url:{json.dumps(spec_url)},dom_id:'#swagger-ui',deepLinking:true}});</script></body></html>""",
+        render_swagger_ui(spec_url),
         mimetype="text/html",
     )
 
 
-@app.route("/readiness", methods=["GET"])
+@route("/readiness", methods=["GET"])
 def get_readiness():
     return jsonify(get_publication_readiness())
 
 
-@app.route("/admin/email-test", methods=["POST"])
+@route("/admin/email-test", methods=["POST"])
 def send_admin_email_test():
     data = request.get_json(silent=True) or {}
     diagnostics = get_email_configuration_diagnostics()
@@ -7851,7 +7935,7 @@ def send_admin_email_test():
     })
 
 
-@app.route("/admin/users/resend-verification", methods=["POST"])
+@route("/admin/users/resend-verification", methods=["POST"])
 def admin_resend_email_verification():
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
@@ -7906,7 +7990,7 @@ def admin_resend_email_verification():
             "targetUserId": user.id,
             "targetEmail": user.email,
             "provider": EMAIL_PROVIDER,
-            "sentAt": datetime.utcnow().isoformat() + "Z",
+            "sentAt": utcnow().isoformat() + "Z",
         },
         commit=True,
     )
@@ -7924,7 +8008,7 @@ def admin_resend_email_verification():
     })
 
 
-@app.route("/ai/status", methods=["GET"])
+@route("/ai/status", methods=["GET"])
 def get_ai_status():
     now = time.time()
 
@@ -7977,7 +8061,7 @@ def get_ai_status():
     return jsonify(status_data)
 
 
-@app.route("/init-db", methods=["GET"])
+@route("/init-db", methods=["GET"])
 def init_db():
     db.create_all()
     ensure_database_columns()
@@ -7993,7 +8077,7 @@ def init_db():
 # Auth
 # =========================
 
-@app.route("/register", methods=["POST"])
+@route("/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
 
@@ -8048,8 +8132,8 @@ def register():
         email_verified_at=None,
         referred_by_user_id=inviter.id if inviter else None,
         terms_version=TERMS_VERSION,
-        terms_accepted_at=datetime.utcnow(),
-        age_confirmed_at=datetime.utcnow(),
+        terms_accepted_at=utcnow(),
+        age_confirmed_at=utcnow(),
     )
 
     db.session.add(new_user)
@@ -8076,7 +8160,7 @@ def register():
     return response, 201
 
 
-@app.route("/auth/verify-email", methods=["POST"])
+@route("/auth/verify-email", methods=["POST"])
 def verify_email():
     data = request.get_json(silent=True) or {}
     token = data.get("token", "").strip()
@@ -8091,7 +8175,7 @@ def verify_email():
 
     was_already_verified = bool(user.email_verified)
     user.email_verified = True
-    user.email_verified_at = datetime.utcnow()
+    user.email_verified_at = utcnow()
     user.auth_version = int(user.auth_version or 0) + 1
     db.session.commit()
 
@@ -8114,7 +8198,7 @@ def verify_email():
     return set_auth_cookie(response, user)
 
 
-@app.route("/auth/resend-verification", methods=["POST"])
+@route("/auth/resend-verification", methods=["POST"])
 def resend_email_verification():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
@@ -8145,7 +8229,7 @@ def resend_email_verification():
     return jsonify(response)
 
 
-@app.route("/login", methods=["POST"])
+@route("/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
 
@@ -8172,14 +8256,14 @@ def login():
     })
 
 
-@app.route("/auth/password-strength", methods=["POST"])
+@route("/auth/password-strength", methods=["POST"])
 def get_password_strength():
     data = request.get_json(silent=True) or {}
     password = data.get("password", "")
     return jsonify(validate_password_strength(password))
 
 
-@app.route("/forgot-password", methods=["POST"])
+@route("/forgot-password", methods=["POST"])
 def forgot_password():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
@@ -8210,7 +8294,7 @@ def forgot_password():
     return jsonify(response)
 
 
-@app.route("/reset-password", methods=["POST"])
+@route("/reset-password", methods=["POST"])
 def reset_password():
     data = request.get_json(silent=True) or {}
     token = data.get("token", "").strip()
@@ -8236,7 +8320,7 @@ def reset_password():
     user.auth_version = int(user.auth_version or 0) + 1
     if not user.email_verified:
         user.email_verified = True
-        user.email_verified_at = datetime.utcnow()
+        user.email_verified_at = utcnow()
     db.session.commit()
 
     response = jsonify({
@@ -8246,7 +8330,7 @@ def reset_password():
     return set_auth_cookie(response, user)
 
 
-@app.route("/account/delete/request", methods=["POST"])
+@route("/account/delete/request", methods=["POST"])
 def request_account_deletion():
     user = g.current_user
     sent, deletion_url = send_account_deletion_email(user)
@@ -8273,7 +8357,7 @@ def request_account_deletion():
     return jsonify(response)
 
 
-@app.route("/account/privacy", methods=["GET"])
+@route("/account/privacy", methods=["GET"])
 def get_account_privacy():
     user = g.current_user
     return jsonify({
@@ -8287,7 +8371,7 @@ def get_account_privacy():
     })
 
 
-@app.route("/account/consent", methods=["POST"])
+@route("/account/consent", methods=["POST"])
 def update_account_consent():
     data = request.get_json(silent=True) or {}
 
@@ -8296,7 +8380,7 @@ def update_account_consent():
 
     user = g.current_user
     user.analytics_consent = data["analytics"]
-    user.analytics_consent_at = datetime.utcnow()
+    user.analytics_consent_at = utcnow()
     record_user_event(
         user.id,
         "privacy_consent",
@@ -8311,7 +8395,7 @@ def update_account_consent():
     })
 
 
-@app.route("/account/delete/confirm", methods=["POST"])
+@route("/account/delete/confirm", methods=["POST"])
 def confirm_account_deletion():
     data = request.get_json(silent=True) or {}
     token = data.get("token", "").strip()
@@ -8345,7 +8429,7 @@ def confirm_account_deletion():
     return response
 
 
-@app.route("/auth/me", methods=["GET"])
+@route("/auth/me", methods=["GET"])
 def get_authenticated_user():
     user = get_current_user()
 
@@ -8358,7 +8442,7 @@ def get_authenticated_user():
 def build_account_export(user):
     subscription = Subscription.query.filter_by(user_id=user.id).first()
     return {
-        "exportedAt": datetime.utcnow().isoformat() + "Z",
+        "exportedAt": utcnow().isoformat() + "Z",
         "formatVersion": "1.0",
         "account": {
             "id": user.id,
@@ -8439,7 +8523,7 @@ def build_account_export(user):
     }
 
 
-@app.route("/account/data", methods=["GET"])
+@route("/account/data", methods=["GET"])
 def get_account_data():
     payload = build_account_export(g.current_user)
     return jsonify({
@@ -8454,8 +8538,8 @@ def get_account_data():
     })
 
 
-@app.route("/account/export", methods=["GET"])
-@app.route("/account/data-export", methods=["GET"])
+@route("/account/export", methods=["GET"])
+@route("/account/data-export", methods=["GET"])
 def export_account_data():
     payload = build_account_export(g.current_user)
     return Response(
@@ -8469,7 +8553,7 @@ def export_account_data():
     )
 
 
-@app.route("/account/restriction", methods=["POST"])
+@route("/account/restriction", methods=["POST"])
 def update_processing_restriction():
     data = request.get_json(silent=True) or {}
     restricted = data.get("restricted", True)
@@ -8483,7 +8567,7 @@ def update_processing_restriction():
 
     user = g.current_user
     user.processing_restricted = restricted
-    user.processing_restricted_at = datetime.utcnow() if restricted else None
+    user.processing_restricted_at = utcnow() if restricted else None
     user.processing_restriction_reason = reason or None if restricted else None
     record_user_event(
         user.id,
@@ -8503,7 +8587,7 @@ def update_processing_restriction():
     })
 
 
-@app.route("/privacy/consent", methods=["POST"])
+@route("/privacy/consent", methods=["POST"])
 def record_privacy_consent():
     data = request.get_json(silent=True) or {}
     consent_type = str(data.get("type") or "").strip().lower()
@@ -8532,7 +8616,7 @@ def record_privacy_consent():
     return jsonify({"recorded": True, "consentId": record.id}), 201
 
 
-@app.route("/logout", methods=["POST"])
+@route("/logout", methods=["POST"])
 def logout():
     response = jsonify({"message": "Deconectare reusita."})
     response.delete_cookie(AUTH_COOKIE_NAME, path="/")
@@ -8541,7 +8625,7 @@ def logout():
 
 @app.after_request
 def persist_login_session(response):
-    if request.endpoint == "login" and response.status_code < 300:
+    if endpoint_name(request.endpoint) == "login" and response.status_code < 300:
         data = response.get_json(silent=True) or {}
         user_id = (data.get("user") or {}).get("id")
         user = db.session.get(User, user_id) if user_id else None
@@ -8551,7 +8635,7 @@ def persist_login_session(response):
 
     return response
 
-@app.route("/users", methods=["GET"])
+@route("/users", methods=["GET"])
 def get_users():
     users = User.query.all()
 
@@ -8570,7 +8654,7 @@ def get_users():
     ])
 
 
-@app.route("/billing/status", methods=["GET"])
+@route("/billing/status", methods=["GET"])
 def get_billing_status():
     user = g.current_user
     if request.args.get("sync") == "stripe":
@@ -8586,7 +8670,7 @@ def get_billing_status():
     })
 
 
-@app.route("/dashboard/summary", methods=["GET"])
+@route("/dashboard/summary", methods=["GET"])
 def get_dashboard_summary():
     user = g.current_user
     requested_profile_id = get_requested_family_profile_id()
@@ -8617,7 +8701,7 @@ def get_dashboard_summary():
     })
 
 
-@app.route("/family/profiles", methods=["GET"])
+@route("/family/profiles", methods=["GET"])
 def get_family_profiles():
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8635,7 +8719,7 @@ def get_family_profiles():
     })
 
 
-@app.route("/family/profiles", methods=["POST"])
+@route("/family/profiles", methods=["POST"])
 def create_family_profile():
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8672,7 +8756,7 @@ def create_family_profile():
     return jsonify({"profile": family_profile_to_dict(profile)}), 201
 
 
-@app.route("/family/profiles/<int:profile_id>", methods=["PATCH"])
+@route("/family/profiles/<int:profile_id>", methods=["PATCH"])
 def update_family_profile(profile_id):
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8704,7 +8788,7 @@ def update_family_profile(profile_id):
     return jsonify({"profile": family_profile_to_dict(profile)})
 
 
-@app.route("/family/profiles/<int:profile_id>", methods=["DELETE"])
+@route("/family/profiles/<int:profile_id>", methods=["DELETE"])
 def delete_family_profile(profile_id):
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8732,7 +8816,7 @@ def delete_family_profile(profile_id):
     return jsonify({"deleted": True})
 
 
-@app.route("/billing/checkout", methods=["POST"])
+@route("/billing/checkout", methods=["POST"])
 def start_checkout():
     data = request.get_json(silent=True) or {}
     plan = str(data.get("plan") or "pro").strip().lower()
@@ -8892,7 +8976,7 @@ def start_checkout():
     })
 
 
-@app.route("/billing/portal", methods=["POST"])
+@route("/billing/portal", methods=["POST"])
 def start_billing_portal():
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8943,7 +9027,7 @@ def start_billing_portal():
     return jsonify({"portalUrl": portal_session.url})
 
 
-@app.route("/billing/stripe/webhook", methods=["POST"])
+@route("/billing/stripe/webhook", methods=["POST"])
 def stripe_webhook():
     if stripe is None:
         return jsonify({"error": "Stripe SDK nu este instalat."}), 503
@@ -8977,7 +9061,7 @@ def stripe_webhook():
     webhook_record = StripeWebhookEvent.query.filter_by(
         provider_event_id=event_id,
     ).first()
-    retry_before = datetime.utcnow() - timedelta(minutes=10)
+    retry_before = utcnow() - timedelta(minutes=10)
 
     if webhook_record and webhook_record.status == "processed":
         return jsonify({"received": True, "duplicate": True})
@@ -8994,14 +9078,14 @@ def stripe_webhook():
         webhook_record.event_type = event_type or "unknown"
         webhook_record.attempts = int(webhook_record.attempts or 0) + 1
         webhook_record.last_error = None
-        webhook_record.updated_at = datetime.utcnow()
+        webhook_record.updated_at = utcnow()
     else:
         webhook_record = StripeWebhookEvent(
             provider_event_id=event_id,
             event_type=event_type or "unknown",
             status="processing",
             attempts=1,
-            updated_at=datetime.utcnow(),
+            updated_at=utcnow(),
         )
         db.session.add(webhook_record)
 
@@ -9038,7 +9122,7 @@ def stripe_webhook():
         if failed_record:
             failed_record.status = "failed"
             failed_record.last_error = str(error)[:2000]
-            failed_record.updated_at = datetime.utcnow()
+            failed_record.updated_at = utcnow()
             db.session.commit()
         app.logger.exception(
             "Stripe webhook handler failed for event %s",
@@ -9067,8 +9151,8 @@ def stripe_webhook():
     ).first()
     if processed_record:
         processed_record.status = "processed"
-        processed_record.processed_at = datetime.utcnow()
-        processed_record.updated_at = datetime.utcnow()
+        processed_record.processed_at = utcnow()
+        processed_record.updated_at = utcnow()
         processed_record.last_error = None
         db.session.commit()
 
@@ -9079,12 +9163,12 @@ def stripe_webhook():
 # Gamification
 # =========================
 
-@app.route("/gamification/coin-packs", methods=["GET"])
+@route("/gamification/coin-packs", methods=["GET"])
 def get_cecoin_packs():
     return jsonify({"coinPacks": get_public_cecoin_packs()})
 
 
-@app.route("/gamification/summary", methods=["GET"])
+@route("/gamification/summary", methods=["GET"])
 def get_gamification_summary():
     try:
         include_leaderboard = request.args.get("leaderboard") == "1"
@@ -9100,7 +9184,7 @@ def get_gamification_summary():
         }), 500
 
 
-@app.route("/gamification/leaderboard", methods=["GET"])
+@route("/gamification/leaderboard", methods=["GET"])
 def get_gamification_leaderboard():
     try:
         period = str(request.args.get("period") or "weekly").strip().lower()
@@ -9120,7 +9204,7 @@ def get_gamification_leaderboard():
         }), 500
 
 
-@app.route("/gamification/claim", methods=["POST"])
+@route("/gamification/claim", methods=["POST"])
 def claim_gamification_mission():
     data = request.get_json(silent=True) or {}
     mission_id = str(data.get("missionId") or "").strip()
@@ -9188,7 +9272,7 @@ def claim_gamification_mission():
                 "daily": bool(mission.get("daily")),
                 "current": mission.get("current"),
                 "target": mission.get("target"),
-                "claimedAt": datetime.utcnow().isoformat() + "Z",
+                "claimedAt": utcnow().isoformat() + "Z",
                 "dayStart": (
                     get_day_start().isoformat() + "Z"
                     if mission.get("daily")
@@ -9214,7 +9298,7 @@ def claim_gamification_mission():
     })
 
 
-@app.route("/gamification/redeem", methods=["POST"])
+@route("/gamification/redeem", methods=["POST"])
 def redeem_cecoin_reward():
     data = request.get_json(silent=True) or {}
     item_id = str(data.get("itemId") or "").strip()
@@ -9282,7 +9366,7 @@ def redeem_cecoin_reward():
     })
 
 
-@app.route("/gamification/coin-checkout", methods=["POST"])
+@route("/gamification/coin-checkout", methods=["POST"])
 def start_cecoin_checkout():
     data = request.get_json(silent=True) or {}
     pack = get_cecoin_pack(data.get("packId"))
@@ -9406,7 +9490,7 @@ def start_cecoin_checkout():
     })
 
 
-@app.route("/gamification/coin-checkout/sync", methods=["POST"])
+@route("/gamification/coin-checkout/sync", methods=["POST"])
 def sync_cecoin_checkout_session():
     data = request.get_json(silent=True) or {}
     session_id = str(data.get("sessionId") or "").strip()
@@ -9571,7 +9655,7 @@ def public_contributor_name(name, rank):
 
 
 def build_public_catalog_romania_stats():
-    now = datetime.utcnow()
+    now = utcnow()
     since = now - timedelta(days=30)
     quality = get_catalog_quality_snapshot()
 
@@ -9689,7 +9773,7 @@ def build_public_catalog_romania_stats():
     }
 
 
-@app.route("/catalog/romania/stats", methods=["GET"])
+@route("/catalog/romania/stats", methods=["GET"])
 def get_public_catalog_romania_stats():
     if public_catalog_stats_cache_is_fresh():
         return jsonify(PUBLIC_CATALOG_STATS_CACHE["data"])
@@ -9811,13 +9895,13 @@ def recategorize_catalog_products(
     }
 
 
-@app.route("/admin/monitoring", methods=["GET"])
+@route("/admin/monitoring", methods=["GET"])
 def get_admin_monitoring():
     days = request.args.get("days", default=7, type=int)
     limit = request.args.get("limit", default=16, type=int)
     safe_days = max(1, min(days or 7, 90))
     safe_limit = max(5, min(limit or 16, 50))
-    since = datetime.utcnow() - timedelta(days=safe_days)
+    since = utcnow() - timedelta(days=safe_days)
     readiness = get_publication_readiness()
 
     issue_filter = or_(
@@ -9895,7 +9979,7 @@ def get_admin_monitoring():
 
     return jsonify({
         "windowDays": safe_days,
-        "generatedAt": admin_iso(datetime.utcnow()),
+        "generatedAt": admin_iso(utcnow()),
         "backend": {
             "ready": bool(readiness.get("ready")),
             "environment": readiness.get("environment"),
@@ -10009,11 +10093,11 @@ def get_admin_monitoring():
     })
 
 
-@app.route("/admin/export/search-misses.csv", methods=["GET"])
+@route("/admin/export/search-misses.csv", methods=["GET"])
 def export_admin_search_misses():
     days = request.args.get("days", default=30, type=int)
     safe_days = max(1, min(days or 30, 180))
-    since = datetime.utcnow() - timedelta(days=safe_days)
+    since = utcnow() - timedelta(days=safe_days)
     rows = (
         db.session.query(
             SearchEvent.search_text.label("query"),
@@ -10051,11 +10135,11 @@ def export_admin_search_misses():
     )
 
 
-@app.route("/admin/export/alternative-reports.csv", methods=["GET"])
+@route("/admin/export/alternative-reports.csv", methods=["GET"])
 def export_admin_alternative_reports():
     days = request.args.get("days", default=30, type=int)
     safe_days = max(1, min(days or 30, 180))
-    since = datetime.utcnow() - timedelta(days=safe_days)
+    since = utcnow() - timedelta(days=safe_days)
     events = UsageEvent.query.filter(
         UsageEvent.event_type == "alternative_report",
         UsageEvent.created_at >= since,
@@ -10098,11 +10182,11 @@ def export_admin_alternative_reports():
     )
 
 
-@app.route("/admin/export/payment-events.csv", methods=["GET"])
+@route("/admin/export/payment-events.csv", methods=["GET"])
 def export_admin_payment_events():
     days = request.args.get("days", default=30, type=int)
     safe_days = max(1, min(days or 30, 180))
-    since = datetime.utcnow() - timedelta(days=safe_days)
+    since = utcnow() - timedelta(days=safe_days)
     events = UsageEvent.query.filter(
         UsageEvent.event_type.in_([
             "payment_checkout_started",
@@ -10150,7 +10234,7 @@ def export_admin_payment_events():
     )
 
 
-@app.route("/admin/overview", methods=["GET"])
+@route("/admin/overview", methods=["GET"])
 def get_admin_overview():
     return jsonify({
         "users": User.query.count(),
@@ -10169,7 +10253,7 @@ def get_admin_overview():
     })
 
 
-@app.route("/admin/submissions", methods=["GET"])
+@route("/admin/submissions", methods=["GET"])
 def get_admin_submissions():
     submissions = ProductSubmission.query.order_by(
         ProductSubmission.created_at.desc()
@@ -10177,13 +10261,13 @@ def get_admin_submissions():
     return jsonify([product_submission_to_dict(item) for item in submissions])
 
 
-@app.route("/admin/search-misses", methods=["GET"])
+@route("/admin/search-misses", methods=["GET"])
 def get_admin_search_misses():
     days = request.args.get("days", default=30, type=int)
     limit = request.args.get("limit", default=50, type=int)
     safe_days = max(1, min(days or 30, 365))
     safe_limit = max(1, min(limit or 50, 200))
-    since = datetime.utcnow() - timedelta(days=safe_days)
+    since = utcnow() - timedelta(days=safe_days)
 
     rows = (
         db.session.query(
@@ -10230,7 +10314,7 @@ def parse_admin_optional_float(data, key, label):
         return None, f"{label} trebuie sa fie numar valid.", True
 
 
-@app.route("/admin/products/search", methods=["GET"])
+@route("/admin/products/search", methods=["GET"])
 def search_admin_products():
     query_text = str(request.args.get("q", "") or "").strip()
     limit = request.args.get("limit", default=20, type=int)
@@ -10275,7 +10359,7 @@ def search_admin_products():
     return jsonify([product_to_dict(product) for product in products])
 
 
-@app.route("/admin/products/<int:product_id>", methods=["PATCH"])
+@route("/admin/products/<int:product_id>", methods=["PATCH"])
 def update_admin_product(product_id):
     product = db.session.get(Product, product_id)
 
@@ -10450,14 +10534,14 @@ def update_admin_product(product_id):
     })
 
 
-@app.route("/admin/catalog/quality", methods=["GET"])
+@route("/admin/catalog/quality", methods=["GET"])
 def get_admin_catalog_quality():
     report = get_catalog_quality_snapshot()
-    report["generatedAt"] = datetime.utcnow().isoformat() + "Z"
+    report["generatedAt"] = utcnow().isoformat() + "Z"
     return jsonify(report)
 
 
-@app.route("/admin/catalog/recategorize", methods=["GET", "POST"])
+@route("/admin/catalog/recategorize", methods=["GET", "POST"])
 def recategorize_admin_catalog():
     data = request.get_json(silent=True) or {}
     limit = request.args.get("limit", data.get("limit", 300), type=int)
@@ -10504,7 +10588,7 @@ def recategorize_admin_catalog():
     })
 
 
-@app.route("/admin/missions/digest", methods=["GET", "POST"])
+@route("/admin/missions/digest", methods=["GET", "POST"])
 def send_admin_mission_digest():
     data = request.get_json(silent=True) or {}
     limit = request.args.get("limit", data.get("limit", 100), type=int)
@@ -10547,12 +10631,12 @@ def cron_request_is_authorized():
 def get_cron_recategorize_min_id(limit):
     max_product_id = db.session.query(func.max(Product.id)).scalar() or 1
     safe_limit = max(1, int(limit or 1))
-    day_number = datetime.utcnow().date().toordinal()
+    day_number = utcnow().date().toordinal()
     return 1 + ((day_number * safe_limit) % max(1, int(max_product_id)))
 
 
 def run_retention_cleanup(apply_changes=False):
-    now = datetime.utcnow()
+    now = utcnow()
     activity_cutoff = now - timedelta(days=RETENTION_ACTIVITY_DAYS)
     analytics_cutoff = now - timedelta(days=ANALYTICS_RETENTION_DAYS)
     search_cutoff = now - timedelta(days=SEARCH_RETENTION_DAYS)
@@ -10650,7 +10734,7 @@ def run_retention_cleanup(apply_changes=False):
     return result
 
 
-@app.route("/admin/retention", methods=["GET", "POST"])
+@route("/admin/retention", methods=["GET", "POST"])
 def run_admin_retention():
     apply_changes = request.method == "POST" and (
         str((request.get_json(silent=True) or {}).get("apply", "false")).lower()
@@ -10659,7 +10743,7 @@ def run_admin_retention():
     return jsonify(run_retention_cleanup(apply_changes=apply_changes))
 
 
-@app.route("/internal/cron/maintenance", methods=["POST"])
+@route("/internal/cron/maintenance", methods=["POST"])
 def run_cron_maintenance():
     if not cron_request_is_authorized():
         return jsonify({"error": "Unauthorized"}), 401
@@ -10675,7 +10759,7 @@ def run_cron_maintenance():
     }
     result = {
         "ok": True,
-        "generatedAt": datetime.utcnow().isoformat() + "Z",
+        "generatedAt": utcnow().isoformat() + "Z",
         "recategorize": None,
         "missionDigest": None,
         "retention": None,
@@ -10729,7 +10813,7 @@ def run_cron_maintenance():
     return jsonify(result)
 
 
-@app.route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"])
+@route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"])
 def resolve_admin_alternative_report(event_id):
     event = UsageEvent.query.filter_by(
         id=event_id,
@@ -10808,7 +10892,7 @@ def resolve_admin_alternative_report(event_id):
         "source": alternative_product.get("source") or product.store,
     }
     metadata["adminReview"] = {
-        "reviewedAt": admin_iso(datetime.utcnow()),
+        "reviewedAt": admin_iso(utcnow()),
         "reviewedBy": g.current_user.email,
         "method": method,
         "fixed": bool(fix_result.get("fixed")),
@@ -10846,7 +10930,7 @@ def resolve_admin_alternative_report(event_id):
     })
 
 
-@app.route("/admin/products/<int:product_id>", methods=["DELETE"])
+@route("/admin/products/<int:product_id>", methods=["DELETE"])
 def delete_admin_product(product_id):
     product = db.session.get(Product, product_id)
 
@@ -10858,7 +10942,7 @@ def delete_admin_product(product_id):
     return jsonify({"message": "Produs șters din catalog."})
 
 
-@app.route("/admin/users/<int:user_id>/plan", methods=["PATCH"])
+@route("/admin/users/<int:user_id>/plan", methods=["PATCH"])
 def admin_update_user_plan(user_id):
     data = request.get_json(silent=True) or {}
     plan = str(data.get("plan") or "").strip().lower()
@@ -10879,7 +10963,7 @@ def admin_update_user_plan(user_id):
     subscription.plan = plan
     subscription.status = status
     subscription.provider = data.get("provider") or "manual_admin"
-    subscription.updated_at = datetime.utcnow()
+    subscription.updated_at = utcnow()
     db.session.commit()
 
     return jsonify({
@@ -10894,7 +10978,7 @@ def admin_update_user_plan(user_id):
 # Products
 # =========================
 
-@app.route("/products/seed", methods=["GET"])
+@route("/products/seed", methods=["GET"])
 def seed_products():
     db.create_all()
 
@@ -10939,7 +11023,7 @@ def seed_products():
     })
 
 
-@app.route("/products", methods=["GET"])
+@route("/products", methods=["GET"])
 def get_products():
     store = request.args.get("store")
     limit = min(max(request.args.get("limit", default=200, type=int) or 200, 1), 500)
@@ -10955,7 +11039,7 @@ def get_products():
     return jsonify([product_to_dict(product) for product in products])
 
 
-@app.route("/products/search", methods=["GET"])
+@route("/products/search", methods=["GET"])
 def search_products():
     query_text = request.args.get("q", "").strip()
     store_id = request.args.get("store", "").strip()
@@ -11067,7 +11151,7 @@ def search_products():
     return response
 
 
-@app.route("/products/search-label", methods=["GET"])
+@route("/products/search-label", methods=["GET"])
 def search_products_by_label():
     label_text = request.args.get("q", "").strip()
 
@@ -11103,7 +11187,7 @@ def search_products_by_label():
     return jsonify(results[:5])
 
 
-@app.route("/alternatives/open-food-facts", methods=["POST"])
+@route("/alternatives/open-food-facts", methods=["POST"])
 def get_open_food_facts_alternatives():
     data = request.get_json(silent=True) or {}
     scanned_product = data.get("product") or {}
@@ -11319,6 +11403,11 @@ def get_open_food_facts_alternatives():
         product for product in alternatives if not product.get("image")
     ]
     products = (photographed_alternatives + alternatives_without_photos)[:6]
+    used_local_fallback = bool(
+        lookup_errors
+        and local_seed_alternatives
+        and not off_products
+    )
 
     if len(products) < 2:
         current_user = getattr(g, "current_user", None)
@@ -11345,13 +11434,21 @@ def get_open_food_facts_alternatives():
         )
 
     return jsonify({
-        "source": "catalog" if prefer_local_catalog else "openfoodfacts",
+        "source": (
+            "catalog"
+            if prefer_local_catalog
+            else "local-fallback"
+            if used_local_fallback
+            else "openfoodfacts"
+        ),
         "category": category_tag,
         "products": products,
         "message": (
             (
                 "Alternative calculate rapid din catalogul intern."
                 if prefer_local_catalog
+                else "Catalogul extern nu este disponibil momentan. Am folosit alternative verificate din catalogul intern."
+                if used_local_fallback
                 else "Alternative calculate din catalogul Open Food Facts."
             )
             if alternatives
@@ -11360,7 +11457,7 @@ def get_open_food_facts_alternatives():
     })
 
 
-@app.route("/analyze", methods=["POST"])
+@route("/analyze", methods=["POST"])
 def analyze_product():
     if "image" not in request.files:
         return jsonify({
@@ -11477,9 +11574,9 @@ def analyze_product():
 # Cart
 # =========================
 
-@app.route("/cart/<int:user_id>", methods=["GET"])
+@route("/cart/<int:user_id>", methods=["GET"])
 def get_cart(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11493,7 +11590,7 @@ def get_cart(user_id):
     return jsonify([cart_item_to_dict(item) for item in items])
 
 
-@app.route("/cart/add", methods=["POST"])
+@route("/cart/add", methods=["POST"])
 def add_to_cart():
     data = request.get_json()
 
@@ -11507,7 +11604,7 @@ def add_to_cart():
     if not user_id or not product_name:
         return jsonify({"error": "user_id și name sunt obligatorii."}), 400
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11580,9 +11677,9 @@ def add_to_cart():
     }), 201
 
 
-@app.route("/cart/item/<int:item_id>", methods=["PATCH"])
+@route("/cart/item/<int:item_id>", methods=["PATCH"])
 def update_cart_item(item_id):
-    item = CartItem.query.get(item_id)
+    item = db.session.get(CartItem, item_id)
 
     if not item:
         return jsonify({"error": "Produsul din coș nu există."}), 404
@@ -11613,9 +11710,9 @@ def update_cart_item(item_id):
     })
 
 
-@app.route("/cart/item/<int:item_id>", methods=["DELETE"])
+@route("/cart/item/<int:item_id>", methods=["DELETE"])
 def delete_cart_item(item_id):
-    item = CartItem.query.get(item_id)
+    item = db.session.get(CartItem, item_id)
 
     if not item:
         return jsonify({"error": "Produsul din coș nu există."}), 404
@@ -11626,9 +11723,9 @@ def delete_cart_item(item_id):
     return jsonify({"message": "Produs șters din coș."})
 
 
-@app.route("/cart/clear/<int:user_id>", methods=["DELETE"])
+@route("/cart/clear/<int:user_id>", methods=["DELETE"])
 def clear_cart(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11645,9 +11742,9 @@ def clear_cart(user_id):
 # Favorites
 # =========================
 
-@app.route("/favorites/<int:user_id>", methods=["GET"])
+@route("/favorites/<int:user_id>", methods=["GET"])
 def get_favorites(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11659,7 +11756,7 @@ def get_favorites(user_id):
     return jsonify([favorite_item_to_dict(item) for item in items])
 
 
-@app.route("/favorites/add", methods=["POST"])
+@route("/favorites/add", methods=["POST"])
 def add_to_favorites():
     data = request.get_json()
 
@@ -11673,7 +11770,7 @@ def add_to_favorites():
     if not user_id or not product_name:
         return jsonify({"error": "user_id și name sunt obligatorii."}), 400
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11710,9 +11807,9 @@ def add_to_favorites():
     }), 201
 
 
-@app.route("/favorites/item/<int:favorite_id>", methods=["DELETE"])
+@route("/favorites/item/<int:favorite_id>", methods=["DELETE"])
 def delete_favorite_item(favorite_id):
-    item = Favorite.query.get(favorite_id)
+    item = db.session.get(Favorite, favorite_id)
 
     if not item:
         return jsonify({"error": "Produsul favorit nu există."}), 404
@@ -11723,9 +11820,9 @@ def delete_favorite_item(favorite_id):
     return jsonify({"message": "Produs șters din favorite."})
 
 
-@app.route("/favorites/clear/<int:user_id>", methods=["DELETE"])
+@route("/favorites/clear/<int:user_id>", methods=["DELETE"])
 def clear_favorites(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11740,9 +11837,9 @@ def clear_favorites(user_id):
 # History
 # =========================
 
-@app.route("/history/<int:user_id>", methods=["GET"])
+@route("/history/<int:user_id>", methods=["GET"])
 def get_scan_history(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11754,7 +11851,7 @@ def get_scan_history(user_id):
     return jsonify([scan_history_item_to_dict(item) for item in items])
 
 
-@app.route("/history/add", methods=["POST"])
+@route("/history/add", methods=["POST"])
 def add_scan_history():
     data = request.get_json()
 
@@ -11768,7 +11865,7 @@ def add_scan_history():
     if not user_id or not product_name:
         return jsonify({"error": "user_id și name sunt obligatorii."}), 400
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11794,9 +11891,9 @@ def add_scan_history():
     }), 201
 
 
-@app.route("/history/item/<int:history_id>", methods=["DELETE"])
+@route("/history/item/<int:history_id>", methods=["DELETE"])
 def delete_scan_history_item(history_id):
-    item = ScanHistory.query.get(history_id)
+    item = db.session.get(ScanHistory, history_id)
 
     if not item:
         return jsonify({"error": "Scanarea nu există."}), 404
@@ -11807,9 +11904,9 @@ def delete_scan_history_item(history_id):
     return jsonify({"message": "Scanare ștearsă din istoric."})
 
 
-@app.route("/history/clear/<int:user_id>", methods=["DELETE"])
+@route("/history/clear/<int:user_id>", methods=["DELETE"])
 def clear_scan_history(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11824,7 +11921,7 @@ def clear_scan_history(user_id):
 # Product submissions
 # =========================
 
-@app.route("/uploads/submissions/<path:filename>", methods=["GET"])
+@route("/uploads/submissions/<path:filename>", methods=["GET"])
 def get_submission_image(filename):
     image_path = f"/uploads/submissions/{filename}"
 
@@ -11834,7 +11931,7 @@ def get_submission_image(filename):
     return send_from_directory(SUBMISSIONS_FOLDER, filename)
 
 
-@app.route("/uploads/scans/<path:filename>", methods=["GET"])
+@route("/uploads/scans/<path:filename>", methods=["GET"])
 @require_auth
 def get_scan_image(filename):
     expected_prefix = f"scan_{g.current_user.id}_"
@@ -11845,7 +11942,7 @@ def get_scan_image(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
-@app.route("/uploads/supabase-submissions/<path:object_path>", methods=["GET"])
+@route("/uploads/supabase-submissions/<path:object_path>", methods=["GET"])
 def get_supabase_submission_image(object_path):
     image_path = f"/uploads/supabase-submissions/{object_path}"
 
@@ -11866,9 +11963,9 @@ def get_supabase_submission_image(object_path):
     return app.response_class(image_bytes, mimetype=content_type)
 
 
-@app.route("/submissions/<int:user_id>", methods=["GET"])
+@route("/submissions/<int:user_id>", methods=["GET"])
 def get_user_submissions(user_id):
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -11880,7 +11977,7 @@ def get_user_submissions(user_id):
     return jsonify([product_submission_to_dict(item) for item in submissions])
 
 
-@app.route("/submissions/add", methods=["POST"])
+@route("/submissions/add", methods=["POST"])
 def add_product_submission():
     user_id = request.form.get("user_id")
     product_name = request.form.get("product_name", "").strip()
@@ -11934,7 +12031,7 @@ def add_product_submission():
             "errors": validation_errors,
         }), 400
 
-    user = User.query.get(user_id)
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"error": "Utilizatorul nu există."}), 404
@@ -12024,9 +12121,9 @@ def add_product_submission():
     }), 201
 
 
-@app.route("/submissions/item/<int:submission_id>", methods=["DELETE"])
+@route("/submissions/item/<int:submission_id>", methods=["DELETE"])
 def delete_product_submission(submission_id):
-    submission = ProductSubmission.query.get(submission_id)
+    submission = db.session.get(ProductSubmission, submission_id)
 
     if not submission:
         return jsonify({"error": "Propunerea nu există."}), 404
@@ -12037,9 +12134,9 @@ def delete_product_submission(submission_id):
     return jsonify({"message": "Propunerea a fost ștearsă."})
 
 
-@app.route("/submissions/ai-review/<int:submission_id>", methods=["POST"])
+@route("/submissions/ai-review/<int:submission_id>", methods=["POST"])
 def ai_review_product_submission(submission_id):
-    submission = ProductSubmission.query.get(submission_id)
+    submission = db.session.get(ProductSubmission, submission_id)
 
     if not submission:
         return jsonify({"error": "Propunerea nu există."}), 404
@@ -12059,9 +12156,9 @@ def ai_review_product_submission(submission_id):
     })
 
 
-@app.route("/submissions/approve/<int:submission_id>", methods=["POST"])
+@route("/submissions/approve/<int:submission_id>", methods=["POST"])
 def approve_product_submission(submission_id):
-    submission = ProductSubmission.query.get(submission_id)
+    submission = db.session.get(ProductSubmission, submission_id)
 
     if not submission:
         return jsonify({"error": "Propunerea nu există."}), 404
@@ -12205,7 +12302,7 @@ def approve_product_submission(submission_id):
         "submission": product_submission_to_dict(submission),
     })
 
-@app.route("/ai/extract-product-info", methods=["POST"])
+@route("/ai/extract-product-info", methods=["POST"])
 def ai_extract_product_info():
     front_image = request.files.get("front_image")
     nutrition_image = request.files.get("nutrition_image")
@@ -12369,7 +12466,7 @@ def find_demo_products():
     ]
 
 
-@app.route("/products/cleanup-duplicates", methods=["POST", "GET"])
+@route("/products/cleanup-duplicates", methods=["POST", "GET"])
 def cleanup_duplicate_products():
     duplicates = find_duplicate_products()
     demo_products = find_demo_products()
@@ -12489,7 +12586,7 @@ def translate_catalog_text(text_value, target_language):
         return text_value
 
 
-@app.route("/translate", methods=["POST"])
+@route("/translate", methods=["POST"])
 def translate_text():
     data = request.get_json(silent=True) or {}
     text_value = str(data.get("text") or "").strip()
@@ -12935,7 +13032,7 @@ def product_to_dict_with_open_price(product):
     return product_data
 
 
-@app.route("/prices/report", methods=["POST"])
+@route("/prices/report", methods=["POST"])
 def report_local_price():
     data = request.get_json(silent=True) or {}
     barcode = str(data.get("barcode") or "").strip()
@@ -12949,7 +13046,7 @@ def report_local_price():
         validate_text_length(store, "Magazinul", 100),
     ]
 
-    if not user_id or not User.query.get(user_id):
+    if not user_id or not db.session.get(User, user_id):
         validation_errors.append("Autentifică-te pentru a salva prețul.")
 
     if price is None or price <= 0 or price > 100000:
@@ -12976,7 +13073,7 @@ def report_local_price():
     }), 201
 
 
-@app.route("/prices/<barcode>", methods=["GET"])
+@route("/prices/<barcode>", methods=["GET"])
 def get_latest_local_price(barcode):
     barcode_error = validate_barcode(barcode, required=True)
 
@@ -17451,7 +17548,7 @@ def save_product_to_local_database(product_data):
     return product
 
 
-@app.route("/barcode/import", methods=["POST"])
+@route("/barcode/import", methods=["POST"])
 def import_barcode_product():
     data = request.get_json(silent=True) or {}
     barcode = str(data.get("barcode") or "").strip()
@@ -17492,7 +17589,7 @@ def import_barcode_product():
     }), 201
 
 
-@app.route("/ai/identify-product-frame", methods=["POST"])
+@route("/ai/identify-product-frame", methods=["POST"])
 def identify_product_frame():
     subscription = get_or_create_subscription(g.current_user)
 
@@ -17651,7 +17748,7 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
     })
 
 
-@app.route("/barcode/lookup/<barcode>", methods=["GET"])
+@route("/barcode/lookup/<barcode>", methods=["GET"])
 def lookup_barcode(barcode):
     barcode = barcode.strip()
 
@@ -17778,6 +17875,9 @@ def lookup_barcode(barcode):
         "usage": scan_gate["usage"],
     })                                    
 
+register_blueprints(app)
+
+
 with app.app_context():
     db.create_all()
     ensure_database_columns()
@@ -17792,5 +17892,3 @@ if __name__ == "__main__":
         debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true",
         port=int(os.environ.get("PORT", "5001")),
     )
-
-

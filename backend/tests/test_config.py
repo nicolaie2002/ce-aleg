@@ -3,6 +3,7 @@ from flask import Flask
 
 from app_factory import create_app
 from config import DEFAULT_AUTH_SECRET, RuntimeConfig, normalize_database_url, read_secret_env
+from routes import BLUEPRINTS, blueprint_for_rule
 
 
 def test_postgres_urls_use_psycopg_driver():
@@ -67,3 +68,12 @@ def test_factory_creates_independent_configured_app_shells():
     assert first.testing is True
     assert second.testing is False
     assert first.extensions["cealeg_runtime_config"] is config
+
+
+def test_route_registry_covers_expected_production_domains():
+    assert len(BLUEPRINTS) == 13
+    assert blueprint_for_rule("/health").name == "system"
+    assert blueprint_for_rule("/register").name == "auth"
+    assert blueprint_for_rule("/products/search").name == "products"
+    assert blueprint_for_rule("/admin/overview").name == "admin"
+    assert blueprint_for_rule("/submissions/add").name == "submissions"

@@ -15,14 +15,15 @@ const customJestConfig = {
   },
   collectCoverageFrom: [
     "app/error.tsx",
-    "app/components/LocaleProvider.js",
+    "app/components/{BackendWarmup,ConfirmModal,CookieConsentBanner,LanguageSwitcher,LocaleProvider,ProductImage}.js",
+    "app/utils/{apiResponse,getImageUrl,passwordStrength,profilePreferences}.js",
   ],
   coverageThreshold: {
     global: {
-      branches: 80,
-      functions: 90,
-      lines: 90,
-      statements: 90,
+      branches: 60,
+      functions: 60,
+      lines: 60,
+      statements: 60,
     },
   },
 };

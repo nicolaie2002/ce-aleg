@@ -1,12 +1,13 @@
 import io
 from types import SimpleNamespace
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from werkzeug.security import generate_password_hash
 
 import app as app_module
 from database import db
 from models import ConsentRecord, Product, SearchEvent, User
+from time_utils import utcnow
 from ai_provider import extract_response_text
 
 
@@ -46,6 +47,29 @@ def test_openapi_contract_lists_protected_admin_route(app, client):
     operation = document["paths"]["/admin/monitoring"]["get"]
     assert operation["security"] == [{"sessionCookie": []}]
     assert "403" in operation["responses"]
+
+
+def test_runtime_openapi_combines_explicit_schemas_with_every_flask_route(app, client):
+    response = client.get("/api/openapi.json")
+
+    assert response.status_code == 200
+    document = response.get_json()
+    assert document["jsonSchemaDialect"].endswith("2020-12/schema")
+    assert "RegisterRequest" in document["components"]["schemas"]
+    assert (
+        document["paths"]["/support/contact"]["post"]["x-validation-helper"]
+        == "validate_support_payload"
+    )
+    assert "/admin/catalog/quality" in document["paths"]
+    assert "/internal/cron/maintenance" in document["paths"]
+
+    operation_ids = [
+        operation["operationId"]
+        for path_item in document["paths"].values()
+        for operation in path_item.values()
+        if isinstance(operation, dict) and "operationId" in operation
+    ]
+    assert len(operation_ids) == len(set(operation_ids))
 
 
 def test_admin_monitoring_rejects_regular_user(app, client):
@@ -349,7 +373,7 @@ def test_retention_supports_dry_run_and_apply(app):
             search_text="old query",
             result_count=0,
             source="test",
-            created_at=datetime.utcnow() - timedelta(days=500),
+            created_at=utcnow() - timedelta(days=500),
         )
         db.session.add(old_search)
         db.session.commit()

@@ -38,7 +38,7 @@ jobs:
       DATABASE_SSLMODE: disable
       EXTERNAL_CATALOG_ENABLED: "false"
       OPEN_PRICES_ENABLED: "false"
-      COVERAGE_FAIL_UNDER: "20"
+      COVERAGE_FAIL_UNDER: "70"
     defaults:
       run:
         working-directory: backend
@@ -68,23 +68,7 @@ jobs:
             ai_providers.py \
             api_docs.py \
             backup_supabase_storage.py \
-            catalog_quality.py \
-            config.py \
-            database.py \
-            models.py \
-            import_openfoodfacts_export.py \
-            import_retailer_feed.py \
-            migrate_sqlite_to_supabase.py \
-            prewarm_openfoodfacts_catalog.py \
-            recategorize_catalog.py \
-            seed_e2e.py
-          ruff check \
-            app.py \
-            app_factory.py \
-            ai_provider.py \
-            ai_providers.py \
-            api_docs.py \
-            backup_supabase_storage.py \
+            restore_supabase_storage.py \
             catalog_quality.py \
             config.py \
             database.py \
@@ -95,7 +79,32 @@ jobs:
             prewarm_openfoodfacts_catalog.py \
             recategorize_catalog.py \
             seed_e2e.py \
+            time_utils.py
+          python -m compileall -q routes
+          ruff check \
+            app.py \
+            app_factory.py \
+            ai_provider.py \
+            ai_providers.py \
+            api_docs.py \
+            backup_supabase_storage.py \
+            restore_supabase_storage.py \
+            catalog_quality.py \
+            config.py \
+            database.py \
+            models.py \
+            import_openfoodfacts_export.py \
+            import_retailer_feed.py \
+            migrate_sqlite_to_supabase.py \
+            prewarm_openfoodfacts_catalog.py \
+            recategorize_catalog.py \
+            seed_e2e.py \
+            time_utils.py \
+            routes \
             --select E9,F63,F7,F82
+
+      - name: Check backup and restore scripts
+        run: bash -n ../scripts/backup-supabase.sh ../scripts/restore-supabase.sh
 
       - name: Smoke-test Flask application
         run: |
@@ -112,6 +121,7 @@ jobs:
         run: |
           if find tests -type f \( -name 'test_*.py' -o -name '*_test.py' \) -print -quit 2>/dev/null | grep -q .; then
             python -m pytest tests \
+              -W error::DeprecationWarning \
               --cov=app \
               --cov-report=term-missing \
               --cov-report=xml:coverage.xml \

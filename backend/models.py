@@ -1,5 +1,5 @@
-from datetime import datetime
 from database import db
+from time_utils import utcnow
 
 
 class User(db.Model):
@@ -27,7 +27,7 @@ class User(db.Model):
     analytics_consent = db.Column(db.Boolean, nullable=True)
     analytics_consent_at = db.Column(db.DateTime, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class Product(db.Model):
@@ -86,7 +86,7 @@ class ProductSubmission(db.Model):
     ingredients = db.Column(db.Text, nullable=True)
 
     status = db.Column(db.String(30), default="pending")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     user = db.relationship("User", backref="product_submissions")
 
@@ -108,7 +108,7 @@ class ScanHistory(db.Model):
     verdict = db.Column(db.Text, nullable=True)
     short_advice = db.Column(db.Text, nullable=True)
 
-    scanned_at = db.Column(db.DateTime, default=datetime.utcnow)
+    scanned_at = db.Column(db.DateTime, default=utcnow)
 
     user = db.relationship("User", backref="scan_history")
 
@@ -128,7 +128,7 @@ class Favorite(db.Model):
     image = db.Column(db.String(255), nullable=True)
     reason = db.Column(db.Text, nullable=True)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     user = db.relationship("User", backref="favorites")
 
@@ -156,7 +156,7 @@ class CartItem(db.Model):
     quantity = db.Column(db.Integer, default=1)
     bought = db.Column(db.Boolean, default=False)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
     user = db.relationship("User", backref="cart_items")
     family_profile = db.relationship("FamilyProfile")
@@ -171,7 +171,7 @@ class PriceObservation(db.Model):
     store = db.Column(db.String(100), nullable=False)
     price = db.Column(db.Float, nullable=False)
     currency = db.Column(db.String(10), nullable=False, default="RON")
-    observed_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    observed_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
     user = db.relationship("User", backref="price_observations")
 
@@ -185,7 +185,7 @@ class SearchEvent(db.Model):
     store = db.Column(db.String(100), nullable=True)
     result_count = db.Column(db.Integer, default=0, nullable=False)
     source = db.Column(db.String(40), nullable=False, default="product_search")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
     user = db.relationship("User", backref="search_events")
 
@@ -202,8 +202,8 @@ class Subscription(db.Model):
     provider_subscription_id = db.Column(db.String(120), nullable=True)
     current_period_start = db.Column(db.DateTime, nullable=True)
     current_period_end = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
     user = db.relationship("User", backref="subscription")
 
@@ -217,7 +217,7 @@ class FamilyProfile(db.Model):
     color = db.Column(db.String(30), nullable=False, default="teal")
     avatar = db.Column(db.String(20), nullable=True)
     is_primary = db.Column(db.Boolean, default=False, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
     user = db.relationship("User", backref="family_profiles")
 
@@ -231,7 +231,7 @@ class UsageEvent(db.Model):
     source = db.Column(db.String(40), nullable=True)
     idempotency_key = db.Column(db.String(180), nullable=True, unique=True, index=True)
     metadata_json = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
 
     user = db.relationship("User", backref="usage_events")
 
@@ -245,8 +245,8 @@ class StripeWebhookEvent(db.Model):
     status = db.Column(db.String(30), nullable=False, default="processing", index=True)
     attempts = db.Column(db.Integer, nullable=False, default=1)
     last_error = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=utcnow, nullable=False)
     processed_at = db.Column(db.DateTime, nullable=True)
 
 
@@ -260,6 +260,6 @@ class ConsentRecord(db.Model):
     policy_version = db.Column(db.String(40), nullable=False)
     source = db.Column(db.String(80), nullable=False, default="web")
     request_identity_hash = db.Column(db.String(64), nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
 
     user = db.relationship("User", backref="consent_records")

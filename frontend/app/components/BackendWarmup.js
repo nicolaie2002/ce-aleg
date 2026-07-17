@@ -20,7 +20,7 @@ export function BackendWarmup() {
       return undefined;
     }
 
-    const timer = window.setTimeout(() => {
+    const warmBackend = () => {
       fetch("/api/backend/health", {
         cache: "no-store",
         keepalive: true,
@@ -35,9 +35,25 @@ export function BackendWarmup() {
         .catch(() => {
           // Warm-up is opportunistic; user-facing flows handle backend errors separately.
         });
-    }, 900);
+    };
 
-    return () => window.clearTimeout(timer);
+    let timer;
+    let idleHandle;
+
+    timer = window.setTimeout(() => {
+      if ("requestIdleCallback" in window) {
+        idleHandle = window.requestIdleCallback(warmBackend, { timeout: 2000 });
+      } else {
+        warmBackend();
+      }
+    }, 8000);
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      if (idleHandle && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleHandle);
+      }
+    };
   }, []);
 
   return null;

@@ -28,6 +28,15 @@ const siteDescription =
   "Scanează codul de bare al unui produs, vezi rapid verdictul și compară alternative mai bune pentru bugetul și preferințele tale.";
 const socialImage = "/opengraph-image.png?v=20260623";
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f5f8f9" },
+    { media: "(prefers-color-scheme: dark)", color: "#05080f" },
+  ],
+};
+
 export const metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: siteName,

@@ -70,6 +70,11 @@ export function CarbonVaporBackground({ variant = "global" }) {
       (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
       connection?.saveData ||
       window.innerWidth < 768;
+
+    // Mobile already has the CSS carbon treatment. Avoid allocating and
+    // painting a large canvas twice during the critical rendering window.
+    if (lowPowerDevice) return undefined;
+
     const shouldAnimate = variant === "hero" && !reducedMotion.matches && !lowPowerDevice;
     const noise = createNoiseTexture(112);
     const wisps = makeWisps(

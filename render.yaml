@@ -121,7 +121,9 @@ services:
       - key: SUBMISSION_PENDING_LIMIT
         value: "20"
       - key: VISION_PROVIDER
-        value: openai
+        value: local
+      - key: ENABLE_OPENAI_VISION
+        value: "false"
       - key: OPENAI_VISION_TIMEOUT
         value: "20"
       - key: SENTRY_DSN

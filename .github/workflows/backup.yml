@@ -38,22 +38,21 @@ jobs:
 
       - name: Export database and Storage
         shell: bash
-        run: |
-          mkdir -p backup/database backup/storage
-          docker run --rm -e DATABASE_URL -v "$PWD/backup/database:/backup" postgres:17-alpine \
-            sh -c 'pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file=/backup/cealeg.dump && pg_restore --list /backup/cealeg.dump > /backup/manifest.txt'
-          python backend/backup_supabase_storage.py --output backup/storage
+        run: bash scripts/backup-supabase.sh backup
 
       - name: Encrypt backup
         shell: bash
         run: |
-          tar -C backup -czf - database storage | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_ENCRYPTION_KEY -out cealeg-backup.tar.gz.enc
+          tar -C backup -czf - database storage checksums.sha256 backup-info.txt | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_ENCRYPTION_KEY -out cealeg-backup.tar.gz.enc
           test -s cealeg-backup.tar.gz.enc
+          sha256sum cealeg-backup.tar.gz.enc > cealeg-backup.tar.gz.enc.sha256
 
       - name: Upload encrypted backup
         uses: actions/upload-artifact@v4
         with:
           name: cealeg-production-backup-${{ github.run_id }}
-          path: cealeg-backup.tar.gz.enc
+          path: |
+            cealeg-backup.tar.gz.enc
+            cealeg-backup.tar.gz.enc.sha256
           retention-days: 30
           if-no-files-found: error

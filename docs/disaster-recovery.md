@@ -14,12 +14,10 @@ Never use the public/publishable key for this job. Never place these values in r
 ## Restore drill
 
 1. Download one encrypted artifact from a completed `Encrypted production backup` run.
-2. Decrypt it in a temporary restricted directory:
-
-   `openssl enc -d -aes-256-cbc -pbkdf2 -in cealeg-backup.tar.gz.enc -pass env:BACKUP_ENCRYPTION_KEY | tar -xzf -`
-
-3. Verify the dump with `pg_restore --list database/cealeg.dump`.
-4. Restore only into a disposable Supabase project: `pg_restore --clean --if-exists --no-owner --no-acl --dbname "$RESTORE_TEST_DATABASE_URL" database/cealeg.dump`.
+2. Verify the artifact checksum and set `BACKUP_ENCRYPTION_KEY` from the password manager.
+3. Run `bash scripts/restore-supabase.sh cealeg-backup.tar.gz.enc` for a no-write validation.
+4. Restore only into a disposable target with the guarded `--apply` procedure in
+   `docs/runbooks/database-restore.md`.
 5. Upload the files under `storage/<bucket>/` into buckets with the same names.
 6. Run `/health`, `/readiness`, sign-in, one barcode scan, and a Stripe test checkout against the disposable environment.
 7. Delete the temporary project and the decrypted local files.

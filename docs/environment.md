@@ -52,6 +52,19 @@ corectata inainte de a acorda acces altor colaboratori.
 | `CRON_SECRET` | da, critic | aceeasi valoare in Render si Vercel; protejeaza maintenance |
 
 `render.yaml` marcheaza valorile care trebuie introduse manual cu `sync: false`.
+
+## GitHub Actions backup
+
+| Variabila / secret | Scop |
+| --- | --- |
+| `BACKUP_DATABASE_URL` | conexiune directa sau session pooler folosita numai de export |
+| `SUPABASE_URL` | proiectul din care se exporta Storage |
+| `SUPABASE_SERVICE_ROLE_KEY` | cheie server-side pentru exportul Storage; nu ajunge in frontend |
+| `BACKUP_ENCRYPTION_KEY` | parola independenta pentru arhiva AES-256 |
+| `BACKUP_STORAGE_BUCKETS` | implicit `product-images,product-submissions` |
+
+Variabilele `RESTORE_*` se seteaza numai temporar pentru o tinta disposable,
+conform `docs/runbooks/database-restore.md`; nu se configureaza in Render Production.
 Nu transforma price ID-urile in secrete, dar evita amestecarea obiectelor test si
 live.
 

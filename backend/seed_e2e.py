@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from werkzeug.security import generate_password_hash
 
@@ -13,13 +13,14 @@ if os.environ.get("E2E_TEST_MODE", "false").lower() != "true":
 from app import app  # noqa: E402
 from database import db  # noqa: E402
 from models import Product, Subscription, User  # noqa: E402
+from time_utils import utcnow  # noqa: E402
 
 
 PASSWORD = "E2e-password-123"
 
 
 def create_user(name, email, invite_code, *, admin=False, plan="free"):
-    now = datetime.utcnow()
+    now = utcnow()
     user = User(
         name=name,
         email=email,
