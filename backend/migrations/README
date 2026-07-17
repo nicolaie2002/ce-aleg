@@ -1,0 +1,10 @@
+Create a revision from backend/ with:
+
+    python -m alembic -c migrations.ini revision --autogenerate -m "change"
+
+Apply revisions through migration.py so PostgreSQL locking and fail-closed release
+behavior are always active:
+
+    python migration.py upgrade
+    python migration.py downgrade -1
+    python migration.py release

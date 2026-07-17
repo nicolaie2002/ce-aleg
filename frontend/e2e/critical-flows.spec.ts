@@ -15,6 +15,34 @@ test("public navigation and English help work", async ({ page }) => {
   await expect(page.locator("#help-results")).toContainText(/account/i);
 });
 
+test("English catalog store pages render localized content", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "English" }).click();
+  await page.goto("/catalog-romania/magazine/lidl");
+
+  await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  await expect(
+    page.getByRole("heading", { name: "Lidl: scan products and compare alternatives." }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What to check on the shelf" })).toBeVisible();
+  await expect(page.getByText(/This page helps people looking for Lidl products in Romania/)).toBeVisible();
+  await expect(page.getByText("Pentru ce e util", { exact: true })).toHaveCount(0);
+});
+
+test("signed-out checkout guidance follows the selected language", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "English" }).click();
+  await page.goto("/pricing");
+  await page.getByRole("button", { name: "Choose monthly" }).first().click();
+
+  await expect(
+    page.getByText(
+      "You need an account to buy plans or CeCoins. Sign in or create an account, then return to checkout.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByText(/Ai nevoie de cont ca sa cumperi/)).toHaveCount(0);
+});
+
 test("private product flows redirect signed-out visitors", async ({ page }) => {
   await page.goto("/dashboard");
   await page.waitForURL(/\/login(?:\?|$)/);

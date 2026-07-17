@@ -1,4 +1,7 @@
 import json
+import time
+from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
 
 import app as app_module
 
@@ -156,3 +159,28 @@ def test_rate_limit_falls_back_locally_when_redis_pipeline_fails(app, monkeypatc
     with app.test_request_context("/support", environ_base={"REMOTE_ADDR": "10.0.0.3"}):
         assert app_module.rate_limit("support", 1, 60) is True
         assert app_module.rate_limit("support", 1, 60) is False
+
+
+def test_local_rate_limit_is_atomic_across_server_threads(app, monkeypatch):
+    class SlowDeque(deque):
+        def __len__(self):
+            # Widen the check/append race window so this test protects the lock.
+            time.sleep(0.005)
+            return super().__len__()
+
+    reset_distributed_state()
+    monkeypatch.setattr(app_module, "get_redis_client", lambda: None)
+    monkeypatch.setattr(app_module, "RATE_LIMIT_BUCKETS", defaultdict(SlowDeque))
+    monkeypatch.setattr(app_module.time, "time", lambda: 300.0)
+
+    def attempt():
+        with app.test_request_context(
+            "/support", environ_base={"REMOTE_ADDR": "10.0.0.4"}
+        ):
+            return app_module.rate_limit("support", 1, 60)
+
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        results = list(executor.map(lambda _index: attempt(), range(24)))
+
+    assert results.count(True) == 1
+    assert results.count(False) == 23

@@ -1,4 +1,9 @@
 services:
+  - type: redis
+    name: cealeg-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
   - type: web
     name: cealeg-api
     runtime: python
@@ -6,6 +11,7 @@ services:
     rootDir: backend
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5
+    autoDeployTrigger: off
     healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
@@ -95,6 +101,10 @@ services:
       - key: CRON_SECRET
         sync: false
       - key: REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
+      - key: UPSTASH_REDIS_TOKEN
         sync: false
       - key: LOG_FORMAT
         value: json

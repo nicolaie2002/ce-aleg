@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * @param {{
+ *   as?: import("react").ElementType,
+ *   ambient?: boolean,
+ *   className?: string,
+ *   children?: import("react").ReactNode,
+ *   [key: string]: any
+ * }} props
+ */
 export function InteractiveSurface({
   as: Component = "div",
   ambient = true,

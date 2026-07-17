@@ -10,6 +10,7 @@ import {
   Camera,
   CameraIcon,
   Crown,
+  Info,
   Mic,
   MicOff,
   RefreshCw,
@@ -20,6 +21,7 @@ import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
+import { getAIProvider } from "../../components/AIProvider";
 
 const MAX_CAMERA_SESSION_MS = 2 * 60 * 1000;
 
@@ -120,12 +122,13 @@ export default function LiveAssistantPage() {
   const barcodeCandidateRef = useRef({ code: "", count: 0 });
   const detectedBarcodeRef = useRef(false);
   const analyzingRef = useRef(false);
-  const [user, setUser] = useState(null);
+const [user, setUser] = useState(null);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [cloudVision, setCloudVision] = useState(false);
+  const [aiVisionEnabled, setAiVisionEnabled] = useState(false);
   const [cameraDevices, setCameraDevices] = useState([]);
   const [cameraIndex, setCameraIndex] = useState(0);
   const [transcript, setTranscript] = useState("");
@@ -151,7 +154,7 @@ export default function LiveAssistantPage() {
     window.speechSynthesis.speak(utterance);
   }, [locale]);
 
-  useEffect(() => {
+useEffect(() => {
     queueMicrotask(() => {
       setVoiceSupported(Boolean(window.SpeechRecognition || window.webkitSpeechRecognition));
       const savedUser = localStorage.getItem("cealeg_user");
@@ -181,7 +184,9 @@ export default function LiveAssistantPage() {
         .then((response) => response.json())
         .then((data) => {
           const enabled = Boolean(data.cloudVision?.enabled);
+          const aiEnabled = Boolean(data.aiVision?.enabled);
           setCloudVision(enabled);
+          setAiVisionEnabled(aiEnabled);
 
           if (!enabled) {
             setMessage(pick(
@@ -190,7 +195,10 @@ export default function LiveAssistantPage() {
             ));
           }
         })
-        .catch(() => setCloudVision(false));
+        .catch(() => {
+          setCloudVision(false);
+          setAiVisionEnabled(false);
+        });
 
       fetch(`${API_URL}/billing/status`)
         .then(async (response) => {
@@ -454,7 +462,7 @@ export default function LiveAssistantPage() {
     );
   }
 
-  const analyzeFrame = useCallback(async () => {
+const analyzeFrame = useCallback(async () => {
     if (!hasLiveAssistantAccess) {
       setBillingGate({
         code: "paid_plan_required",
@@ -469,7 +477,7 @@ export default function LiveAssistantPage() {
 
     if (
       document.hidden ||
-      !cloudVision ||
+      !aiVisionEnabled ||
       !videoRef.current ||
       analyzingRef.current
     ) return;
@@ -490,38 +498,31 @@ export default function LiveAssistantPage() {
       canvas.height = Math.round(video.videoHeight * scale);
       canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
       const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
-      const form = new FormData();
-      form.append("frame", blob, "camera.jpg");
-      const response = await fetch(`${API_URL}/ai/identify-product-frame`, {
-        method: "POST",
-        body: form,
-        signal: abortController.signal,
+      
+      const provider = getAIProvider();
+      if (!provider.isAvailable()) {
+        throw new Error("Serviciul AI nu este disponibil momentan.");
+      }
+      
+      const result = await provider.identify(blob);
+
+      if (!result.identified) {
+        setMessage(result.message || "Încă nu văd clar produsul. Apropie partea frontală a ambalajului.");
+        return;
+      }
+
+      const productMessage = `Am găsit ${result.product_name}. Poți deschide analiza completă.`;
+      setCandidate({
+        name: result.product_name,
+        brand: result.brand,
+        variant: result.variant,
+        barcode: result.barcode,
+        confidence: result.confidence,
+        needs_barcode: result.needs_barcode,
+        message: result.message,
       });
-      const data = await response.json();
-
-      if (data.code === "scan_limit_reached") {
-        setBillingGate(data);
-        setMessage(data.error || pick("Limita gratuită a fost atinsă.", "The free scan limit has been reached."));
-        return;
-      }
-
-      if (!response.ok) throw new Error(data.error || "Cadrul nu a putut fi analizat.");
-
-      if (!data.identified) {
-        setMessage(data.message || "Încă nu văd clar produsul. Apropie partea frontală a ambalajului.");
-        return;
-      }
-
-      if (data.product) {
-        const productMessage = `Am găsit ${data.product.name}. Poți deschide analiza completă.`;
-        setCandidate({ ...data.candidate, product: data.product });
-        setMessage(productMessage);
-        speak(productMessage);
-        return;
-      }
-
-      setCandidate(data.candidate);
-      setMessage(data.candidate?.message || "Am recunoscut ambalajul. Arată și codul de bare pentru confirmare.");
+      setMessage(productMessage);
+      speak(productMessage);
     } catch (requestError) {
       if (requestError.name !== "AbortError") {
         setError(requestError.message);
@@ -531,7 +532,7 @@ export default function LiveAssistantPage() {
       analyzingRef.current = false;
       setIsAnalyzing(false);
     }
-  }, [cloudVision, currentPlan, hasLiveAssistantAccess, pick, speak]);
+  }, [aiVisionEnabled, currentPlan, hasLiveAssistantAccess, pick, speak]);
 
   useEffect(() => {
     if (!isCameraOn || !cloudVision) return undefined;

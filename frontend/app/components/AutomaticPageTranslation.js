@@ -23,7 +23,6 @@ const translations = {
   "Vezi coșul": "View cart",
   "Caută alternative potrivite": "Find suitable alternatives",
   "Alternative potrivite": "Suitable alternatives",
-  "Favorite": "Favorites",
   "Coș inteligent": "Smart cart",
   "Coșul este gol": "Your cart is empty",
   "Adaugă magazin nou": "Add new store",

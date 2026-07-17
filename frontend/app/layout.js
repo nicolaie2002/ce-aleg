@@ -5,10 +5,11 @@ import { AutomaticPageTranslation } from "./components/AutomaticPageTranslation"
 import { ThemeProvider } from "./components/ThemeProvider";
 import { LegalFooter } from "./components/LegalFooter";
 import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
-import { Analytics } from "./components/Analytics";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
 import { BackendWarmup } from "./components/BackendWarmup";
 import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
+import { PostHogProvider } from "@/components/PostHogProvider";
+import { Analytics } from "./components/Analytics";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -189,8 +190,10 @@ export default function RootLayout({ children }) {
             <CarbonVaporBackground />
               <BackendWarmup />
               <ServiceWorkerRegistration />
-            <Analytics />
-            {children}
+            <PostHogProvider>
+              <Analytics />
+              {children}
+            </PostHogProvider>
             <LegalFooter />
             <CookieConsentBanner />
           </ThemeProvider>

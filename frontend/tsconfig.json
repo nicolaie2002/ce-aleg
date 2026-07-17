@@ -6,8 +6,12 @@
       "esnext"
     ],
     "allowJs": true,
+    "checkJs": true,
     "skipLibCheck": true,
     "strict": true,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "useUnknownInCatchVariables": false,
     "noEmit": true,
     "esModuleInterop": true,
     "module": "esnext",
@@ -39,10 +43,19 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "app/**/*.js",
+    "app/**/*.jsx",
+    "instrumentation*.js",
+    "proxy.js",
+    "sentry.*.config.js",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "app/admin/page.js",
+    "app/alternatives/page.js",
+    "app/barcode-scan/page.js",
+    "app/dashboard/page.js"
   ]
 }

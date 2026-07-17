@@ -8,8 +8,8 @@ export function PasswordField({
   label,
   value,
   onChange,
-  placeholder,
-  minLength,
+  placeholder = "",
+  minLength = undefined,
   autoComplete,
   required = true,
 }) {

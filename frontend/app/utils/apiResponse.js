@@ -1,4 +1,4 @@
-export async function readApiJson(response) {
+export async function readApiJson(response, _context = "") {
   const contentType = response.headers.get("content-type") || "";
 
   if (contentType.includes("application/json")) {
@@ -21,12 +21,12 @@ const apiCodeTranslations = {
   auth_required: "Sign in is required.",
   invalid_scan_image: "The selected image could not be processed.",
   invalid_server_response: "The server response could not be read. Refresh and try again.",
+  validation_error: "Check the information you entered and try again.",
   wrong_account: "You cannot access another account's data.",
 };
 
 const apiErrorTranslations = {
   "Autentificare necesară.": "Sign in is required.",
-  "Autentificare necesara.": "Sign in is required.",
   "Acces rezervat administratorului.": "Administrator access is required.",
   "Nu poți accesa datele altui cont.": "You cannot access another account's data.",
   "Nu poti accesa datele altui cont.": "You cannot access another account's data.",

@@ -35,6 +35,10 @@ Assert-CommandSucceeded "Backend lint"
 Assert-CommandSucceeded "Backend tests"
 Pop-Location
 
+Write-Host "Checking representative backend p95 latency..."
+& $python (Join-Path $PSScriptRoot "benchmark-backend.py") --iterations 60 --threshold-ms 500
+Assert-CommandSucceeded "Backend latency benchmark"
+
 Write-Host "Scanning source files for exposed production secrets..."
 $secretPattern = "(sk_(live|test)_[A-Za-z0-9]{20,}|whsec_[A-Za-z0-9]{20,}|xkeysib-[A-Za-z0-9_-]{20,}|sb_secret_[A-Za-z0-9_-]{20,})"
 $secretMatches = & rg `

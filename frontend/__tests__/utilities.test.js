@@ -72,6 +72,9 @@ describe("API response utilities", () => {
     expect(localizeApiMessage("ignored", pickEnglish, "auth_required")).toBe(
       "Sign in is required."
     );
+    expect(
+      localizeApiMessage("Numele este obligatoriu.", pickEnglish, "validation_error")
+    ).toBe("Check the information you entered and try again.");
     expect(localizeApiMessage("Autentificare necesara.", pickEnglish)).toBe(
       "Sign in is required."
     );

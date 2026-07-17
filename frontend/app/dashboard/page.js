@@ -639,6 +639,8 @@ export default function DashboardPage() {
       tone: "border-violet-300/25 bg-violet-300/[0.08] text-violet-100",
       actionHref: "/pricing",
       actionLabel: pick("Vezi planurile", "See plans"),
+      actionOnClick: usage.plan === "pro" || usage.plan === "family" ? handleOpenBillingPortal : undefined,
+      actionLabelOverride: usage.plan === "pro" || usage.plan === "family" ? pick("Administrează abonamentul", "Manage subscription") : undefined,
     },
     {
       label: pick("Scanări", "Scans"),

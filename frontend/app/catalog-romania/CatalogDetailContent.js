@@ -20,6 +20,7 @@ import {
   getLocalizedSeoStore,
 } from "./seo-data";
 
+/** @param {import("react").ComponentProps<typeof CatalogSeoLayout>} props */
 function DetailLayout({ children, ...props }) {
   const { pick } = useLocale();
 

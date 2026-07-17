@@ -330,6 +330,18 @@ textarea:focus {
   }
 }
 
+@keyframes ce-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes ce-gradient-drift {
   0%,
   100% {
@@ -431,6 +443,10 @@ textarea:focus {
 
 @utility transition-smooth {
   transition: var(--transition-smooth);
+}
+
+.animate-slide-up {
+  animation: ce-slide-up 300ms ease-out;
 }
 
 .ce-shell {

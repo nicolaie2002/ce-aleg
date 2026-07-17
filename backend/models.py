@@ -263,3 +263,18 @@ class ConsentRecord(db.Model):
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
 
     user = db.relationship("User", backref="consent_records")
+
+
+class ConsentLog(db.Model):
+    __tablename__ = "consent_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=True, index=True)
+    session_id = db.Column(db.String(128), nullable=False, index=True)
+    categories = db.Column(db.JSON, nullable=False)
+    version = db.Column(db.String(40), nullable=False)
+    ip = db.Column(db.String(45), nullable=True)
+    user_agent = db.Column(db.String(512), nullable=True)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+
+    user = db.relationship("User", backref="consent_logs")

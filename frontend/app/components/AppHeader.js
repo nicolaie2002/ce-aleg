@@ -39,7 +39,7 @@ const PROTECTED_ROUTE_PREFIXES = [
   "/submit-product",
 ];
 
-export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
+export function AppHeader({ actionHref = "/barcode-scan", actionLabel = "" }) {
   const { pick } = useLocale();
   const pathname = usePathname();
   const [cartCount, setCartCount] = useState(0);

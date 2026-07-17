@@ -94,6 +94,12 @@ function toPublicAnalyticsMetadata(metadata = {}) {
   );
 }
 
+let posthogInstance = null;
+
+export function setPostHogInstance(instance) {
+  posthogInstance = instance;
+}
+
 export function trackEvent(name, metadata = {}) {
   if (
     typeof window === "undefined" ||
@@ -111,6 +117,10 @@ export function trackEvent(name, metadata = {}) {
   if (!eventName) return;
 
   const safeMetadata = toPublicAnalyticsMetadata(metadata);
+
+  if (posthogInstance) {
+    posthogInstance.capture(eventName, safeMetadata);
+  }
 
   if (window.gtag) {
     window.gtag("event", eventName, safeMetadata);

@@ -20,6 +20,7 @@ import re
 import unicodedata
 import requests
 import smtplib
+import threading
 from io import BytesIO, StringIO
 from uuid import uuid4
 from difflib import SequenceMatcher
@@ -73,6 +74,7 @@ from models import (
     UsageEvent,
     StripeWebhookEvent,
     ConsentRecord,
+    ConsentLog,
 )
 
 
@@ -119,6 +121,7 @@ APPROX_RON_EXCHANGE_RATES = {
     "MDL": 0.26,
 }
 RATE_LIMIT_BUCKETS = defaultdict(deque)
+RATE_LIMIT_BUCKETS_LOCK = threading.RLock()
 REDIS_CLIENT = None
 REDIS_RETRY_AFTER = 0
 CACHE_METRICS = {"hits": 0, "misses": 0, "writes": 0, "errors": 0}
@@ -2618,16 +2621,18 @@ def rate_limit(scope, limit, window_seconds, identity_value=None):
             app.logger.warning("Redis rate limiter unavailable; using local fallback: %s", error)
 
     key = f"{scope}:{identity}"
-    bucket = RATE_LIMIT_BUCKETS[key]
 
-    while bucket and now - bucket[0] > window_seconds:
-        bucket.popleft()
+    with RATE_LIMIT_BUCKETS_LOCK:
+        bucket = RATE_LIMIT_BUCKETS[key]
 
-    if len(bucket) >= limit:
-        return False
+        while bucket and now - bucket[0] > window_seconds:
+            bucket.popleft()
 
-    bucket.append(now)
-    return True
+        if len(bucket) >= limit:
+            return False
+
+        bucket.append(now)
+        return True
 
 
 def validate_request_payload():
@@ -17877,13 +17882,12 @@ def lookup_barcode(barcode):
 
 register_blueprints(app)
 
+# Schema and release data changes are intentionally absent from application
+# startup. Run `python migration.py release` before deploying this process.
+if PRODUCTION_MODE:
+    from migration import assert_database_at_head
 
-with app.app_context():
-    db.create_all()
-    ensure_database_columns()
-    ensure_database_indexes()
-    ensure_invite_codes_for_existing_users()
-    ensure_configured_admin()
+    assert_database_at_head(database_url=RUNTIME_CONFIG.database_url)
 
 
 if __name__ == "__main__":

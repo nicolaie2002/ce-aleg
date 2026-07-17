@@ -1,4 +1,5 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import withPWA from "@ducanh2912/next-pwa";
 
 const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5001";
 const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
@@ -64,7 +65,35 @@ const contentSecurityPolicy = [
   .filter(Boolean)
   .join("; ");
 
-const nextConfig = {
+const withPWAConfig = withPWA({
+  dest: "public",
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV === "development",
+  runtimeCaching: [
+    {
+      urlPattern: /^https:\/\/images\.openfoodfacts\.org/,
+      handler: "CacheFirst",
+      options: {
+        cacheName: "product-images",
+        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
+      },
+    },
+    {
+      urlPattern: /^https:\/\/.*\.supabase\.co/,
+      handler: "NetworkFirst",
+      options: { cacheName: "supabase-api", networkTimeoutSeconds: 10 },
+    },
+    {
+      urlPattern: /\/api\/backend/,
+      handler: "NetworkFirst",
+      options: { cacheName: "api-cache", networkTimeoutSeconds: 5 },
+    },
+  ],
+  fallbacks: { document: "/offline" },
+});
+
+const nextConfig = withPWAConfig({
   poweredByHeader: false,
   compress: true,
   images: {
@@ -159,7 +188,7 @@ const nextConfig = {
       },
     ];
   },
-};
+});
 
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,

@@ -64,6 +64,7 @@ jobs:
           python -m py_compile \
             app.py \
             app_factory.py \
+            migration.py \
             ai_provider.py \
             ai_providers.py \
             api_docs.py \
@@ -80,10 +81,11 @@ jobs:
             recategorize_catalog.py \
             seed_e2e.py \
             time_utils.py
-          python -m compileall -q routes
+          python -m compileall -q migrations routes
           ruff check \
             app.py \
             app_factory.py \
+            migration.py \
             ai_provider.py \
             ai_providers.py \
             api_docs.py \
@@ -100,11 +102,18 @@ jobs:
             recategorize_catalog.py \
             seed_e2e.py \
             time_utils.py \
+            migrations \
             routes \
             --select E9,F63,F7,F82
 
       - name: Check backup and restore scripts
         run: bash -n ../scripts/backup-supabase.sh ../scripts/restore-supabase.sh
+
+      - name: Verify versioned migrations on PostgreSQL
+        run: |
+          python migration.py upgrade
+          python migration.py downgrade base
+          python migration.py upgrade
 
       - name: Smoke-test Flask application
         run: |

@@ -14,16 +14,36 @@ const customJestConfig = {
     "^@/(.*)$": "<rootDir>/$1",
   },
   collectCoverageFrom: [
-    "app/error.tsx",
-    "app/components/{BackendWarmup,ConfirmModal,CookieConsentBanner,LanguageSwitcher,LocaleProvider,ProductImage}.js",
-    "app/utils/{apiResponse,getImageUrl,passwordStrength,profilePreferences}.js",
+    "app/**/*.{js,jsx,ts,tsx}",
+    "instrumentation*.js",
+    "proxy.js",
+    "sentry.*.config.js",
+    "!app/**/*.d.ts",
   ],
   coverageThreshold: {
-    global: {
+    "./app/components/useTranslatedText.js": {
+      branches: 75,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    "./app/utils/analytics.js": {
       branches: 60,
+      functions: 85,
+      lines: 90,
+      statements: 85,
+    },
+    "./app/utils/apiResponse.js": {
+      branches: 90,
+      functions: 95,
+      lines: 95,
+      statements: 95,
+    },
+    "./app/utils/authStorage.js": {
+      branches: 50,
       functions: 60,
-      lines: 60,
-      statements: 60,
+      lines: 75,
+      statements: 70,
     },
   },
 };
