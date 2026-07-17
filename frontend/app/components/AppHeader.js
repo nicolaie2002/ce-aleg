@@ -22,7 +22,22 @@ import { useLocale } from "./LocaleProvider";
 import { API_URL } from "../config";
 import { getActiveProfile } from "../utils/profilePreferences";
 
-const NO_PREFETCH_ROUTES = new Set(["/barcode-scan", "/live-assistant", "/cart", "/store"]);
+const PROTECTED_ROUTE_PREFIXES = [
+  "/admin",
+  "/alternatives",
+  "/barcode-scan",
+  "/cart",
+  "/dashboard",
+  "/favorites",
+  "/history",
+  "/live-assistant",
+  "/missions",
+  "/preferences",
+  "/result",
+  "/scan",
+  "/store",
+  "/submit-product",
+];
 
 export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
   const { pick } = useLocale();
@@ -83,7 +98,9 @@ export function AppHeader({ actionHref = "/barcode-scan", actionLabel }) {
   }
 
   function shouldPrefetchRoute(href) {
-    return !NO_PREFETCH_ROUTES.has(href);
+    return !PROTECTED_ROUTE_PREFIXES.some(
+      (prefix) => href === prefix || href.startsWith(`${prefix}/`) || href.startsWith(`${prefix}?`)
+    );
   }
 
   useEffect(() => {

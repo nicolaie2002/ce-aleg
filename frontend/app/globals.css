@@ -544,8 +544,7 @@ textarea:focus {
 }
 
 .ce-interactive-surface[data-ce-ambient="true"] {
-  animation: ce-surface-orbit var(--ce-motion-duration, 9.5s) ease-in-out infinite;
-  animation-delay: calc(var(--ce-reveal-index, 0) * 120ms);
+  animation: none;
 }
 
 .ce-interactive-surface::before {
@@ -613,31 +612,27 @@ textarea:focus {
 }
 
 .ce-interactive-surface[data-ce-ambient="true"].ce-reveal {
-  animation:
-    ce-fade-up 520ms ease both,
-    ce-surface-orbit var(--ce-motion-duration, 9.5s) ease-in-out infinite;
-  animation-delay: 0ms, 620ms;
+  animation: ce-fade-up 520ms ease both;
+  animation-delay: 0ms;
 }
 
 .ce-interactive-surface[data-ce-ambient="true"].ce-reveal-delay-1 {
-  animation-delay: 80ms, 700ms;
+  animation-delay: 80ms;
 }
 
 .ce-interactive-surface[data-ce-ambient="true"].ce-reveal-delay-2 {
-  animation-delay: 160ms, 780ms;
+  animation-delay: 160ms;
 }
 
 .ce-interactive-surface[data-ce-ambient="true"].ce-reveal-delay-3 {
-  animation-delay: 240ms, 860ms;
+  animation-delay: 240ms;
 }
 
 .ce-reveal.ce-pricing-note,
 .ce-reveal.ce-usage-banner,
 .ce-reveal.ce-family-panel {
-  animation:
-    ce-fade-up 520ms ease both,
-    ce-soft-card-float var(--ce-motion-duration, 10.5s) ease-in-out infinite;
-  animation-delay: 0ms, 620ms;
+  animation: ce-fade-up 520ms ease both;
+  animation-delay: 0ms;
 }
 
 [data-ce-scroll-reveal="pending"] {
@@ -741,34 +736,7 @@ textarea:focus {
 .ce-pricing-note,
 .ce-usage-banner,
 .ce-family-panel {
-  transform-style: preserve-3d;
-  animation: ce-soft-card-float var(--ce-motion-duration, 10.5s) ease-in-out infinite;
-  animation-delay: calc(var(--ce-reveal-index, 0) * 120ms);
-  will-change: transform, translate;
-}
-
-.ce-panel-interactive:not(.ce-interactive-surface):nth-of-type(2n),
-.ce-subtle-card:not(.ce-interactive-surface):nth-of-type(2n),
-.ce-stat-card:not(.ce-interactive-surface):nth-of-type(2n),
-.ce-plan-card:not(.ce-interactive-surface):nth-of-type(2n),
-.ce-store-logo-card:not(.ce-interactive-surface):nth-of-type(2n) {
-  --ce-motion-duration: 12.5s;
-}
-
-.ce-panel-interactive:not(.ce-interactive-surface):nth-of-type(3n),
-.ce-subtle-card:not(.ce-interactive-surface):nth-of-type(3n),
-.ce-stat-card:not(.ce-interactive-surface):nth-of-type(3n),
-.ce-plan-card:not(.ce-interactive-surface):nth-of-type(3n),
-.ce-store-logo-card:not(.ce-interactive-surface):nth-of-type(3n) {
-  --ce-motion-duration: 14s;
-}
-
-.ce-panel-interactive:not(.ce-interactive-surface):hover,
-.ce-subtle-card:not(.ce-interactive-surface):hover,
-.ce-stat-card:not(.ce-interactive-surface):hover,
-.ce-plan-card:not(.ce-interactive-surface):hover,
-.ce-store-logo-card:not(.ce-interactive-surface):hover {
-  animation-play-state: paused;
+  animation: none;
 }
 
 .ce-nav-link {

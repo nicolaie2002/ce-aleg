@@ -59,3 +59,12 @@ jobs:
           BACKEND_URL: http://127.0.0.1:5001
           NEXT_PUBLIC_API_URL: /api/backend
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run accessibility tests
+        env:
+          BACKEND_URL: http://127.0.0.1:5001
+          NEXT_PUBLIC_API_URL: /api/backend
+        run: npm run test:a11y

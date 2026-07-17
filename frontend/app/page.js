@@ -337,7 +337,12 @@ export default function Home() {
       </section>
 
       <section className="border-b border-white/10 bg-[#080d12]">
-        <div className="ce-shell ce-mobile-snap-row flex gap-4 overflow-x-auto py-8 md:grid md:grid-cols-3 md:overflow-visible xl:py-10">
+        <div
+          className="ce-shell ce-mobile-snap-row flex gap-4 overflow-x-auto py-8 md:grid md:grid-cols-3 md:overflow-visible xl:py-10"
+          role="region"
+          aria-label={pick("Cum funcționează", "How it works")}
+          tabIndex={0}
+        >
           {steps.map(({ icon: Icon, title, detail }, index) => (
             <InteractiveSurface
               as="article"
@@ -444,7 +449,12 @@ export default function Home() {
             </InteractiveSurface>
           </div>
 
-          <div className="ce-mobile-snap-row mt-5 flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0">
+          <div
+            className="ce-mobile-snap-row mt-5 flex gap-4 overflow-x-auto pb-2 lg:grid lg:grid-cols-3 lg:overflow-visible lg:pb-0"
+            role="region"
+            aria-label={pick("Exemple de verdicturi", "Verdict examples")}
+            tabIndex={0}
+          >
               {verdictCards.map(({ icon: Icon, image, tone, badge, title, score, detail, points }, index) => (
                 <InteractiveSurface
                   as="article"
@@ -512,7 +522,12 @@ export default function Home() {
               </p>
             </div>
 
-            <div className="ce-mobile-snap-row flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:overflow-visible md:pb-0">
+            <div
+              className="ce-mobile-snap-row flex gap-4 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:overflow-visible md:pb-0"
+              role="region"
+              aria-label={pick("Ce poți face în aplicație", "What you can do in the app")}
+              tabIndex={0}
+            >
               {capabilities.map(({ icon: Icon, label, detail }, index) => (
                 <InteractiveSurface
                   as="article"

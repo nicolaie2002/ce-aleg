@@ -8,7 +8,6 @@ from PIL import Image, ImageOps
 from sqlalchemy import func, or_, text
 from sqlalchemy.exc import IntegrityError
 from dotenv import load_dotenv
-import base64
 import csv
 import hashlib
 import hmac
@@ -16,7 +15,6 @@ import json
 import logging
 import math
 import os
-import secrets
 import time
 import re
 import unicodedata
@@ -53,7 +51,10 @@ except ImportError:
     FlaskIntegration = None
 
 from database import db
+from app_factory import create_app
 from ai_provider import get_vision_provider, VisionProviderError, VisionProviderNotConfigured
+from catalog_quality import build_catalog_quality_report
+from config import DEFAULT_AUTH_SECRET, RuntimeConfig, read_secret_env
 from models import (
     User,
     Product,
@@ -71,9 +72,11 @@ from models import (
 )
 
 
+BACKEND_DIR = os.path.dirname(os.path.abspath(__file__))
+
 # Load the local file before reading any configuration. Hosted environments keep
 # precedence because override=False is the default.
-load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
+load_dotenv(os.path.join(BACKEND_DIR, ".env"))
 
 
 OPEN_FOOD_FACTS_ALTERNATIVES_CACHE = {}
@@ -115,9 +118,15 @@ RATE_LIMIT_BUCKETS = defaultdict(deque)
 REDIS_CLIENT = None
 REDIS_RETRY_AFTER = 0
 CACHE_METRICS = {"hits": 0, "misses": 0, "writes": 0, "errors": 0}
-APP_ENV = os.environ.get("APP_ENV", "development").strip().lower()
-PRODUCTION_MODE = APP_ENV in {"production", "prod"}
-DEFAULT_AUTH_SECRET = "local-development-change-this-secret"
+RUNTIME_CONFIG = RuntimeConfig.from_env()
+APP_ENV = RUNTIME_CONFIG.app_env
+PRODUCTION_MODE = RUNTIME_CONFIG.production_mode
+EXTERNAL_CATALOG_ENABLED = os.environ.get(
+    "EXTERNAL_CATALOG_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes", "on"}
+OPEN_PRICES_ENABLED = os.environ.get(
+    "OPEN_PRICES_ENABLED", "true"
+).strip().lower() in {"1", "true", "yes", "on"}
 GLOBAL_RATE_LIMIT = int(os.environ.get("GLOBAL_RATE_LIMIT", "300"))
 GLOBAL_RATE_LIMIT_WINDOW = int(os.environ.get("GLOBAL_RATE_LIMIT_WINDOW", "60"))
 AUTH_RATE_LIMIT = int(os.environ.get("AUTH_RATE_LIMIT", "5"))
@@ -272,18 +281,35 @@ OFF_FALLBACK_BARCODES_BY_CATEGORY = {
 }
 
 
-def read_secret_env(name, default=""):
-    value = os.environ.get(name, default).strip().strip("\"'")
-    prefixed_name = f"{name}="
-
-    if value.startswith(prefixed_name):
-        value = value[len(prefixed_name):].strip().strip("\"'")
-
-    return value
-
-app = Flask(__name__)
+app = create_app(__name__, RUNTIME_CONFIG, app_class=Flask)
 
 SENTRY_DSN = read_secret_env("SENTRY_DSN")
+
+
+def sanitize_sentry_event(event, _hint):
+    request_data = event.get("request")
+
+    if isinstance(request_data, dict):
+        request_data.pop("data", None)
+        request_data.pop("cookies", None)
+        request_data["query_string"] = ""
+        headers = request_data.get("headers")
+
+        if isinstance(headers, dict):
+            for header_name in list(headers):
+                if header_name.lower() in {
+                    "authorization",
+                    "cookie",
+                    "set-cookie",
+                    "x-api-key",
+                }:
+                    headers.pop(header_name, None)
+
+    user_data = event.get("user")
+    if isinstance(user_data, dict):
+        event["user"] = {"id": user_data.get("id")} if user_data.get("id") else {}
+
+    return event
 
 if SENTRY_DSN and sentry_sdk is not None:
     sentry_sdk.init(
@@ -296,6 +322,8 @@ if SENTRY_DSN and sentry_sdk is not None:
             min(1.0, float(os.environ.get("SENTRY_TRACES_SAMPLE_RATE", "0.05"))),
         ),
         send_default_pii=False,
+        max_request_body_size="never",
+        before_send=sanitize_sentry_event,
     )
 
 
@@ -391,38 +419,12 @@ def get_frontend_origins():
 frontend_origins = get_frontend_origins()
 CORS(app, resources={r"/*": {"origins": frontend_origins}}, supports_credentials=True)
 
-database_url = os.environ.get("DATABASE_URL", "").strip()
-
-if PRODUCTION_MODE and not database_url:
-    raise RuntimeError(
-        "DATABASE_URL is required in production. "
-        "Refusing to use ephemeral SQLite storage."
-    )
-
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql+psycopg://", 1)
-elif database_url.startswith("postgresql://"):
-    database_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url or "sqlite:///cealeg.db"
-app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = (
-    {
-        "pool_pre_ping": True,
-        "pool_recycle": 240,
-        "connect_args": {"sslmode": "require"},
-    }
-    if database_url.startswith("postgresql+psycopg://")
-    else {}
-)
-app.config["MAX_CONTENT_LENGTH"] = int(
-    os.environ.get("MAX_UPLOAD_MB", "8")
-) * 1024 * 1024
-Image.MAX_IMAGE_PIXELS = int(os.environ.get("MAX_IMAGE_PIXELS", "24000000"))
+database_url = RUNTIME_CONFIG.database_url
+Image.MAX_IMAGE_PIXELS = RUNTIME_CONFIG.max_image_pixels
 
 db.init_app(app)
 
-UPLOAD_FOLDER = "uploads"
+UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER") or os.path.join(BACKEND_DIR, "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 SUBMISSIONS_FOLDER = os.path.join(UPLOAD_FOLDER, "submissions")
@@ -430,21 +432,10 @@ os.makedirs(SUBMISSIONS_FOLDER, exist_ok=True)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_SERVICE_ROLE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
+SUPABASE_STORAGE_ENABLED = os.environ.get("SUPABASE_STORAGE_ENABLED", "true").lower() == "true"
 SUPABASE_PRODUCT_IMAGES_BUCKET = os.environ.get(
     "SUPABASE_PRODUCT_IMAGES_BUCKET", "product-images"
 )
-configured_auth_secret = read_secret_env("AUTH_SECRET")
-
-if PRODUCTION_MODE and (
-    not configured_auth_secret
-    or configured_auth_secret == DEFAULT_AUTH_SECRET
-    or len(configured_auth_secret) < 32
-):
-    raise RuntimeError(
-        "AUTH_SECRET must be a unique value of at least 32 characters in production."
-    )
-
-app.config["AUTH_SECRET"] = configured_auth_secret or secrets.token_urlsafe(48)
 SUPABASE_SUBMISSIONS_BUCKET = os.environ.get(
     "SUPABASE_SUBMISSIONS_BUCKET", "product-submissions"
 )
@@ -1161,12 +1152,15 @@ def render_brand_email(preheader, title, intro, button_label=None, button_url=No
     """
 
 
-def send_admin_alert(subject, intro, details=None, alert_key=None, min_interval_seconds=3600):
+def send_admin_alert(
+    subject,
+    intro,
+    details=None,
+    alert_key=None,
+    min_interval_seconds=3600,
+    severity="warning",
+):
     admin_email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
-
-    if not admin_email or not is_valid_email_address(admin_email) or not is_email_configured():
-        return False
-
     key = alert_key or subject
     now = time.time()
     last_sent_at = ADMIN_ALERT_THROTTLE.get(key, 0)
@@ -1175,6 +1169,40 @@ def send_admin_alert(subject, intro, details=None, alert_key=None, min_interval_
         return False
 
     ADMIN_ALERT_THROTTLE[key] = now
+    delivered = False
+    normalized_severity = severity if severity in {"debug", "info", "warning", "error", "fatal"} else "warning"
+
+    if sentry_sdk is not None and SENTRY_DSN:
+        try:
+            with sentry_sdk.new_scope() as scope:
+                scope.set_tag("alert_key", str(key)[:120])
+                scope.set_tag("alert_channel", "application")
+                scope.set_extra("alert_intro", str(intro)[:500])
+                sentry_sdk.capture_message(subject, level=normalized_severity)
+            delivered = True
+        except Exception as error:
+            app.logger.warning("Sentry alert delivery failed: %s", error)
+
+    webhook_url = read_secret_env("ALERT_WEBHOOK_URL")
+    if webhook_url and (webhook_url.startswith("https://") or not PRODUCTION_MODE):
+        try:
+            webhook_response = requests.post(
+                webhook_url,
+                json={
+                    "text": f"[Ce aleg] {subject}: {intro}",
+                    "subject": subject,
+                    "intro": intro,
+                    "severity": normalized_severity,
+                    "details": [str(item)[:500] for item in (details or [])[:20]],
+                    "adminUrl": f"{FRONTEND_PUBLIC_URL}/admin",
+                },
+                timeout=3,
+            )
+            webhook_response.raise_for_status()
+            delivered = True
+        except Exception as error:
+            app.logger.warning("Alert webhook delivery failed: %s", error)
+
     text_body = "\n".join([
         subject,
         "",
@@ -1194,7 +1222,15 @@ def send_admin_alert(subject, intro, details=None, alert_key=None, min_interval_
         tone="danger",
     )
 
-    return send_transactional_email(admin_email, f"[Ce aleg] {subject}", text_body, html_body)
+    if admin_email and is_valid_email_address(admin_email) and is_email_configured():
+        delivered = send_transactional_email(
+            admin_email,
+            f"[Ce aleg] {subject}",
+            text_body,
+            html_body,
+        ) or delivered
+
+    return delivered
 
 
 def send_welcome_email(user):
@@ -2135,7 +2171,12 @@ def find_inviter_by_code(code):
     if not normalized_code:
         return None
 
-    return User.query.filter(func.upper(User.invite_code) == normalized_code).first()
+    normalized_column = func.upper(User.invite_code)
+
+    for separator in ("-", "_", " "):
+        normalized_column = func.replace(normalized_column, separator, "")
+
+    return User.query.filter(normalized_column == normalized_code).first()
 
 
 def bonus_unlimited_is_active(user, now=None):
@@ -2891,7 +2932,35 @@ def configure_stripe():
         return False
 
     stripe.api_key = secret_key
+    stripe.max_network_retries = max(
+        0,
+        min(5, int(os.environ.get("STRIPE_MAX_NETWORK_RETRIES", "2"))),
+    )
+    configured_api_version = os.environ.get("STRIPE_API_VERSION", "").strip()
+    if configured_api_version:
+        stripe.api_version = configured_api_version
     return True
+
+
+def build_stripe_idempotency_key(scope, user_id, *parts, window_seconds=120):
+    supplied_key = request.headers.get("Idempotency-Key", "").strip()
+
+    if supplied_key and not re.fullmatch(r"[A-Za-z0-9._:-]{8,200}", supplied_key):
+        supplied_key = ""
+
+    operation_marker = supplied_key or str(int(time.time() // max(30, window_seconds)))
+    raw_value = ":".join([
+        str(scope),
+        str(user_id),
+        *(str(part) for part in parts),
+        operation_marker,
+    ])
+    digest = hmac.new(
+        app.config["AUTH_SECRET"].encode("utf-8"),
+        raw_value.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"cealeg:{scope}:{digest}"[:255]
 
 
 def stripe_customer_is_usable(customer_id):
@@ -2955,9 +3024,17 @@ def apply_stripe_customer_to_checkout(checkout_params, subscription, user, allow
     return None
 
 
-def create_checkout_session_with_stale_customer_retry(checkout_params, subscription, user):
+def create_checkout_session_with_stale_customer_retry(
+    checkout_params,
+    subscription,
+    user,
+    idempotency_key,
+):
     try:
-        return stripe.checkout.Session.create(**checkout_params)
+        return stripe.checkout.Session.create(
+            **checkout_params,
+            idempotency_key=idempotency_key,
+        )
     except Exception as error:
         if (
             subscription
@@ -2975,7 +3052,10 @@ def create_checkout_session_with_stale_customer_retry(checkout_params, subscript
             retry_params.pop("customer", None)
             retry_params.pop("customer_update", None)
             retry_params["customer_email"] = user.email
-            return stripe.checkout.Session.create(**retry_params)
+            return stripe.checkout.Session.create(
+                **retry_params,
+                idempotency_key=f"{idempotency_key}:stale-retry"[:255],
+            )
 
         raise
 
@@ -4636,6 +4716,7 @@ ADMIN_ENDPOINTS = {
     "export_admin_payment_events",
     "resolve_admin_alternative_report",
     "recategorize_admin_catalog",
+    "get_admin_catalog_quality",
     "send_admin_mission_digest",
     "run_admin_retention",
     "update_admin_product",
@@ -6583,6 +6664,50 @@ def find_best_product_match(search_text, store_name=None):
     return best_product, best_score
 
 
+def get_local_product_search_results(search_text, store_name=None, limit=10):
+    normalized_query = normalize_search_text(search_text)
+    query_words = [
+        word for word in normalized_query.split()
+        if len(word) >= 2 and not word.isdigit()
+    ][:8]
+    filters = []
+
+    if re.fullmatch(r"\d{4,}", str(search_text or "").strip()):
+        filters.append(Product.barcode == str(search_text).strip())
+
+    for word in query_words:
+        pattern = f"%{word}%"
+        filters.extend([
+            Product.name.ilike(pattern),
+            Product.category.ilike(pattern),
+            Product.store.ilike(pattern),
+        ])
+
+    if not filters:
+        return []
+
+    candidates = Product.query.filter(or_(*filters)).limit(160).all()
+    scored = []
+
+    for product in candidates:
+        score = product_match_score(product, search_text)
+
+        if product.barcode and product.barcode == str(search_text).strip():
+            score += 160
+        if store_name and store_name != "Fără magazin ales" and product.store == store_name:
+            score += 15
+        if score < 34:
+            continue
+
+        product_data = product_to_dict(product)
+        product_data["matchScore"] = score
+        product_data["source"] = "local_catalog"
+        scored.append((score, product.id, product_data))
+
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    return [item[2] for item in scored[:max(1, min(int(limit or 10), 20))]]
+
+
 def extract_openai_output_text(response_data):
     output_text = response_data.get("output_text")
 
@@ -6618,7 +6743,7 @@ def allowed_image_file(filename):
 
 
 def supabase_storage_enabled():
-    return bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+    return SUPABASE_STORAGE_ENABLED and bool(SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
 
 
 def upload_to_supabase_storage(image_bytes, bucket, object_path):
@@ -8692,10 +8817,18 @@ def start_checkout():
         )
 
         try:
+            idempotency_key = build_stripe_idempotency_key(
+                "subscription-checkout",
+                user.id,
+                plan,
+                billing_interval,
+                price_id,
+            )
             checkout_session = create_checkout_session_with_stale_customer_retry(
                 checkout_params,
                 subscription,
                 user,
+                idempotency_key,
             )
         except Exception as error:
             app.logger.warning("Stripe checkout session failed: %s", error)
@@ -8793,6 +8926,12 @@ def start_billing_portal():
         portal_session = stripe.billing_portal.Session.create(
             customer=subscription.provider_customer_id,
             return_url=f"{FRONTEND_PUBLIC_URL}/pricing",
+            idempotency_key=build_stripe_idempotency_key(
+                "billing-portal",
+                user.id,
+                subscription.provider_customer_id,
+                window_seconds=60,
+            ),
         )
     except Exception as error:
         app.logger.warning("Stripe billing portal failed: %s", error)
@@ -8904,6 +9043,19 @@ def stripe_webhook():
         app.logger.exception(
             "Stripe webhook handler failed for event %s",
             event_type,
+        )
+        send_admin_alert(
+            "Eroare critică webhook Stripe",
+            "Un eveniment Stripe valid nu a putut fi procesat.",
+            [
+                f"Event ID: {event_id}",
+                f"Tip: {event_type or 'unknown'}",
+                f"Încercare: {failed_record.attempts if failed_record else 1}",
+                f"Eroare: {str(error)[:500]}",
+            ],
+            alert_key=f"stripe_webhook_failed:{event_type or 'unknown'}",
+            min_interval_seconds=300,
+            severity="error",
         )
         return jsonify({
             "code": "stripe_webhook_handler_failed",
@@ -9182,10 +9334,17 @@ def start_cecoin_checkout():
     apply_stripe_customer_to_checkout(checkout_params, subscription, user)
 
     try:
+        idempotency_key = build_stripe_idempotency_key(
+            "cecoins-checkout",
+            user.id,
+            pack["id"],
+            price_id,
+        )
         checkout_session = create_checkout_session_with_stale_customer_retry(
             checkout_params,
             subscription,
             user,
+            idempotency_key,
         )
     except Exception as error:
         app.logger.warning("Stripe CeCoins checkout failed: %s", error)
@@ -9387,34 +9546,11 @@ def is_placeholder_catalog_product_name(name):
 
 
 def get_catalog_quality_snapshot():
-    total = Product.query.count()
-    with_barcode = Product.query.filter(
-        Product.barcode.isnot(None),
-        Product.barcode != "",
-    ).count()
-    with_image = Product.query.filter(
-        Product.image.isnot(None),
-        Product.image != "",
-    ).count()
-    with_nutrition = Product.query.filter(or_(
-        Product.calories.isnot(None),
-        Product.protein.isnot(None),
-        Product.sugar.isnot(None),
-        Product.fat.isnot(None),
-    )).count()
-    uncategorized = count_uncategorized_products()
-
-    return {
-        "products": total,
-        "uncategorizedProducts": uncategorized,
-        "withBarcode": with_barcode,
-        "withImage": with_image,
-        "withNutrition": with_nutrition,
-        "barcodeCoverage": round((with_barcode / total) * 100, 1) if total else 0,
-        "imageCoverage": round((with_image / total) * 100, 1) if total else 0,
-        "nutritionCoverage": round((with_nutrition / total) * 100, 1) if total else 0,
-        "uncategorizedRate": round((uncategorized / total) * 100, 1) if total else 0,
-    }
+    return build_catalog_quality_report(
+        db.session,
+        Product,
+        uncategorized_terms=UNCATEGORIZED_CATEGORY_TERMS,
+    )
 
 
 def public_catalog_stats_cache_is_fresh():
@@ -10314,6 +10450,13 @@ def update_admin_product(product_id):
     })
 
 
+@app.route("/admin/catalog/quality", methods=["GET"])
+def get_admin_catalog_quality():
+    report = get_catalog_quality_snapshot()
+    report["generatedAt"] = datetime.utcnow().isoformat() + "Z"
+    return jsonify(report)
+
+
 @app.route("/admin/catalog/recategorize", methods=["GET", "POST"])
 def recategorize_admin_catalog():
     data = request.get_json(silent=True) or {}
@@ -10411,7 +10554,10 @@ def get_cron_recategorize_min_id(limit):
 def run_retention_cleanup(apply_changes=False):
     now = datetime.utcnow()
     activity_cutoff = now - timedelta(days=RETENTION_ACTIVITY_DAYS)
+    analytics_cutoff = now - timedelta(days=ANALYTICS_RETENTION_DAYS)
+    search_cutoff = now - timedelta(days=SEARCH_RETENTION_DAYS)
     account_cutoff = now - timedelta(days=RETENTION_UNVERIFIED_ACCOUNT_DAYS)
+    rejected_submission_cutoff = now - timedelta(days=REJECTED_SUBMISSION_RETENTION_DAYS)
     scan_cutoff = time.time() - RETENTION_SCAN_FILE_HOURS * 3600
     ephemeral_event_types = {
         "alternative_report",
@@ -10423,13 +10569,16 @@ def run_retention_cleanup(apply_changes=False):
         "support_message",
     }
     usage_query = UsageEvent.query.filter(
-        UsageEvent.created_at < activity_cutoff,
         or_(
-            UsageEvent.event_type.in_(ephemeral_event_types),
-            UsageEvent.event_type.like("ui_%"),
+            (
+                UsageEvent.created_at < activity_cutoff
+            ) & UsageEvent.event_type.in_(ephemeral_event_types),
+            (
+                UsageEvent.created_at < analytics_cutoff
+            ) & UsageEvent.event_type.like("ui_%"),
         ),
     )
-    search_query = SearchEvent.query.filter(SearchEvent.created_at < activity_cutoff)
+    search_query = SearchEvent.query.filter(SearchEvent.created_at < search_cutoff)
     webhook_query = StripeWebhookEvent.query.filter(
         StripeWebhookEvent.status == "processed",
         StripeWebhookEvent.updated_at < activity_cutoff,
@@ -10443,6 +10592,10 @@ def run_retention_cleanup(apply_changes=False):
         )
         .all()
     )
+    rejected_submissions = ProductSubmission.query.filter(
+        ProductSubmission.status.in_(["rejected", "ai_rejected"]),
+        ProductSubmission.created_at < rejected_submission_cutoff,
+    ).all()
     expired_scan_files = []
 
     if os.path.isdir(UPLOAD_FOLDER):
@@ -10460,11 +10613,15 @@ def run_retention_cleanup(apply_changes=False):
     result = {
         "applied": bool(apply_changes),
         "activityCutoff": activity_cutoff.isoformat() + "Z",
+        "analyticsCutoff": analytics_cutoff.isoformat() + "Z",
+        "searchCutoff": search_cutoff.isoformat() + "Z",
         "unverifiedAccountCutoff": account_cutoff.isoformat() + "Z",
+        "rejectedSubmissionCutoff": rejected_submission_cutoff.isoformat() + "Z",
         "usageEvents": usage_query.count(),
         "searchEvents": search_query.count(),
         "webhookEvents": webhook_query.count(),
         "unverifiedAccounts": len(unverified_users),
+        "rejectedSubmissions": len(rejected_submissions),
         "scanFiles": len(expired_scan_files),
     }
 
@@ -10473,6 +10630,11 @@ def run_retention_cleanup(apply_changes=False):
 
     for user in unverified_users:
         delete_account_data(user)
+
+    for submission in rejected_submissions:
+        delete_submission_file(submission.front_image)
+        delete_submission_file(submission.nutrition_image)
+        db.session.delete(submission)
 
     usage_query.delete(synchronize_session=False)
     search_query.delete(synchronize_session=False)
@@ -10497,52 +10659,6 @@ def run_admin_retention():
     return jsonify(run_retention_cleanup(apply_changes=apply_changes))
 
 
-def purge_expired_data():
-    now = datetime.utcnow()
-    search_cutoff = now - timedelta(days=SEARCH_RETENTION_DAYS)
-    analytics_cutoff = now - timedelta(days=ANALYTICS_RETENTION_DAYS)
-    submission_cutoff = now - timedelta(days=REJECTED_SUBMISSION_RETENTION_DAYS)
-    deleted_searches = SearchEvent.query.filter(SearchEvent.created_at < search_cutoff).delete(
-        synchronize_session=False
-    )
-    deleted_analytics = UsageEvent.query.filter(
-        UsageEvent.event_type.like("ui_%"),
-        UsageEvent.created_at < analytics_cutoff,
-    ).delete(synchronize_session=False)
-    rejected_submissions = ProductSubmission.query.filter(
-        ProductSubmission.status.in_(["rejected", "ai_rejected"]),
-        ProductSubmission.created_at < submission_cutoff,
-    ).all()
-
-    for submission in rejected_submissions:
-        delete_submission_file(submission.front_image)
-        delete_submission_file(submission.nutrition_image)
-        db.session.delete(submission)
-
-    deleted_scan_files = 0
-    scan_file_cutoff = time.time() - SCAN_FILE_RETENTION_DAYS * 86400
-
-    for entry in os.scandir(UPLOAD_FOLDER):
-        try:
-            if (
-                entry.is_file(follow_symlinks=False)
-                and entry.name.startswith("scan_")
-                and entry.stat(follow_symlinks=False).st_mtime < scan_file_cutoff
-            ):
-                os.remove(entry.path)
-                deleted_scan_files += 1
-        except OSError as error:
-            app.logger.warning("Could not purge scan file %s: %s", entry.name, error)
-
-    db.session.commit()
-    return {
-        "searchEvents": int(deleted_searches or 0),
-        "analyticsEvents": int(deleted_analytics or 0),
-        "rejectedSubmissions": len(rejected_submissions),
-        "scanFiles": deleted_scan_files,
-    }
-
-
 @app.route("/internal/cron/maintenance", methods=["POST"])
 def run_cron_maintenance():
     if not cron_request_is_authorized():
@@ -10554,14 +10670,16 @@ def run_cron_maintenance():
     send_digest = str(data.get("sendDigest", "true")).lower() in {"1", "true", "yes", "on"}
     run_recategorize = str(data.get("recategorize", "true")).lower() in {"1", "true", "yes", "on"}
     run_retention = str(data.get("retention", "true")).lower() in {"1", "true", "yes", "on"}
-    run_retention = str(data.get("retention", "true")).lower() in {"1", "true", "yes", "on"}
+    run_catalog_quality = str(data.get("catalogQuality", "true")).lower() in {
+        "1", "true", "yes", "on",
+    }
     result = {
         "ok": True,
         "generatedAt": datetime.utcnow().isoformat() + "Z",
         "recategorize": None,
         "missionDigest": None,
         "retention": None,
-        "retention": None,
+        "catalogQuality": None,
     }
 
     if run_recategorize:
@@ -10582,8 +10700,31 @@ def run_cron_maintenance():
     if run_retention:
         result["retention"] = run_retention_cleanup(apply_changes=True)
 
-    if run_retention:
-        result["retention"] = purge_expired_data()
+    if run_catalog_quality:
+        result["catalogQuality"] = get_catalog_quality_snapshot()
+        try:
+            configured_threshold = float(
+                os.environ.get("CATALOG_QUALITY_ALERT_THRESHOLD", "65")
+            )
+        except (TypeError, ValueError):
+            configured_threshold = 65.0
+        threshold = max(0.0, min(100.0, configured_threshold))
+        quality = result["catalogQuality"]
+        if quality["products"] and quality["healthScore"] < threshold:
+            send_admin_alert(
+                "Calitatea catalogului este sub prag",
+                "Raportul automat a detectat prea multe produse incomplete sau invalide.",
+                [
+                    f"Scor: {quality['healthScore']}/100",
+                    f"Prag: {threshold}",
+                    f"Fără categorie: {quality['uncategorizedProducts']}",
+                    f"Fără nutriție: {quality['missingNutrition']}",
+                    f"Barcode-uri duplicate: {quality['duplicateBarcodes']}",
+                ],
+                alert_key="catalog_quality_below_threshold",
+                min_interval_seconds=86400,
+                severity="warning",
+            )
 
     return jsonify(result)
 
@@ -10825,17 +10966,29 @@ def search_products():
 
     store_name = get_store_name_from_id(store_id) if store_id else None
 
-    results = []
-    seen_keys = set()
-    seen_names = set()
+    results = get_local_product_search_results(query_text, store_name, limit=10)
+    seen_keys = {
+        normalize_search_text(f"{item.get('barcode') or ''} {item.get('name') or ''}")
+        for item in results
+    }
+    seen_names = {
+        normalize_search_text(item.get("name") or "")
+        for item in results
+    }
     cache_key = f"product-search:{normalize_search_text(query_text)}:{normalize_search_text(store_name or '')}"
     cached_results = get_cached_product_search_results(cache_key)
-    source = "openfoodfacts"
+    external_results = []
+    external_seen_keys = set()
+    external_seen_names = set()
+    external_unavailable = False
+    exact_local_match = bool(results and (results[0].get("matchScore") or 0) >= 150)
+    use_external_catalog = EXTERNAL_CATALOG_ENABLED and not exact_local_match
+    source = "local_catalog" if results or not EXTERNAL_CATALOG_ENABLED else "openfoodfacts"
 
-    if cached_results is not None:
-        results = cached_results
-        source = "openfoodfacts-cache"
-    elif len(query_text) >= 3:
+    if use_external_catalog and cached_results is not None:
+        external_results = cached_results
+        source = "local+openfoodfacts-cache" if results else "openfoodfacts-cache"
+    elif use_external_catalog and len(query_text) >= 3:
         try:
             for off_product in fetch_off_text_search_products(query_text):
                 product_data = build_off_search_result(off_product, query_text, store_name)
@@ -10849,24 +11002,52 @@ def search_products():
                 )
                 name_key = normalize_search_text(product_data.get("name") or "")
 
-                if key in seen_keys or name_key in seen_names:
+                if (
+                    key in seen_keys
+                    or name_key in seen_names
+                    or key in external_seen_keys
+                    or name_key in external_seen_names
+                ):
                     continue
 
                 product_data["matchScore"] = score
-                results.append(product_data)
-                seen_keys.add(key)
-                seen_names.add(name_key)
+                external_results.append(product_data)
+                external_seen_keys.add(key)
+                external_seen_names.add(name_key)
         except requests.RequestException as error:
             app.logger.warning("Open Food Facts suggestions failed: %s", error)
+            external_unavailable = True
+
+        if not external_unavailable:
+            external_results.sort(key=lambda item: item.get("matchScore", 0), reverse=True)
+            external_results = external_results[:10]
+            set_cached_product_search_results(cache_key, external_results)
+            source = "local+openfoodfacts" if results else "openfoodfacts"
+
+    for product_data in external_results:
+        key = normalize_search_text(
+            f"{product_data.get('barcode') or ''} {product_data.get('name') or ''}"
+        )
+        name_key = normalize_search_text(product_data.get("name") or "")
+
+        if key in seen_keys or name_key in seen_names:
+            continue
+
+        results.append(product_data)
+        seen_keys.add(key)
+        seen_names.add(name_key)
+
+    results.sort(key=lambda item: item.get("matchScore", 0), reverse=True)
+    results = results[:10]
+
+    if external_unavailable:
+        if not results:
             return jsonify({
                 "error": "Catalogul extern nu este disponibil momentan.",
                 "code": "external_catalog_unavailable",
                 "source": "openfoodfacts",
             }), 502
-
-        results.sort(key=lambda item: item.get("matchScore", 0), reverse=True)
-        results = results[:10]
-        set_cached_product_search_results(cache_key, results)
+        source = "local-fallback"
 
     record_search_event(
         query_text,
@@ -10879,6 +11060,10 @@ def search_products():
 
     response = jsonify(results)
     response.headers["X-Product-Source"] = source
+    if external_unavailable:
+        response.headers["X-External-Catalog"] = "unavailable"
+    elif not EXTERNAL_CATALOG_ENABLED:
+        response.headers["X-External-Catalog"] = "disabled"
     return response
 
 
@@ -12609,7 +12794,7 @@ def get_local_price_summary(barcode):
 
 
 def get_open_prices_summary(barcode):
-    if not barcode:
+    if not OPEN_PRICES_ENABLED or not barcode:
         return None
 
     now = time.time()
@@ -16139,6 +16324,9 @@ OFF_ALTERNATIVE_FIELDS = (
 
 
 def fetch_off_products(params, cache_key):
+    if not EXTERNAL_CATALOG_ENABLED:
+        return []
+
     distributed = distributed_cache_get("off-search", cache_key)
 
     if isinstance(distributed, list):
@@ -16186,6 +16374,9 @@ def fetch_off_products(params, cache_key):
 
 
 def fetch_off_product_by_barcode(barcode):
+    if not EXTERNAL_CATALOG_ENABLED:
+        return None
+
     barcode = str(barcode or "").strip()
 
     if not barcode:
@@ -16396,6 +16587,9 @@ def get_off_text_search_terms(query_text):
 
 
 def fetch_off_text_search_products(query_text):
+    if not EXTERNAL_CATALOG_ENABLED:
+        return []
+
     normalized_query = normalize_search_text(query_text)
     primary_terms = get_off_text_search_terms(query_text)
     query_brand = detect_query_brand(query_text)

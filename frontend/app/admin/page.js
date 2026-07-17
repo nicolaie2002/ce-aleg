@@ -1054,7 +1054,13 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8">
+            <StatCard
+              label="Scor calitate"
+              value={`${catalog.healthScore ?? 0}/100`}
+              tone={(catalog.healthScore ?? 0) < 65 ? "warning" : "default"}
+              detail="Indicator agregat"
+            />
             <StatCard
               label="Produse"
               value={compactNumber(catalog.products)}
@@ -1080,6 +1086,25 @@ export default function AdminPage() {
               label="Nutriție"
               value={`${catalog.nutritionCoverage ?? 0}%`}
               detail={`${compactNumber(catalog.withNutrition)} produse`}
+            />
+            <StatCard
+              label="Categorii"
+              value={`${catalog.categoryCoverage ?? 0}%`}
+              detail={`${compactNumber(catalog.uncategorizedProducts)} neîncadrate`}
+            />
+            <StatCard
+              label="Duplicate"
+              value={compactNumber(catalog.duplicateBarcodes)}
+              tone={catalog.duplicateBarcodes ? "warning" : "default"}
+              detail={`${compactNumber(catalog.duplicateProducts)} produse în plus`}
+            />
+            <StatCard
+              label="Valori invalide"
+              value={compactNumber(
+                Number(catalog.invalidScores || 0) + Number(catalog.invalidNutrition || 0)
+              )}
+              tone={(catalog.invalidScores || catalog.invalidNutrition) ? "danger" : "default"}
+              detail={`${compactNumber(catalog.missingIngredients)} fără ingrediente`}
             />
           </div>
 

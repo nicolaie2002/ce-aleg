@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Eye, EyeOff, LockKeyhole } from "lucide-react";
 import { useLocale } from "./LocaleProvider";
 
@@ -14,18 +14,20 @@ export function PasswordField({
   required = true,
 }) {
   const { pick } = useLocale();
+  const inputId = useId();
   const [isVisible, setIsVisible] = useState(false);
   const inputType = isVisible ? "text" : "password";
 
   return (
-    <label className="block text-sm font-semibold text-gray-300">
-      <span className="flex items-center gap-2">
+    <div className="block text-sm font-semibold text-gray-300">
+      <label htmlFor={inputId} className="flex items-center gap-2">
         <LockKeyhole size={15} className="text-emerald-300" aria-hidden="true" />
         {label}
-      </span>
+      </label>
 
       <span className="relative mt-2 block">
         <input
+          id={inputId}
           type={inputType}
           value={value}
           onChange={(event) => onChange(event.target.value)}
@@ -53,6 +55,6 @@ export function PasswordField({
           {isVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
         </button>
       </span>
-    </label>
+    </div>
   );
 }

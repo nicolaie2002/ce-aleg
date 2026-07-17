@@ -14,6 +14,11 @@ export function ServiceWorkerRegistration() {
       });
     };
 
+    if (document.readyState === "complete") {
+      register();
+      return undefined;
+    }
+
     window.addEventListener("load", register, { once: true });
     return () => window.removeEventListener("load", register);
   }, []);

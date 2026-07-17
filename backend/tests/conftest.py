@@ -8,6 +8,8 @@ os.environ.setdefault("COOKIE_SECURE", "false")
 os.environ.setdefault("EXPOSE_DEV_AUTH_LINKS", "false")
 os.environ.setdefault("EMAIL_PROVIDER", "smtp")
 os.environ.setdefault("EMAIL_SMTP_HOST", "")
+os.environ.setdefault("EXTERNAL_CATALOG_ENABLED", "false")
+os.environ.setdefault("OPEN_PRICES_ENABLED", "false")
 
 import pytest
 

@@ -537,6 +537,7 @@ function SubmitProductPageContent() {
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <Link
             href="/dashboard"
+            prefetch={false}
             className="inline-flex items-center gap-2 text-sm font-bold text-cyan-200 hover:text-white"
           >
             <ArrowLeft size={16} /> Înapoi la dashboard
@@ -544,6 +545,7 @@ function SubmitProductPageContent() {
 
           <Link
             href="/store"
+            prefetch={false}
             className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 px-5 py-3 text-center font-semibold hover:bg-white/10"
           >
             <ScanLine size={17} />
@@ -576,6 +578,7 @@ function SubmitProductPageContent() {
             </p>
             <Link
               href="/missions"
+              prefetch={false}
               className="mt-4 inline-flex rounded-xl bg-yellow-300 px-4 py-2.5 text-sm font-black text-black hover:bg-yellow-200"
             >
               Vezi misiunile

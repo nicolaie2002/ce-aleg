@@ -21,6 +21,9 @@ const eslintConfig = defineConfig([
     // Default ignores of eslint-config-next:
     ".next/**",
     "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
+    "blob-report/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

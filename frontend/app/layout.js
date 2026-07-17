@@ -5,7 +5,6 @@ import { AutomaticPageTranslation } from "./components/AutomaticPageTranslation"
 import { ThemeProvider } from "./components/ThemeProvider";
 import { LegalFooter } from "./components/LegalFooter";
 import { CarbonVaporBackground } from "./components/CarbonVaporBackground";
-import { ScrollRevealController } from "./components/ScrollRevealController";
 import { Analytics } from "./components/Analytics";
 import { CookieConsentBanner } from "./components/CookieConsentBanner";
 import { BackendWarmup } from "./components/BackendWarmup";
@@ -179,7 +178,6 @@ export default function RootLayout({ children }) {
           <ThemeProvider>
             <AutomaticPageTranslation />
             <CarbonVaporBackground />
-            <ScrollRevealController />
               <BackendWarmup />
               <ServiceWorkerRegistration />
             <Analytics />

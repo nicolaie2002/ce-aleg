@@ -51,7 +51,6 @@ def test_openapi_contract_lists_protected_admin_route(app, client):
 def test_admin_monitoring_rejects_regular_user(app, client):
     with app.app_context():
         user = create_user()
-        user_id = user.id
         cookie = auth_cookie_for(user)
 
     client.set_cookie(app_module.AUTH_COOKIE_NAME, cookie)
@@ -73,6 +72,16 @@ def test_auth_version_revokes_existing_session(app, client):
     response = client.get("/auth/me")
 
     assert response.status_code == 401
+
+
+def test_invite_lookup_accepts_display_separators(app):
+    with app.app_context():
+        inviter = create_user(email="inviter@example.com")
+        inviter.invite_code = "CE-PRO001"
+        db.session.commit()
+
+        assert app_module.find_inviter_by_code("cepro001").id == inviter.id
+        assert app_module.find_inviter_by_code("CE-PRO001").id == inviter.id
 
 
 def test_account_export_excludes_credentials_and_restriction_blocks_processing(app, client):
@@ -199,6 +208,85 @@ def test_stripe_webhook_is_processed_once(app, client, monkeypatch):
     assert second.status_code == 200
     assert second.get_json()["duplicate"] is True
     assert calls == ["cs_test"]
+
+
+def test_stripe_checkout_uses_scoped_idempotency_keys(app, monkeypatch):
+    calls = []
+
+    def create_session(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(id="cs_test_idempotent", url="https://checkout.example.test")
+
+    monkeypatch.setattr(
+        app_module,
+        "stripe",
+        SimpleNamespace(
+            checkout=SimpleNamespace(
+                Session=SimpleNamespace(create=create_session),
+            ),
+        ),
+    )
+    user = SimpleNamespace(id=42, email="checkout@example.com")
+
+    with app.test_request_context(
+        "/billing/checkout",
+        method="POST",
+        headers={"Idempotency-Key": "client-operation-123"},
+    ):
+        first_key = app_module.build_stripe_idempotency_key(
+            "subscription-checkout",
+            user.id,
+            "pro",
+            "monthly",
+        )
+        repeated_key = app_module.build_stripe_idempotency_key(
+            "subscription-checkout",
+            user.id,
+            "pro",
+            "monthly",
+        )
+        other_user_key = app_module.build_stripe_idempotency_key(
+            "subscription-checkout",
+            43,
+            "pro",
+            "monthly",
+        )
+        result = app_module.create_checkout_session_with_stale_customer_retry(
+            {"mode": "subscription"},
+            None,
+            user,
+            first_key,
+        )
+
+    assert first_key == repeated_key
+    assert first_key != other_user_key
+    assert calls[0]["idempotency_key"] == first_key
+    assert result.id == "cs_test_idempotent"
+
+
+def test_sentry_sanitizer_removes_request_secrets():
+    event = {
+        "request": {
+            "data": {"password": "secret"},
+            "cookies": {"session": "secret"},
+            "query_string": "token=secret",
+            "headers": {
+                "Authorization": "Bearer secret",
+                "Cookie": "session=secret",
+                "Accept": "application/json",
+            },
+        },
+        "user": {"id": "12", "email": "private@example.com", "ip_address": "127.0.0.1"},
+    }
+
+    sanitized = app_module.sanitize_sentry_event(event, None)
+
+    assert "data" not in sanitized["request"]
+    assert "cookies" not in sanitized["request"]
+    assert sanitized["request"]["query_string"] == ""
+    assert "Authorization" not in sanitized["request"]["headers"]
+    assert "Cookie" not in sanitized["request"]["headers"]
+    assert sanitized["user"] == {"id": "12"}
 
 
 def test_account_export_excludes_auth_secrets_and_other_users(app, client):

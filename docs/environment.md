@@ -24,6 +24,7 @@ corectata inainte de a acorda acces altor colaboratori.
 | --- | --- | --- |
 | `APP_ENV` | nu | `production`; activeaza validarile stricte |
 | `DATABASE_URL` | da | connection string Supabase Postgres; nu folosi SQLite in productie |
+| `DATABASE_SSLMODE` | nu | `require` in productie; `disable` numai pentru Postgres local izolat in CI |
 | `SUPABASE_URL` | nu | URL proiect Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | da, critic | acces backend la Storage/API; nu ajunge in frontend |
 | `AUTH_SECRET` | da, critic | semnare sesiuni si token-uri; unic, aleator, minimum 32 caractere |
@@ -33,6 +34,8 @@ corectata inainte de a acorda acces altor colaboratori.
 | `PAYMENT_PROVIDER` | nu | `stripe` cand platile sunt active |
 | `STRIPE_SECRET_KEY` | da, critic | cheia server-side pentru acelasi mod test/live ca price ID-urile |
 | `STRIPE_WEBHOOK_SECRET` | da, critic | signing secret al endpoint-ului live corect |
+| `STRIPE_API_VERSION` | nu | optional; lasa gol pentru versiunea inclusa in SDK si seteaza doar dupa testarea upgrade-ului in Stripe Workbench |
+| `STRIPE_MAX_NETWORK_RETRIES` | nu | retry automat sigur pentru erori de retea; recomandat `2` |
 | `STRIPE_PRO_PRICE_ID` | nu | pret lunar Pro |
 | `STRIPE_PRO_YEARLY_PRICE_ID` | nu | pret anual Pro |
 | `STRIPE_FAMILY_PRICE_ID` | nu | pret lunar Family |
@@ -45,6 +48,7 @@ corectata inainte de a acorda acces altor colaboratori.
 | `EMAIL_FROM_NAME` | nu | numele public al expeditorului |
 | `CONTACT_EMAIL` | nu | Reply-To si destinatie suport, in prezent `contact@cealeg.shop` |
 | `ADMIN_EMAIL` | date de contact | destinatia alertelor administrative |
+| `ALERT_WEBHOOK_URL` | da, optional | webhook HTTPS pentru alerte operationale (Slack/Discord/gateway); alertele functioneaza si prin Sentry/email fara el |
 | `CRON_SECRET` | da, critic | aceeasi valoare in Render si Vercel; protejeaza maintenance |
 
 `render.yaml` marcheaza valorile care trebuie introduse manual cu `sync: false`.
@@ -100,6 +104,9 @@ Configureaza numai ramura providerului activ.
 | `LOG_LEVEL` | nu | nivel logging, de regula `INFO` |
 | `LOG_FORMAT` | nu | `json` recomandat in productie |
 | `OPEN_FOOD_FACTS_CACHE_MAX_ITEMS` | nu | limita cache produs OFF |
+| `EXTERNAL_CATALOG_ENABLED` | nu | `true` in productie; `false` opreste apelurile externe in teste sau in timpul unei indisponibilitati OFF |
+| `OPEN_PRICES_ENABLED` | nu | `true` in productie; `false` evita lookup-urile de pret externe in teste sau in timpul unei indisponibilitati |
+| `CATALOG_QUALITY_ALERT_THRESHOLD` | nu | prag 0-100 sub care cronul trimite alerta; recomandat `65` |
 | `OPEN_PRICES_CACHE_MAX_ITEMS` | nu | limita cache preturi |
 | `PRODUCT_SEARCH_RESULT_CACHE_TTL` | nu | TTL cautari produse |
 | `PRODUCT_SEARCH_RESULT_CACHE_MAX_ITEMS` | nu | dimensiune cache cautari |

@@ -70,10 +70,10 @@ export function CarbonVaporBackground({ variant = "global" }) {
       (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
       connection?.saveData ||
       window.innerWidth < 768;
-    const shouldAnimate = !reducedMotion.matches && !lowPowerDevice;
+    const shouldAnimate = variant === "hero" && !reducedMotion.matches && !lowPowerDevice;
     const noise = createNoiseTexture(112);
     const wisps = makeWisps(
-      lowPowerDevice ? (variant === "hero" ? 14 : 10) : variant === "hero" ? 30 : 26,
+      lowPowerDevice ? (variant === "hero" ? 12 : 8) : variant === "hero" ? 20 : 12,
       variant === "hero" ? 17 : 41
     );
     const pointer = {
@@ -85,6 +85,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
     let width = 0;
     let height = 0;
     let animationFrame = 0;
+    let lastFrameTime = 0;
     let running = true;
 
     function resize() {
@@ -180,7 +181,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       const drift = time * wisp.speed + wisp.phase;
       const pulse = 0.55 + Math.sin(drift * 1.3) * 0.18;
       const alpha = wisp.alpha * pulse * (isLight ? (variant === "hero" ? 1.25 : 0.95) : variant === "hero" ? 1.45 : 1.18);
-      const segments = lowPowerDevice ? 28 : 54;
+      const segments = lowPowerDevice ? 24 : 36;
 
       context.save();
       context.translate(centerX, centerY);
@@ -250,7 +251,7 @@ export function CarbonVaporBackground({ variant = "global" }) {
       context.restore();
     }
 
-    function renderFrame(time = 0, shouldContinue = false) {
+    function renderFrame(time = 0) {
       if (!running) return;
 
       const isLight = document.documentElement.dataset.theme === "light";
@@ -266,11 +267,19 @@ export function CarbonVaporBackground({ variant = "global" }) {
       context.filter = "none";
       context.globalCompositeOperation = "source-over";
 
-      if (shouldContinue && shouldAnimate && document.visibilityState === "visible") {
-        animationFrame = window.requestAnimationFrame((nextTime) => {
-          renderFrame(nextTime, true);
-        });
-      }
+    }
+
+    function scheduleAnimationFrame() {
+      if (!running || !shouldAnimate || document.visibilityState !== "visible") return;
+
+      animationFrame = window.requestAnimationFrame((nextTime) => {
+        if (nextTime - lastFrameTime >= 1000 / 24) {
+          lastFrameTime = nextTime;
+          renderFrame(nextTime);
+        }
+
+        scheduleAnimationFrame();
+      });
     }
 
     resize();
@@ -288,20 +297,25 @@ export function CarbonVaporBackground({ variant = "global" }) {
 
     const resizeObserver = new ResizeObserver(() => {
       resize();
-      renderFrame(performance.now(), false);
+      renderFrame(performance.now());
     });
     resizeObserver.observe(container);
 
     function handleVisibilityChange() {
       window.cancelAnimationFrame(animationFrame);
-      renderFrame(performance.now(), shouldAnimate && document.visibilityState === "visible");
+      renderFrame(performance.now());
+
+      if (document.visibilityState === "visible") {
+        scheduleAnimationFrame();
+      }
     }
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    renderFrame(0, shouldAnimate);
+    renderFrame(0);
+    scheduleAnimationFrame();
 
     const themeObserver = new MutationObserver(() => {
-      renderFrame(performance.now(), false);
+      renderFrame(performance.now());
     });
     themeObserver.observe(document.documentElement, {
       attributes: true,

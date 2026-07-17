@@ -18,7 +18,6 @@ import {
 import { API_URL } from "../config";
 import { ProductImage } from "../components/ProductImage";
 import { AppHeader } from "../components/AppHeader";
-import { CarbonVaporBackground } from "../components/CarbonVaporBackground";
 import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
@@ -397,7 +396,6 @@ function ScanPageContent() {
   if (!user) {
     return (
       <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#05080f] text-white">
-        <CarbonVaporBackground />
         <div className="relative z-10 flex items-center gap-3 rounded-2xl border border-white/10 bg-black/35 px-5 py-4 shadow-2xl backdrop-blur">
           <Loader2 className="h-5 w-5 animate-spin text-cyan-200" />
           <p className="font-semibold text-gray-200" role="status">{pick("Se pregătește scanarea...", "Preparing scanner...")}</p>
@@ -408,7 +406,6 @@ function ScanPageContent() {
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#05080f] text-white">
-      <CarbonVaporBackground />
       <div className="relative z-10">
         <AppHeader actionHref="/barcode-scan" actionLabel={pick("Scanează codul", "Scan barcode")} />
       </div>

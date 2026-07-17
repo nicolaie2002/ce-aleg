@@ -3,6 +3,7 @@ import time
 
 import requests
 
+from database import db
 from app import (
     app,
     build_product_from_open_food_facts,

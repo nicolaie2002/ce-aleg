@@ -24,6 +24,8 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+      - key: SUPABASE_STORAGE_ENABLED
+        value: "true"
       - key: AUTH_SECRET
         generateValue: true
       - key: COOKIE_SECURE
@@ -44,6 +46,10 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_API_VERSION
+        sync: false
+      - key: STRIPE_MAX_NETWORK_RETRIES
+        value: "2"
       - key: STRIPE_PRO_PRICE_ID
         sync: false
       - key: STRIPE_PRO_YEARLY_PRICE_ID
@@ -104,6 +110,12 @@ services:
         value: "30"
       - key: REJECTED_SUBMISSION_RETENTION_DAYS
         value: "90"
+      - key: CATALOG_QUALITY_ALERT_THRESHOLD
+        value: "65"
+      - key: EXTERNAL_CATALOG_ENABLED
+        value: "true"
+      - key: OPEN_PRICES_ENABLED
+        value: "true"
       - key: SUBMISSION_DAILY_LIMIT
         value: "10"
       - key: SUBMISSION_PENDING_LIMIT
@@ -121,6 +133,8 @@ services:
       - key: EMAIL_USE_SSL
         value: "false"
       - key: ADMIN_EMAIL
+        sync: false
+      - key: ALERT_WEBHOOK_URL
         sync: false
       - key: AUTH_RATE_LIMIT
         value: "5"
