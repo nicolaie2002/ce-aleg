@@ -46,7 +46,7 @@
     "app/**/*.js",
     "app/**/*.jsx",
     "instrumentation*.js",
-    "middleware.js",
+    "proxy.js",
     "sentry.*.config.js",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"

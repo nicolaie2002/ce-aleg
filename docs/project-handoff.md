@@ -5,7 +5,7 @@ Ultima actualizare: 2026-07-18
 ## Stare curenta
 
 - Portile locale sunt verzi: backend 357 teste si 73,13% coverage pentru `app.py`;
-  frontend 71 teste Jest; Playwright 32 trecute, 10 skip
+  frontend 76 teste Jest; Playwright 32 trecute, 10 skip
   intentionat si zero esecuri.
 - PWA foloseste un service worker static, fara cache pentru API/date private;
   offline-ul este verificat desktop si mobil.

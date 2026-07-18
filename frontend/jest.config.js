@@ -18,11 +18,17 @@ const customJestConfig = {
   collectCoverageFrom: [
     "app/**/*.{js,jsx,ts,tsx}",
     "instrumentation*.js",
-    "middleware.js",
+    "proxy.js",
     "sentry.*.config.js",
     "!app/**/*.d.ts",
   ],
   coverageThreshold: {
+    "./proxy.js": {
+      branches: 75,
+      functions: 100,
+      lines: 90,
+      statements: 90,
+    },
     "./app/components/AppHeader.js": {
       branches: 45,
       functions: 60,

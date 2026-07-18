@@ -18,7 +18,7 @@ backup/restore, deployment și test pe telefoane reale.
 | Poartă | Rezultat |
 | --- | --- |
 | Backend pytest | 357 teste trecute; 73,13% `app.py`, prag 70% |
-| Frontend Jest | 13 suite și 71 teste trecute |
+| Frontend Jest | 14 suite și 76 teste trecute |
 | Playwright full stack | 32 trecute, 10 sărite intenționat pe mobil, 0 eșuate |
 | ESLint și TypeScript | trecute fără warnings/errors |
 | Next.js build | trecut, 66 rute generate |
@@ -58,7 +58,9 @@ offline-ul rulează atât desktop, cât și mobil.
   cache pentru API/Supabase sau date private. Au fost eliminate 182 de pachete
   tranzitive Workbox/PWA.
 - Convenția Next.js depreciată `middleware.js` a fost migrată la `proxy.js`;
-  buildul nu mai emite avertismentul de compatibilitate.
+  buildul nu mai emite avertismentul de compatibilitate. Proxy-ul este inclus
+  explicit în TypeScript/Jest și are praguri de minimum 90% linii/statements,
+  75% branches și 100% funcții.
 - CI extins cu audit de dependențe, Bandit, coverage 70%, E2E, Lighthouse,
   verificare Cloudflare Workers și smoke test al runtime-ului Linux.
 - Job gratuit GitHub Actions pentru maintenance zilnic și backup săptămânal;
