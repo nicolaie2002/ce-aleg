@@ -9,6 +9,13 @@ Referinta executabila este expusa de backend:
 Documentul de fata explica regulile de integrare. Contractul OpenAPI ramane
 sursa principala pentru schema exacta a rutelor documentate.
 
+Fiecare operatie runtime are o schema pentru raspunsul de succes. Operatiile cu
+`x-contract-source: explicit` au contract de domeniu verificat prin teste;
+operatiile cu `x-contract-source: inferred` sunt incluse complet in document,
+dar folosesc temporar o schema generica si trebuie rafinate inaintea unei
+schimbari incompatibile. Politica de autentificare din OpenAPI este derivata din
+acelasi registru declarativ folosit de backend la executie.
+
 ## URL-uri
 
 | Mediu | Baza recomandata |
@@ -129,7 +136,7 @@ Content-Type: application/json
 
 {
   "plan": "pro",
-  "billingPeriod": "monthly"
+  "billingInterval": "monthly"
 }
 ```
 
@@ -156,9 +163,10 @@ Destinatia operationala este `CONTACT_EMAIL`, configurata in productie ca
 ## Rate limiting
 
 Exista o limita globala si limite mai stricte pentru autentificare, scanare,
-AI/OCR server-side, cautare, suport, contributii si recompense. In configuratia
-fara Redis, contoarele sunt locale procesului; de aceea deploymentul gratuit
-foloseste un singur worker. Clientul trebuie sa trateze `429` si sa permita
+AI/OCR server-side, cautare, suport, contributii si recompense. Productia
+foloseste Render Key Value/Redis pentru contoare distribuite. Daca Redis este
+temporar indisponibil, fallback-ul local este protejat pentru acces concurent,
+dar se reseteaza la restart. Clientul trebuie sa trateze `429` si sa permita
 reincercarea dupa o pauza, fara bucle automate agresive.
 
 ## Idempotenta

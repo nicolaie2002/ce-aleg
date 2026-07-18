@@ -4,7 +4,8 @@ Ultima actualizare: 2026-07-18
 
 ## Stare curenta
 
-- Portile locale sunt verzi: backend 357 teste si 73,13% coverage pentru `app.py`;
+- Portile locale sunt verzi: backend 359 teste, 73,35% coverage pentru `app.py`
+  si 100% pentru `api_docs.py`;
   frontend 84 teste Jest in 16 suite; Playwright 32 trecute, 10 skip
   intentionat si zero esecuri.
 - Coverage-ul ponderat este impus automat la minimum 60% separat pentru
@@ -18,6 +19,11 @@ Ultima actualizare: 2026-07-18
 - Render este configurat `checksPass`: dupa ce workflow-ul `CI` trece, publica
   automat commitul. Deploy hook-ul GitHub ramane doar fallback manual optional si
   verifica apoi commitul din `/version`.
+- OpenAPI are 109/109 operatii cu raspunsuri 2xx tipizate, dintre care 60 cu
+  contract explicit. Contractele principale pentru dashboard, Family, cos,
+  favorite, istoric, cont si traducere sunt blocate prin teste.
+- Verificarea publica din 18 iulie a gasit backendul sanatos, dar inca la
+  `bb5cfef`; setarea Auto-Deploy din serviciul Render trebuie confirmata o data.
 - Configuratia OpenNext/Cloudflare Workers Free este pregatita, dar nu se face
   deploy pana cand jobul Linux este verde si proprietarul conecteaza domeniul.
 - Emailurile live au fost raportate nefunctionale si raman blocant extern. Nu

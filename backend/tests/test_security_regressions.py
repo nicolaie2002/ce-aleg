@@ -73,6 +73,49 @@ def test_runtime_openapi_combines_explicit_schemas_with_every_flask_route(app, c
     assert len(operation_ids) == len(set(operation_ids))
 
 
+def test_runtime_openapi_has_typed_success_and_matches_route_access_policy(app, client):
+    response = client.get("/api/openapi.json")
+
+    assert response.status_code == 200
+    document = response.get_json()
+
+    for rule in app.url_map.iter_rules():
+        if rule.endpoint == "static":
+            continue
+
+        endpoint = app_module.endpoint_name(rule.endpoint)
+        policy = app_module.get_route_access_policy(endpoint)
+        path, _parameters = app_module.flask_rule_to_openapi(rule.rule)
+
+        for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
+            operation = document["paths"][path][method.lower()]
+            success_responses = [
+                value
+                for status, value in operation["responses"].items()
+                if status.startswith("2")
+            ]
+
+            assert success_responses, (path, method)
+            assert all(value.get("content") for value in success_responses), (
+                path,
+                method,
+            )
+
+            if policy in {"authenticated", "admin"}:
+                assert operation["security"] == [{"sessionCookie": []}], (
+                    path,
+                    method,
+                    policy,
+                )
+                assert "401" in operation["responses"]
+            if policy == "admin":
+                assert "403" in operation["responses"]
+            if policy == "signed-webhook":
+                assert operation["security"] == [{"stripeSignature": []}]
+            if policy == "internal-secret":
+                assert operation["security"] == [{"cronBearer": []}]
+
+
 def test_admin_monitoring_rejects_regular_user(app, client):
     with app.app_context():
         user = create_user()

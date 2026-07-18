@@ -17,7 +17,7 @@ backup/restore, deployment și test pe telefoane reale.
 
 | Poartă | Rezultat |
 | --- | --- |
-| Backend pytest | 357 teste trecute; 73,13% `app.py`, prag 70% |
+| Backend pytest | 359 teste trecute; 73,35% `app.py`, 100% `api_docs.py`, prag 70% |
 | Frontend Jest | 16 suite și 84 teste trecute |
 | Coverage țintit frontend | componente 61,37% statements / 62,61% lines; utils 88,56% / 93,54%; prag automat 60% |
 | Playwright full stack | 32 trecute, 10 sărite intenționat pe mobil, 0 eșuate |
@@ -41,6 +41,10 @@ offline-ul rulează atât desktop, cât și mobil.
 
 - Politici explicite de acces pentru toate cele 105 rute backend și teste care
   opresc apariția rutelor fără clasificare public/auth/admin/cron.
+- OpenAPI descrie toate cele 109 operații runtime cu răspunsuri 2xx tipizate;
+  60 de operații critice au contracte explicite, inclusiv dashboard, Family,
+  coș, favorite, istoric, cont și traducere. Restul sunt marcate `inferred`, iar
+  securitatea documentată folosește aceeași politică declarativă ca runtime-ul.
 - App factory Flask, migrări Alembic versionate și verificarea migration head la
   pornirea în producție.
 - Rate limiting și cache Redis distribuit cu fallback local, plus Render Key
@@ -97,6 +101,8 @@ proprietarul conectează contul/domeniul, fără card sau upgrade.
 1. Confirmă workflow-urile GitHub după push, în special build-ul Cloudflare pe
    Linux. `CRON_SECRET` este adăugat. Confirmă o singură dată în Render că
    Auto-Deploy afișează `After CI Checks Pass`; deploy hook-ul este doar opțional.
+   Verificarea publică din 18 iulie a găsit backendul sănătos, dar rămas la
+   commitul `bb5cfef`, deci ultimul `main` trebuie încă publicat.
 2. Repară livrarea Brevo: sender/domeniu SPF-DKIM, cheia API și testele Admin
    pentru confirmare cont, resetare și suport către `contact@cealeg.shop`.
 3. Rulează Stripe în test mode și apoi un test live controlat pentru Pro, Family,

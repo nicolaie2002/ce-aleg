@@ -140,6 +140,8 @@ jobs:
             python -m pytest tests \
               -W error::DeprecationWarning \
               --cov=app \
+              --cov=api_docs \
+              --cov=routes \
               --cov-report=term-missing \
               --cov-report=xml:coverage.xml \
               --cov-fail-under="$COVERAGE_FAIL_UNDER" \

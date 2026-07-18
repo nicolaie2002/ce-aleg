@@ -279,6 +279,57 @@ def test_openapi_covers_each_primary_payload_family(openapi_document):
     )
 
 
+def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_document):
+    paths = openapi_document["paths"]
+    expected_operations = {
+        ("/auth/me", "get"),
+        ("/account/delete/request", "post"),
+        ("/account/delete/confirm", "post"),
+        ("/account/restriction", "post"),
+        ("/ai/status", "get"),
+        ("/translate", "post"),
+        ("/dashboard/summary", "get"),
+        ("/family/profiles", "get"),
+        ("/family/profiles", "post"),
+        ("/family/profiles/{profile_id}", "patch"),
+        ("/family/profiles/{profile_id}", "delete"),
+        ("/cart/{user_id}", "get"),
+        ("/cart/add", "post"),
+        ("/cart/item/{item_id}", "patch"),
+        ("/cart/item/{item_id}", "delete"),
+        ("/cart/clear/{user_id}", "delete"),
+        ("/favorites/{user_id}", "get"),
+        ("/favorites/add", "post"),
+        ("/favorites/item/{favorite_id}", "delete"),
+        ("/favorites/clear/{user_id}", "delete"),
+        ("/history/{user_id}", "get"),
+        ("/history/add", "post"),
+        ("/history/item/{history_id}", "delete"),
+        ("/history/clear/{user_id}", "delete"),
+    }
+
+    for path, method in expected_operations:
+        operation = paths[path][method]
+        assert operation["x-contract-source"] == "explicit", (path, method)
+        success_responses = [
+            response
+            for status, response in operation["responses"].items()
+            if status.startswith("2")
+        ]
+        assert success_responses, (path, method)
+        assert all(response.get("content") for response in success_responses), (
+            path,
+            method,
+        )
+
+        if method in {"post", "put", "patch"} and path != "/account/delete/request":
+            assert operation.get("requestBody", {}).get("content"), (path, method)
+
+    assert paths["/auth/me"]["get"]["responses"]["200"]["content"][
+        "application/json"
+    ]["schema"] == {"$ref": "#/components/schemas/CurrentUserResponse"}
+
+
 def test_openapi_operation_ids_are_unique_and_path_parameters_declared(
     openapi_document,
 ):

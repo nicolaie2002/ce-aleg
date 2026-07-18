@@ -31,7 +31,7 @@ Assert-CommandSucceeded "Backend compilation"
 Assert-CommandSucceeded "Backend route compilation"
 & $python -m ruff check . --select E9,F63,F7,F82
 Assert-CommandSucceeded "Backend lint"
-& $python -m pytest tests -W error::DeprecationWarning --cov=app --cov=routes --cov-fail-under=70 -q
+& $python -m pytest tests -W error::DeprecationWarning --cov=app --cov=api_docs --cov=routes --cov-fail-under=70 -q
 Assert-CommandSucceeded "Backend tests"
 Pop-Location
 

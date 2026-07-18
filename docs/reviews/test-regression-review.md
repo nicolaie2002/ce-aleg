@@ -1,5 +1,10 @@
 # Revizie independentă: teste și risc de regresie
 
+> Snapshot istoric pentru `7be9c7c` din 17 iulie 2026. Raportul curent este
+> `docs/production-improvement-report.md`. Erorile TypeScript, rutele dinamice și
+> locatorul E2E descrise mai jos au fost reparate; cifrele și verdictul de mai jos
+> nu trebuie folosite pentru release-ul curent.
+
 **Data:** 17 iulie 2026  
 **Repository:** `D:\proiecte\ce_aleg`  
 **Bază:** `HEAD 7be9c7c` plus modificările necomise observate în timpul reviziei  

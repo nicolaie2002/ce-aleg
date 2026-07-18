@@ -7895,6 +7895,37 @@ def flask_rule_to_openapi(rule):
     return path, parameters
 
 
+def inferred_openapi_response(path):
+    if path.endswith(".csv"):
+        media_type = "text/csv"
+        schema = {"type": "string"}
+    elif path.startswith("/uploads/"):
+        media_type = "application/octet-stream"
+        schema = {"type": "string", "format": "binary"}
+    elif path in {"/docs", "/api/docs"}:
+        media_type = "text/html"
+        schema = {"type": "string"}
+    else:
+        media_type = "application/json"
+        schema = {"$ref": "#/components/schemas/GenericObject"}
+
+    return {
+        "description": "Successful response inferred from the Flask route",
+        "content": {media_type: {"schema": schema}},
+    }
+
+
+def openapi_error_response(description):
+    return {
+        "description": description,
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/Error"}
+            }
+        },
+    }
+
+
 @route("/openapi.json", methods=["GET"], access="public")
 @route("/api/openapi.json", methods=["GET"], access="public")
 def get_openapi_spec():
@@ -7928,12 +7959,9 @@ def get_openapi_spec():
             if method_name in operations:
                 continue
 
-            requires_admin = normalized_endpoint in ADMIN_ENDPOINTS
-            requires_auth = (
-                requires_admin
-                or normalized_endpoint in AUTH_ENDPOINTS
-                or normalized_endpoint in USER_PATH_ENDPOINTS
-            )
+            access_policy = get_route_access_policy(normalized_endpoint)
+            requires_admin = access_policy == "admin"
+            requires_auth = access_policy in {"authenticated", "admin"}
             operation_id = f"{normalized_endpoint}_{method_name}"
 
             if operation_id in operation_ids:
@@ -7951,33 +7979,52 @@ def get_openapi_spec():
                 "operationId": unique_operation_id,
                 "summary": normalized_endpoint.replace("_", " ").capitalize(),
                 "parameters": parameters,
+                "x-access-policy": access_policy,
+                "x-contract-source": "inferred",
                 "responses": {
-                    "200": {"description": "Successful response"},
-                    "400": {
-                        "description": "Invalid request",
-                        "content": {
-                            "application/json": {
-                                "schema": {"$ref": "#/components/schemas/Error"}
-                            }
-                        },
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "content": {
-                            "application/json": {
-                                "schema": {"$ref": "#/components/schemas/Error"}
-                            }
-                        },
-                    },
+                    "200": inferred_openapi_response(path),
+                    "400": openapi_error_response("Invalid request"),
+                    "500": openapi_error_response("Internal server error"),
                 },
             }
 
+            if method_name in {"post", "put", "patch"}:
+                media_type = (
+                    "multipart/form-data"
+                    if normalized_endpoint
+                    in {"ai_extract_product_info", "identify_product_frame"}
+                    else "application/json"
+                )
+                operation["requestBody"] = {
+                    "required": False,
+                    "content": {
+                        media_type: {
+                            "schema": {
+                                "$ref": "#/components/schemas/GenericObject"
+                            }
+                        }
+                    },
+                }
+
             if requires_auth:
                 operation["security"] = [{"sessionCookie": []}]
-                operation["responses"]["401"] = {"description": "Authentication required"}
+                operation["responses"]["401"] = openapi_error_response(
+                    "Authentication required"
+                )
 
             if requires_admin:
-                operation["responses"]["403"] = {"description": "Administrator access required"}
+                operation["responses"]["403"] = openapi_error_response(
+                    "Administrator access required"
+                )
+
+            if access_policy == "signed-webhook":
+                operation["security"] = [{"stripeSignature": []}]
+
+            if access_policy == "internal-secret":
+                operation["security"] = [{"cronBearer": []}]
+                operation["responses"]["401"] = openapi_error_response(
+                    "Internal bearer secret required"
+                )
 
             operations[method_name] = operation
 

@@ -1,5 +1,12 @@
 # Independent Production Architecture Review
 
+> Historical snapshot for `7be9c7c` (17 July 2026). It is superseded by
+> `docs/production-improvement-report.md`. Since this review, versioned release
+> migrations, isolated factory tests, declarative route policies, full JS
+> type-check inclusion, broader frontend coverage and typed runtime OpenAPI
+> responses were implemented. Keep the findings below as review history, not as
+> the current release verdict.
+
 **Verdict: FAIL**  
 **Scope:** current worktree at `HEAD 7be9c7c`, reviewed 2026-07-17  
 **Focus:** Flask factory/Blueprint boundaries, Next.js architecture, API contracts,

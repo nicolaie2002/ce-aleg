@@ -43,6 +43,7 @@ def _errors(*status_codes: str) -> dict[str, Any]:
         "404": "Resource not found",
         "409": "Resource state conflict",
         "413": "Request payload too large",
+        "423": "Account data processing is restricted",
         "429": "Rate limit exceeded",
         "500": "Unexpected server error",
         "502": "Upstream provider failed",
@@ -58,6 +59,7 @@ def _operation(
     success_schema: dict[str, Any],
     *,
     success_status: str = "200",
+    alternate_success_statuses: tuple[str, ...] = (),
     request_schema: dict[str, Any] | None = None,
     media_type: str = JSON,
     security: bool = False,
@@ -69,6 +71,7 @@ def _operation(
         "operationId": operation_id,
         "summary": summary,
         "tags": [tag],
+        "x-contract-source": "explicit",
         "responses": {
             success_status: _response("Successful response", success_schema),
             **_errors(*error_statuses),
@@ -76,6 +79,10 @@ def _operation(
     }
     if request_schema is not None:
         operation["requestBody"] = _request(request_schema, media_type=media_type)
+    for status_code in alternate_success_statuses:
+        operation["responses"][status_code] = _response(
+            "Successful response", success_schema
+        )
     if security:
         operation["security"] = COOKIE_SECURITY
     if parameters:
@@ -117,6 +124,7 @@ def _schemas(password_min_length: int) -> dict[str, Any]:
     text = {"type": "string"}
     nullable_text = {"type": ["string", "null"]}
     nullable_number = {"type": ["number", "null"]}
+    nullable_integer = {"type": ["integer", "null"]}
 
     return {
         "ValidationIssue": {
@@ -179,6 +187,12 @@ def _schemas(password_min_length: int) -> dict[str, Any]:
                 "inviteCode": nullable_text,
             },
             "additionalProperties": True,
+        },
+        "CurrentUserResponse": {
+            "type": "object",
+            "required": ["user"],
+            "properties": {"user": _ref("User")},
+            "additionalProperties": False,
         },
         "AuthResponse": {
             "type": "object",
@@ -552,6 +566,244 @@ def _schemas(password_min_length: int) -> dict[str, Any]:
                 "price": {"type": "number", "exclusiveMinimum": 0, "maximum": 100000},
             },
         },
+        "AiServiceStatus": {
+            "type": "object",
+            "required": ["enabled", "label"],
+            "properties": {
+                "enabled": {"type": "boolean"},
+                "label": text,
+            },
+            "additionalProperties": True,
+        },
+        "AiStatus": {
+            "type": "object",
+            "additionalProperties": _ref("AiServiceStatus"),
+        },
+        "TranslationRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["text"],
+            "properties": {
+                "text": {"type": "string", "maxLength": 5000},
+                "target": {"type": "string", "enum": ["ro", "en"], "default": "ro"},
+            },
+        },
+        "TranslationResponse": {
+            "type": "object",
+            "required": ["translatedText"],
+            "properties": {
+                "translatedText": text,
+                "target": {"type": "string", "enum": ["ro", "en"]},
+            },
+            "additionalProperties": False,
+        },
+        "DashboardSummary": {
+            "type": "object",
+            "required": ["counts", "lastScannedProduct", "billing"],
+            "properties": {
+                "counts": {
+                    "type": "object",
+                    "required": ["cart", "history", "favorites"],
+                    "properties": {
+                        "cart": {"type": "integer", "minimum": 0},
+                        "history": {"type": "integer", "minimum": 0},
+                        "favorites": {"type": "integer", "minimum": 0},
+                    },
+                    "additionalProperties": False,
+                },
+                "lastScannedProduct": text,
+                "billing": _ref("GenericObject"),
+            },
+            "additionalProperties": False,
+        },
+        "FamilyProfile": {
+            "type": "object",
+            "required": ["id", "name", "color", "avatar", "isPrimary"],
+            "properties": {
+                "id": {"type": "integer"},
+                "name": text,
+                "color": text,
+                "avatar": text,
+                "isPrimary": {"type": "boolean"},
+                "createdAt": nullable_text,
+            },
+            "additionalProperties": False,
+        },
+        "FamilyProfilesResponse": {
+            "type": "object",
+            "required": ["plan", "enabled", "maxProfiles", "profiles"],
+            "properties": {
+                "plan": {"type": "string", "enum": ["free", "pro", "family"]},
+                "enabled": {"type": "boolean"},
+                "maxProfiles": {"type": "integer", "minimum": 1},
+                "profiles": {"type": "array", "items": _ref("FamilyProfile")},
+            },
+            "additionalProperties": False,
+        },
+        "FamilyProfileRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "name": {"type": "string", "minLength": 2, "maxLength": 60},
+                "color": {"type": "string", "maxLength": 30},
+                "avatar": {"type": "string", "maxLength": 20},
+            },
+        },
+        "CreateFamilyProfileRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["name"],
+            "properties": {
+                "name": {"type": "string", "minLength": 2, "maxLength": 60},
+                "color": {"type": "string", "maxLength": 30},
+                "avatar": {"type": "string", "maxLength": 20},
+            },
+        },
+        "FamilyProfileResponse": {
+            "type": "object",
+            "required": ["profile"],
+            "properties": {"profile": _ref("FamilyProfile")},
+            "additionalProperties": False,
+        },
+        "DeletedResponse": {
+            "type": "object",
+            "required": ["deleted"],
+            "properties": {"deleted": {"const": True}},
+            "additionalProperties": False,
+        },
+        "SavedProductActionRequest": {
+            "type": "object",
+            "required": ["user_id", "name"],
+            "properties": {
+                "user_id": {"type": "integer", "minimum": 1},
+                "familyProfileId": nullable_integer,
+                "name": {"type": "string", "minLength": 1, "maxLength": 250},
+                "store": {"type": "string", "maxLength": 100},
+                "category": nullable_text,
+                "score": nullable_number,
+                "price": nullable_number,
+                "image": nullable_text,
+                "reason": nullable_text,
+                "verdict": nullable_text,
+                "shortAdvice": nullable_text,
+                "quantity": {"type": "integer", "minimum": 1, "maximum": 999},
+            },
+            "additionalProperties": True,
+        },
+        "CartItem": {
+            "type": "object",
+            "required": ["id", "user_id", "name", "store", "quantity", "bought"],
+            "properties": {
+                "id": {"type": "integer"},
+                "user_id": {"type": "integer"},
+                "familyProfileId": nullable_integer,
+                "name": text,
+                "store": text,
+                "score": nullable_number,
+                "price": nullable_number,
+                "image": nullable_text,
+                "reason": nullable_text,
+                "quantity": {"type": "integer", "minimum": 1},
+                "bought": {"type": "boolean"},
+                "created_at": text,
+            },
+            "additionalProperties": False,
+        },
+        "CartUpdateRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "quantity": {"type": "integer", "minimum": 0, "maximum": 999},
+                "bought": {"type": "boolean"},
+                "store": {"type": "string", "maxLength": 100},
+            },
+        },
+        "CartMutationResponse": {
+            "type": "object",
+            "required": ["message", "item"],
+            "properties": {"message": text, "item": _ref("CartItem")},
+            "additionalProperties": False,
+        },
+        "CartUpdateResponse": {
+            "oneOf": [_ref("CartMutationResponse"), _ref("Message")],
+        },
+        "FavoriteItem": {
+            "type": "object",
+            "required": ["id", "user_id", "name", "store"],
+            "properties": {
+                "id": {"type": "integer"},
+                "user_id": {"type": "integer"},
+                "name": text,
+                "store": text,
+                "category": nullable_text,
+                "score": nullable_number,
+                "price": nullable_number,
+                "image": nullable_text,
+                "reason": nullable_text,
+                "created_at": text,
+            },
+            "additionalProperties": False,
+        },
+        "FavoriteMutationResponse": {
+            "type": "object",
+            "required": ["message", "item"],
+            "properties": {"message": text, "item": _ref("FavoriteItem")},
+            "additionalProperties": False,
+        },
+        "HistoryItem": {
+            "type": "object",
+            "required": ["id", "user_id", "name", "store"],
+            "properties": {
+                "id": {"type": "integer"},
+                "user_id": {"type": "integer"},
+                "name": text,
+                "store": text,
+                "category": nullable_text,
+                "score": nullable_number,
+                "price": nullable_number,
+                "image": nullable_text,
+                "verdict": nullable_text,
+                "shortAdvice": nullable_text,
+                "scanned_at": text,
+            },
+            "additionalProperties": False,
+        },
+        "HistoryMutationResponse": {
+            "type": "object",
+            "required": ["message", "item"],
+            "properties": {"message": text, "item": _ref("HistoryItem")},
+            "additionalProperties": False,
+        },
+        "AccountDeletionRequestResponse": {
+            "type": "object",
+            "required": ["message", "sent", "email", "emailConfigured"],
+            "properties": {
+                "message": text,
+                "sent": {"type": "boolean"},
+                "email": {"type": "string", "format": "email"},
+                "emailConfigured": {"type": "boolean"},
+                "devDeletionLink": {"type": "string", "format": "uri"},
+            },
+            "additionalProperties": False,
+        },
+        "ProcessingRestrictionRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "restricted": {"type": "boolean", "default": True},
+                "reason": {"type": "string", "maxLength": 500},
+            },
+        },
+        "ProcessingRestrictionResponse": {
+            "type": "object",
+            "required": ["message", "restricted", "processingRestricted"],
+            "properties": {
+                "message": text,
+                "restricted": {"type": "boolean"},
+                "processingRestricted": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
         "GenericObject": {"type": "object", "additionalProperties": True},
     }
 
@@ -662,7 +914,7 @@ def _paths() -> dict[str, Any]:
                 "getAuthenticatedUser",
                 "Get the current authenticated user",
                 "Authentication",
-                _ref("User"),
+                _ref("CurrentUserResponse"),
                 security=True,
                 error_statuses=("401", "500"),
             ),
@@ -675,6 +927,57 @@ def _paths() -> dict[str, Any]:
                 message,
                 security=True,
                 error_statuses=("401", "500"),
+            ),
+        },
+        "/account/delete/request": {
+            "post": _operation(
+                "requestAccountDeletion",
+                "Email a signed account deletion confirmation link",
+                "Privacy",
+                _ref("AccountDeletionRequestResponse"),
+                security=True,
+                error_statuses=("401", "429", "500", "502"),
+            ),
+        },
+        "/account/delete/confirm": {
+            "post": _operation(
+                "confirmAccountDeletion",
+                "Permanently delete an account using a signed token",
+                "Privacy",
+                message,
+                request_schema=_ref("TokenRequest"),
+                error_statuses=("400", "429", "500", "502"),
+            ),
+        },
+        "/account/restriction": {
+            "post": _operation(
+                "updateProcessingRestriction",
+                "Restrict or resume optional account data processing",
+                "Privacy",
+                _ref("ProcessingRestrictionResponse"),
+                request_schema=_ref("ProcessingRestrictionRequest"),
+                security=True,
+                error_statuses=("400", "401", "423", "429", "500"),
+            ),
+        },
+        "/translate": {
+            "post": _operation(
+                "translateText",
+                "Translate a short catalog text",
+                "Localization",
+                _ref("TranslationResponse"),
+                request_schema=_ref("TranslationRequest"),
+                security=True,
+                error_statuses=("400", "401", "429", "500", "502"),
+            ),
+        },
+        "/ai/status": {
+            "get": _operation(
+                "getAiStatus",
+                "Get availability of optional scanning services",
+                "Scanning",
+                _ref("AiStatus"),
+                error_statuses=("429", "500"),
             ),
         },
         "/analytics/event": {
@@ -760,6 +1063,72 @@ def _paths() -> dict[str, Any]:
                 generic,
                 security=True,
                 error_statuses=("401", "404", "409", "429", "502", "503"),
+            ),
+        },
+        "/dashboard/summary": {
+            "get": _operation(
+                "getDashboardSummary",
+                "Get the current user's compact dashboard summary",
+                "Dashboard",
+                _ref("DashboardSummary"),
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "profile_id",
+                        {"type": "integer", "minimum": 1},
+                        "Optional active Family profile",
+                    )
+                ],
+                error_statuses=("400", "401", "500"),
+            ),
+        },
+        "/family/profiles": {
+            "get": _operation(
+                "getFamilyProfiles",
+                "List Family profiles for the current account",
+                "Family",
+                _ref("FamilyProfilesResponse"),
+                security=True,
+                error_statuses=("401", "500"),
+            ),
+            "post": _operation(
+                "createFamilyProfile",
+                "Create a Family profile",
+                "Family",
+                _ref("FamilyProfileResponse"),
+                success_status="201",
+                request_schema=_ref("CreateFamilyProfileRequest"),
+                security=True,
+                error_statuses=("400", "401", "402", "429", "500"),
+            ),
+        },
+        "/family/profiles/{profile_id}": {
+            "patch": _operation(
+                "updateFamilyProfile",
+                "Update a Family profile",
+                "Family",
+                _ref("FamilyProfileResponse"),
+                request_schema=_ref("FamilyProfileRequest"),
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "profile_id", {"type": "integer", "minimum": 1}, "Profile identifier"
+                    )
+                ],
+                error_statuses=("400", "401", "402", "404", "429", "500"),
+            ),
+            "delete": _operation(
+                "deleteFamilyProfile",
+                "Delete a non-primary Family profile and its cart",
+                "Family",
+                _ref("DeletedResponse"),
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "profile_id", {"type": "integer", "minimum": 1}, "Profile identifier"
+                    )
+                ],
+                error_statuses=("400", "401", "402", "404", "429", "500"),
             ),
         },
         "/gamification/coin-packs": {
@@ -849,6 +1218,201 @@ def _paths() -> dict[str, Any]:
                 security=True,
                 error_statuses=("400", "401", "403", "409", "429", "500", "502", "503"),
                 validation_helper="validate_checkout_sync_payload",
+            ),
+        },
+        "/cart/{user_id}": {
+            "get": _operation(
+                "getCart",
+                "List cart items for the current account and Family profile",
+                "Cart",
+                {"type": "array", "items": _ref("CartItem")},
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    ),
+                    _query_parameter(
+                        "profile_id",
+                        {"type": "integer", "minimum": 1},
+                        "Optional active Family profile",
+                    ),
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/cart/add": {
+            "post": _operation(
+                "addCartItem",
+                "Add a product to the current profile cart",
+                "Cart",
+                _ref("CartMutationResponse"),
+                alternate_success_statuses=("201",),
+                request_schema=_ref("SavedProductActionRequest"),
+                security=True,
+                error_statuses=("400", "401", "403", "404", "423", "429", "500"),
+            ),
+        },
+        "/cart/item/{item_id}": {
+            "patch": _operation(
+                "updateCartItem",
+                "Update quantity, store or bought state for a cart item",
+                "Cart",
+                _ref("CartUpdateResponse"),
+                request_schema=_ref("CartUpdateRequest"),
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "item_id", {"type": "integer", "minimum": 1}, "Cart item identifier"
+                    )
+                ],
+                error_statuses=("400", "401", "403", "404", "423", "500"),
+            ),
+            "delete": _operation(
+                "deleteCartItem",
+                "Delete one cart item",
+                "Cart",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "item_id", {"type": "integer", "minimum": 1}, "Cart item identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
+            ),
+        },
+        "/cart/clear/{user_id}": {
+            "delete": _operation(
+                "clearCart",
+                "Delete all cart items for the active profile",
+                "Cart",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    ),
+                    _query_parameter(
+                        "profile_id",
+                        {"type": "integer", "minimum": 1},
+                        "Optional active Family profile",
+                    ),
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
+            ),
+        },
+        "/favorites/{user_id}": {
+            "get": _operation(
+                "getFavorites",
+                "List favorite products for the current account",
+                "Favorites",
+                {"type": "array", "items": _ref("FavoriteItem")},
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/favorites/add": {
+            "post": _operation(
+                "addFavorite",
+                "Save a product as favorite",
+                "Favorites",
+                _ref("FavoriteMutationResponse"),
+                alternate_success_statuses=("201",),
+                request_schema=_ref("SavedProductActionRequest"),
+                security=True,
+                error_statuses=("400", "401", "403", "404", "423", "500"),
+            ),
+        },
+        "/favorites/item/{favorite_id}": {
+            "delete": _operation(
+                "deleteFavorite",
+                "Delete one favorite product",
+                "Favorites",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "favorite_id", {"type": "integer", "minimum": 1}, "Favorite identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
+            ),
+        },
+        "/favorites/clear/{user_id}": {
+            "delete": _operation(
+                "clearFavorites",
+                "Delete all favorite products for the current account",
+                "Favorites",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
+            ),
+        },
+        "/history/{user_id}": {
+            "get": _operation(
+                "getScanHistory",
+                "List scan history for the current account",
+                "History",
+                {"type": "array", "items": _ref("HistoryItem")},
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/history/add": {
+            "post": _operation(
+                "addScanHistory",
+                "Save a completed product scan",
+                "History",
+                _ref("HistoryMutationResponse"),
+                success_status="201",
+                request_schema=_ref("SavedProductActionRequest"),
+                security=True,
+                error_statuses=("400", "401", "403", "404", "423", "500"),
+            ),
+        },
+        "/history/item/{history_id}": {
+            "delete": _operation(
+                "deleteScanHistoryItem",
+                "Delete one scan history item",
+                "History",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "history_id", {"type": "integer", "minimum": 1}, "History item identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
+            ),
+        },
+        "/history/clear/{user_id}": {
+            "delete": _operation(
+                "clearScanHistory",
+                "Delete all scan history for the current account",
+                "History",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
             ),
         },
         "/catalog/romania/stats": {
@@ -1075,11 +1639,18 @@ def build_openapi_spec(
         "tags": [
             {"name": "System"},
             {"name": "Authentication"},
+            {"name": "Privacy"},
+            {"name": "Localization"},
             {"name": "Analytics"},
             {"name": "Support"},
             {"name": "Feedback"},
             {"name": "Billing"},
+            {"name": "Dashboard"},
+            {"name": "Family"},
             {"name": "Gamification"},
+            {"name": "Cart"},
+            {"name": "Favorites"},
+            {"name": "History"},
             {"name": "Catalog"},
             {"name": "Scanning"},
             {"name": "Submissions"},
@@ -1093,6 +1664,17 @@ def build_openapi_spec(
                     "in": "cookie",
                     "name": auth_cookie_name,
                     "description": "Signed, HttpOnly Ce aleg browser session cookie.",
+                },
+                "stripeSignature": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "Stripe-Signature",
+                    "description": "Stripe webhook signature verified against the raw body.",
+                },
+                "cronBearer": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "description": "Internal maintenance bearer secret.",
                 },
             },
             "schemas": _schemas(normalized_password_min_length),
