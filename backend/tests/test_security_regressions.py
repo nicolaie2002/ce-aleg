@@ -89,6 +89,7 @@ def test_runtime_openapi_has_typed_success_and_matches_route_access_policy(app, 
 
         for method in sorted(rule.methods - {"HEAD", "OPTIONS"}):
             operation = document["paths"][path][method.lower()]
+            assert operation["x-contract-source"] == "explicit", (path, method)
             success_responses = [
                 value
                 for status, value in operation["responses"].items()

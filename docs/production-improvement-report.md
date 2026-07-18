@@ -41,11 +41,11 @@ offline-ul rulează atât desktop, cât și mobil.
 
 - Politici explicite de acces pentru toate cele 105 rute backend și teste care
   opresc apariția rutelor fără clasificare public/auth/admin/cron.
-- OpenAPI descrie toate cele 109 operații runtime cu răspunsuri 2xx tipizate;
-  72 de operații critice au contracte explicite, inclusiv dashboard, Family,
-  coș, favorite, istoric, cont, confidențialitate, scanare AI, contribuții și
-  traducere. Restul sunt marcate `inferred`, iar
-  securitatea documentată folosește aceeași politică declarativă ca runtime-ul.
+- OpenAPI descrie toate cele 109 operații runtime cu contracte explicite pentru
+  răspunsuri, payload-uri și tipuri media, inclusiv dashboard, Family, coș,
+  favorite, istoric, cont, confidențialitate, scanare AI, contribuții, admin,
+  cron și Stripe. Securitatea documentată folosește aceeași politică declarativă
+  ca runtime-ul, iar testele interzic reapariția contractelor `inferred`.
 - App factory Flask, migrări Alembic versionate și verificarea migration head la
   pornirea în producție.
 - Rate limiting și cache Redis distribuit cu fallback local, plus Render Key

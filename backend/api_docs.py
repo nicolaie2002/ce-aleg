@@ -16,20 +16,26 @@ def _ref(name: str) -> dict[str, str]:
     return {"$ref": f"#/components/schemas/{name}"}
 
 
-def _json_content(schema: dict[str, Any]) -> dict[str, Any]:
-    return {"content": {JSON: {"schema": schema}}}
-
-
-def _response(description: str, schema: dict[str, Any] | None = None) -> dict[str, Any]:
+def _response(
+    description: str,
+    schema: dict[str, Any] | None = None,
+    *,
+    media_type: str = JSON,
+) -> dict[str, Any]:
     response: dict[str, Any] = {"description": description}
     if schema is not None:
-        response.update(_json_content(schema))
+        response["content"] = {media_type: {"schema": schema}}
     return response
 
 
-def _request(schema: dict[str, Any], *, media_type: str = JSON) -> dict[str, Any]:
+def _request(
+    schema: dict[str, Any],
+    *,
+    media_type: str = JSON,
+    required: bool = True,
+) -> dict[str, Any]:
     return {
-        "required": True,
+        "required": required,
         "content": {media_type: {"schema": schema}},
     }
 
@@ -61,8 +67,11 @@ def _operation(
     success_status: str = "200",
     alternate_success_statuses: tuple[str, ...] = (),
     request_schema: dict[str, Any] | None = None,
+    request_required: bool = True,
     media_type: str = JSON,
+    response_media_type: str = JSON,
     security: bool = False,
+    security_scheme: str | None = None,
     parameters: list[dict[str, Any]] | None = None,
     error_statuses: tuple[str, ...] = ("400", "500"),
     validation_helper: str | None = None,
@@ -73,17 +82,29 @@ def _operation(
         "tags": [tag],
         "x-contract-source": "explicit",
         "responses": {
-            success_status: _response("Successful response", success_schema),
+            success_status: _response(
+                "Successful response",
+                success_schema,
+                media_type=response_media_type,
+            ),
             **_errors(*error_statuses),
         },
     }
     if request_schema is not None:
-        operation["requestBody"] = _request(request_schema, media_type=media_type)
+        operation["requestBody"] = _request(
+            request_schema,
+            media_type=media_type,
+            required=request_required,
+        )
     for status_code in alternate_success_statuses:
         operation["responses"][status_code] = _response(
-            "Successful response", success_schema
+            "Successful response",
+            success_schema,
+            media_type=response_media_type,
         )
-    if security:
+    if security_scheme:
+        operation["security"] = [{security_scheme: []}]
+    elif security:
         operation["security"] = COOKIE_SECURITY
     if parameters:
         operation["parameters"] = parameters
@@ -1044,6 +1065,683 @@ def _schemas(password_min_length: int) -> dict[str, Any]:
             },
             "additionalProperties": False,
         },
+        "HomeResponse": {
+            "type": "object",
+            "required": ["message", "database"],
+            "properties": {"message": text, "database": text},
+            "additionalProperties": False,
+        },
+        "ReadinessResponse": {
+            "type": "object",
+            "required": [
+                "ready",
+                "environment",
+                "database",
+                "cookieSecure",
+                "devTunnelOriginsAllowed",
+                "paymentProvider",
+                "emailProvider",
+                "emailConfigured",
+                "freeMode",
+                "cloudVisionRequired",
+                "blockers",
+                "warnings",
+            ],
+            "properties": {
+                "ready": {"type": "boolean"},
+                "environment": text,
+                "database": {"type": "string", "enum": ["postgres", "sqlite"]},
+                "cookieSecure": {"type": "boolean"},
+                "devTunnelOriginsAllowed": {"type": "boolean"},
+                "paymentProvider": text,
+                "emailProvider": text,
+                "emailConfigured": {"type": "boolean"},
+                "freeMode": {"const": True},
+                "cloudVisionRequired": {"const": False},
+                "blockers": {"type": "array", "items": text},
+                "warnings": {"type": "array", "items": text},
+            },
+            "additionalProperties": False,
+        },
+        "RetentionResponse": {
+            "type": "object",
+            "required": [
+                "applied",
+                "activityCutoff",
+                "analyticsCutoff",
+                "searchCutoff",
+                "unverifiedAccountCutoff",
+                "rejectedSubmissionCutoff",
+                "consentCutoff",
+                "usageEvents",
+                "searchEvents",
+                "webhookEvents",
+                "consentLogs",
+                "unverifiedAccounts",
+                "rejectedSubmissions",
+                "scanFiles",
+            ],
+            "properties": {
+                "applied": {"type": "boolean"},
+                "activityCutoff": text,
+                "analyticsCutoff": text,
+                "searchCutoff": text,
+                "unverifiedAccountCutoff": text,
+                "rejectedSubmissionCutoff": text,
+                "consentCutoff": text,
+                "usageEvents": {"type": "integer", "minimum": 0},
+                "searchEvents": {"type": "integer", "minimum": 0},
+                "webhookEvents": {"type": "integer", "minimum": 0},
+                "consentLogs": {"type": "integer", "minimum": 0},
+                "unverifiedAccounts": {"type": "integer", "minimum": 0},
+                "rejectedSubmissions": {"type": "integer", "minimum": 0},
+                "scanFiles": {"type": "integer", "minimum": 0},
+            },
+            "additionalProperties": False,
+        },
+        "RetentionRequest": {
+            "type": "object",
+            "properties": {"apply": {"type": "boolean", "default": False}},
+            "additionalProperties": False,
+        },
+        "CronMaintenanceRequest": {
+            "type": "object",
+            "properties": {
+                "runId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._:-]{1,100}$",
+                },
+                "recategorizeLimit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 500,
+                },
+                "digestLimit": {"type": "integer", "minimum": 1, "maximum": 250},
+                "sendDigest": {"type": "boolean", "default": True},
+                "recategorize": {"type": "boolean", "default": True},
+                "retention": {"type": "boolean", "default": True},
+                "catalogQuality": {"type": "boolean", "default": True},
+            },
+            "additionalProperties": False,
+        },
+        "CronMaintenanceResponse": {
+            "type": "object",
+            "required": [
+                "ok",
+                "generatedAt",
+                "recategorize",
+                "missionDigest",
+                "retention",
+                "catalogQuality",
+                "warnings",
+                "durationsMs",
+                "status",
+                "runId",
+                "lock",
+                "completedAt",
+                "durationMs",
+            ],
+            "properties": {
+                "ok": {"const": True},
+                "generatedAt": text,
+                "recategorize": {
+                    "oneOf": [_ref("RecategorizationBatch"), {"type": "null"}]
+                },
+                "missionDigest": {
+                    "oneOf": [_ref("MissionDigestBatch"), {"type": "null"}]
+                },
+                "retention": {"oneOf": [_ref("RetentionResponse"), {"type": "null"}]},
+                "catalogQuality": {
+                    "oneOf": [_ref("AdminCatalogQuality"), {"type": "null"}]
+                },
+                "warnings": {"type": "array", "items": text},
+                "durationsMs": {
+                    "type": "object",
+                    "additionalProperties": {"type": "number", "minimum": 0},
+                },
+                "status": {"type": "string", "enum": ["success", "degraded"]},
+                "runId": text,
+                "lock": {"type": "string", "enum": ["redis", "local"]},
+                "completedAt": text,
+                "durationMs": {"type": "number", "minimum": 0},
+            },
+            "additionalProperties": False,
+        },
+        "StripeWebhookResponse": {
+            "type": "object",
+            "required": ["received"],
+            "properties": {
+                "received": {"const": True},
+                "duplicate": {"type": "boolean"},
+                "processing": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "CatalogSeedResponse": {
+            "type": "object",
+            "required": ["message", "inserted"],
+            "properties": {
+                "message": text,
+                "inserted": {"type": "integer", "minimum": 0},
+            },
+            "additionalProperties": False,
+        },
+        "DuplicateProductRecord": {
+            "type": "object",
+            "required": ["removed_id", "removed_name"],
+            "properties": {
+                "removed_id": {"type": "integer"},
+                "removed_name": text,
+                "barcode": nullable_text,
+                "kept_id": {"type": "integer"},
+                "kept_name": text,
+            },
+            "additionalProperties": False,
+        },
+        "CatalogCleanupResponse": {
+            "type": "object",
+            "required": [
+                "message",
+                "applied",
+                "removed_count",
+                "duplicates",
+                "demo_products",
+            ],
+            "properties": {
+                "message": text,
+                "applied": {"type": "boolean"},
+                "removed_count": {"type": "integer", "minimum": 0},
+                "duplicates": {
+                    "type": "array",
+                    "items": _ref("DuplicateProductRecord"),
+                },
+                "demo_products": {
+                    "type": "array",
+                    "items": _ref("DuplicateProductRecord"),
+                },
+            },
+            "additionalProperties": False,
+        },
+        "OpenApiDocument": {
+            "type": "object",
+            "required": ["openapi", "info", "paths", "components"],
+            "properties": {
+                "openapi": text,
+                "info": _ref("GenericObject"),
+                "paths": _ref("GenericObject"),
+                "components": _ref("GenericObject"),
+            },
+            "additionalProperties": True,
+        },
+        "AdminOverview": {
+            "type": "object",
+            "required": [
+                "users",
+                "products",
+                "uncategorizedProducts",
+                "pendingSubmissions",
+                "searches",
+                "missingProducts",
+                "priceObservations",
+                "proUsers",
+            ],
+            "properties": {
+                key: {"type": "integer", "minimum": 0}
+                for key in (
+                    "users",
+                    "products",
+                    "uncategorizedProducts",
+                    "pendingSubmissions",
+                    "searches",
+                    "missingProducts",
+                    "priceObservations",
+                    "proUsers",
+                )
+            },
+            "additionalProperties": False,
+        },
+        "AdminUser": {
+            "type": "object",
+            "required": [
+                "id",
+                "name",
+                "email",
+                "is_admin",
+                "email_verified",
+                "plan",
+                "subscription_status",
+                "created_at",
+            ],
+            "properties": {
+                "id": {"type": "integer"},
+                "name": text,
+                "email": {"type": "string", "format": "email"},
+                "is_admin": {"type": "boolean"},
+                "email_verified": {"type": "boolean"},
+                "plan": {"type": "string", "enum": ["free", "pro", "family"]},
+                "subscription_status": text,
+                "created_at": text,
+            },
+            "additionalProperties": False,
+        },
+        "AdminUserList": {"type": "array", "items": _ref("AdminUser")},
+        "AdminSearchMiss": {
+            "type": "object",
+            "required": ["query", "store", "source", "count", "lastSeen"],
+            "properties": {
+                "query": nullable_text,
+                "store": text,
+                "source": text,
+                "count": {"type": "integer", "minimum": 0},
+                "lastSeen": nullable_text,
+            },
+            "additionalProperties": False,
+        },
+        "AdminSearchMissList": {
+            "type": "array",
+            "items": _ref("AdminSearchMiss"),
+        },
+        "AdminUsageEvent": {
+            "type": "object",
+            "required": [
+                "id",
+                "type",
+                "source",
+                "userId",
+                "userEmail",
+                "createdAt",
+                "metadata",
+            ],
+            "properties": {
+                "id": {"type": "integer"},
+                "type": text,
+                "source": nullable_text,
+                "userId": nullable_integer,
+                "userEmail": text,
+                "createdAt": nullable_text,
+                "metadata": _ref("GenericObject"),
+            },
+            "additionalProperties": False,
+        },
+        "EmailDiagnostics": {
+            "type": "object",
+            "required": [
+                "provider",
+                "configured",
+                "from",
+                "fromName",
+                "replyTo",
+                "providerKeyOrHostConfigured",
+                "httpMaxAttempts",
+                "issues",
+                "lastProviderError",
+            ],
+            "properties": {
+                "provider": text,
+                "configured": {"type": "boolean"},
+                "from": text,
+                "fromName": text,
+                "replyTo": text,
+                "providerKeyOrHostConfigured": {"type": "boolean"},
+                "httpMaxAttempts": {"type": "integer", "minimum": 1},
+                "issues": {"type": "array", "items": text},
+                "lastProviderError": text,
+            },
+            "additionalProperties": False,
+        },
+        "AdminEmailTestRequest": {
+            "type": "object",
+            "properties": {
+                "to": {"type": "string", "format": "email", "maxLength": 254}
+            },
+            "additionalProperties": False,
+        },
+        "AdminEmailTestResponse": {
+            "type": "object",
+            "required": ["sent", "from", "to", "diagnostics"],
+            "properties": {
+                "sent": {"type": "boolean"},
+                "message": text,
+                "error": text,
+                "provider": text,
+                "from": text,
+                "to": {"type": "string", "format": "email"},
+                "diagnostics": _ref("EmailDiagnostics"),
+            },
+            "additionalProperties": False,
+        },
+        "AdminVerificationUser": {
+            "type": "object",
+            "required": ["id", "name", "email", "emailVerified"],
+            "properties": {
+                "id": {"type": "integer"},
+                "name": text,
+                "email": {"type": "string", "format": "email"},
+                "emailVerified": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "AdminVerificationResponse": {
+            "type": "object",
+            "required": ["sent", "message", "provider", "user"],
+            "properties": {
+                "sent": {"const": True},
+                "message": text,
+                "provider": text,
+                "user": _ref("AdminVerificationUser"),
+            },
+            "additionalProperties": False,
+        },
+        "AdminMonitoringResponse": {
+            "type": "object",
+            "required": [
+                "windowDays",
+                "generatedAt",
+                "backend",
+                "cache",
+                "scanIssues",
+                "payments",
+                "email",
+                "catalog",
+            ],
+            "properties": {
+                "windowDays": {"type": "integer", "minimum": 1, "maximum": 90},
+                "generatedAt": text,
+                "backend": _ref("GenericObject"),
+                "cache": _ref("GenericObject"),
+                "scanIssues": _ref("GenericObject"),
+                "payments": _ref("GenericObject"),
+                "email": _ref("GenericObject"),
+                "catalog": _ref("AdminCatalogQuality"),
+            },
+            "additionalProperties": False,
+        },
+        "AdminProductUpdateRequest": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string", "minLength": 2, "maxLength": 150},
+                "store": {"type": "string", "maxLength": 100},
+                "category": {"type": "string", "maxLength": 100},
+                "barcode": {"type": "string", "pattern": "^\\d{8,14}$"},
+                "image": {"type": "string", "maxLength": 255},
+                "priceText": {"type": "string", "maxLength": 100},
+                "tag": {"type": "string", "maxLength": 100},
+                "reason": {"type": "string", "maxLength": 5000},
+                "ingredients": {"type": "string", "maxLength": 5000},
+                "price": {"type": ["number", "string", "null"]},
+                "calories": {"type": ["number", "string", "null"]},
+                "protein": {"type": ["number", "string", "null"]},
+                "sugar": {"type": ["number", "string", "null"]},
+                "fat": {"type": ["number", "string", "null"]},
+                "score": {"type": ["number", "string", "null"]},
+                "vegan": {"type": "boolean"},
+                "lactoseFree": {"type": "boolean"},
+                "natural": {"type": "boolean"},
+                "recalculate": {"type": "boolean", "default": False},
+                "notifyUsers": {"type": "boolean", "default": False},
+            },
+            "additionalProperties": False,
+        },
+        "AdminProductUpdateResponse": {
+            "type": "object",
+            "required": ["message", "notifications", "product"],
+            "properties": {
+                "message": text,
+                "notifications": {
+                    "type": "object",
+                    "required": ["requested", "sent", "emailConfigured", "error"],
+                    "properties": {
+                        "requested": {"type": "boolean"},
+                        "sent": {"type": "integer", "minimum": 0},
+                        "emailConfigured": {"type": "boolean"},
+                        "error": nullable_text,
+                    },
+                    "additionalProperties": False,
+                },
+                "product": _ref("Product"),
+            },
+            "additionalProperties": False,
+        },
+        "AdminCatalogQuality": {
+            "type": "object",
+            "required": [
+                "products",
+                "healthScore",
+                "uncategorizedProducts",
+                "missingBarcode",
+                "missingImage",
+                "missingNutrition",
+                "missingIngredients",
+                "invalidScores",
+                "invalidNutrition",
+                "duplicateBarcodes",
+                "duplicateProducts",
+                "withBarcode",
+                "withImage",
+                "withNutrition",
+                "barcodeCoverage",
+                "imageCoverage",
+                "nutritionCoverage",
+                "categoryCoverage",
+                "uncategorizedRate",
+                "duplicateExamples",
+                "categories",
+                "issueExamples",
+            ],
+            "properties": {
+                "products": {"type": "integer", "minimum": 0},
+                "healthScore": {"type": "number", "minimum": 0, "maximum": 100},
+                "uncategorizedProducts": {"type": "integer", "minimum": 0},
+                "missingBarcode": {"type": "integer", "minimum": 0},
+                "missingImage": {"type": "integer", "minimum": 0},
+                "missingNutrition": {"type": "integer", "minimum": 0},
+                "missingIngredients": {"type": "integer", "minimum": 0},
+                "invalidScores": {"type": "integer", "minimum": 0},
+                "invalidNutrition": {"type": "integer", "minimum": 0},
+                "duplicateBarcodes": {"type": "integer", "minimum": 0},
+                "duplicateProducts": {"type": "integer", "minimum": 0},
+                "withBarcode": {"type": "integer", "minimum": 0},
+                "withImage": {"type": "integer", "minimum": 0},
+                "withNutrition": {"type": "integer", "minimum": 0},
+                "barcodeCoverage": {"type": "number", "minimum": 0, "maximum": 100},
+                "imageCoverage": {"type": "number", "minimum": 0, "maximum": 100},
+                "nutritionCoverage": {"type": "number", "minimum": 0, "maximum": 100},
+                "categoryCoverage": {"type": "number", "minimum": 0, "maximum": 100},
+                "uncategorizedRate": {"type": "number", "minimum": 0, "maximum": 100},
+                "duplicateExamples": {"type": "array", "items": _ref("GenericObject")},
+                "categories": {"type": "array", "items": _ref("GenericObject")},
+                "issueExamples": {"type": "array", "items": _ref("GenericObject")},
+                "generatedAt": text,
+                "pendingSubmissions": {"type": "integer", "minimum": 0},
+                "priceObservations": {"type": "integer", "minimum": 0},
+                "searches": {"type": "integer", "minimum": 0},
+            },
+            "additionalProperties": False,
+        },
+        "AdminRecategorizeRequest": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "minimum": 1, "maximum": 1000},
+                "includeAll": {"type": "boolean"},
+                "minId": {"type": "integer", "minimum": 1},
+                "category": {"type": "string", "maxLength": 100},
+                "apply": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "RecategorizationBatch": {
+            "type": "object",
+            "required": [
+                "scanned",
+                "changed",
+                "applied",
+                "minId",
+                "lastScannedId",
+                "nextMinId",
+                "hasMore",
+                "category",
+                "changes",
+            ],
+            "properties": {
+                "scanned": {"type": "integer", "minimum": 0},
+                "changed": {"type": "integer", "minimum": 0},
+                "applied": {"type": "boolean"},
+                "minId": nullable_integer,
+                "lastScannedId": nullable_integer,
+                "nextMinId": nullable_integer,
+                "hasMore": {"type": "boolean"},
+                "category": nullable_text,
+                "changes": {"type": "array", "items": _ref("GenericObject")},
+            },
+            "additionalProperties": False,
+        },
+        "AdminRecategorizeResponse": {
+            "type": "object",
+            "required": [
+                "scanned",
+                "changed",
+                "applied",
+                "minId",
+                "lastScannedId",
+                "nextMinId",
+                "hasMore",
+                "category",
+                "changes",
+                "message",
+                "catalog",
+            ],
+            "properties": {
+                "scanned": {"type": "integer", "minimum": 0},
+                "changed": {"type": "integer", "minimum": 0},
+                "applied": {"type": "boolean"},
+                "minId": nullable_integer,
+                "lastScannedId": nullable_integer,
+                "nextMinId": nullable_integer,
+                "hasMore": {"type": "boolean"},
+                "category": nullable_text,
+                "changes": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "name", "barcode", "oldCategory", "newCategory"],
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "name": text,
+                            "barcode": nullable_text,
+                            "oldCategory": text,
+                            "newCategory": text,
+                        },
+                        "additionalProperties": False,
+                    },
+                },
+                "message": text,
+                "catalog": _ref("AdminCatalogQuality"),
+            },
+            "additionalProperties": False,
+        },
+        "AdminMissionDigestRequest": {
+            "type": "object",
+            "properties": {
+                "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+                "apply": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "MissionDigestBatch": {
+            "type": "object",
+            "required": [
+                "scanned",
+                "eligible",
+                "sent",
+                "failed",
+                "skippedRecent",
+                "skippedUnverified",
+                "applied",
+                "recipients",
+            ],
+            "properties": {
+                "scanned": {"type": "integer", "minimum": 0},
+                "eligible": {"type": "integer", "minimum": 0},
+                "sent": {"type": "integer", "minimum": 0},
+                "failed": {"type": "integer", "minimum": 0},
+                "skippedRecent": {"type": "integer", "minimum": 0},
+                "skippedUnverified": {"type": "integer", "minimum": 0},
+                "applied": {"type": "boolean"},
+                "recipients": {"type": "array", "items": _ref("GenericObject")},
+                "emailConfigured": {"type": "boolean"},
+            },
+            "additionalProperties": False,
+        },
+        "AdminMissionDigestResponse": {
+            "type": "object",
+            "required": [
+                "scanned",
+                "eligible",
+                "sent",
+                "failed",
+                "skippedRecent",
+                "skippedUnverified",
+                "applied",
+                "recipients",
+                "emailConfigured",
+                "cooldownDays",
+                "message",
+            ],
+            "properties": {
+                "scanned": {"type": "integer", "minimum": 0},
+                "eligible": {"type": "integer", "minimum": 0},
+                "sent": {"type": "integer", "minimum": 0},
+                "failed": {"type": "integer", "minimum": 0},
+                "skippedRecent": {"type": "integer", "minimum": 0},
+                "skippedUnverified": {"type": "integer", "minimum": 0},
+                "applied": {"type": "boolean"},
+                "recipients": {"type": "array", "items": _ref("GenericObject")},
+                "emailConfigured": {"type": "boolean"},
+                "cooldownDays": {"type": "integer", "minimum": 1},
+                "message": text,
+            },
+            "additionalProperties": False,
+        },
+        "AdminAlternativeResolveRequest": {
+            "type": "object",
+            "properties": {"category": {"type": "string", "maxLength": 100}},
+            "additionalProperties": False,
+        },
+        "AdminAlternativeResolveResponse": {
+            "type": "object",
+            "required": ["message", "fixed", "product", "event"],
+            "properties": {
+                "message": text,
+                "fixed": {"type": "boolean"},
+                "product": _ref("Product"),
+                "event": _ref("AdminUsageEvent"),
+            },
+            "additionalProperties": False,
+        },
+        "AdminPlanUpdateRequest": {
+            "type": "object",
+            "required": ["plan"],
+            "properties": {
+                "plan": {"type": "string", "enum": ["free", "pro", "family"]},
+                "status": {
+                    "type": "string",
+                    "enum": ["active", "inactive", "canceled"],
+                    "default": "active",
+                },
+                "provider": {"type": "string", "maxLength": 80},
+            },
+            "additionalProperties": False,
+        },
+        "AdminPlanUpdateResponse": {
+            "type": "object",
+            "required": ["message", "user", "usage"],
+            "properties": {
+                "message": text,
+                "user": _ref("User"),
+                "usage": _ref("GenericObject"),
+            },
+            "additionalProperties": False,
+        },
         "GenericObject": {"type": "object", "additionalProperties": True},
     }
 
@@ -1054,6 +1752,15 @@ def _paths() -> dict[str, Any]:
     message = _ref("Message")
 
     return {
+        "/": {
+            "get": _operation(
+                "getApiHome",
+                "Get API service and database mode",
+                "System",
+                _ref("HomeResponse"),
+                error_statuses=("500",),
+            ),
+        },
         "/health": {
             "get": _operation(
                 "health",
@@ -1069,6 +1776,64 @@ def _paths() -> dict[str, Any]:
                 "Get deployed application version",
                 "System",
                 _ref("Version"),
+                error_statuses=("500",),
+            ),
+        },
+        "/readiness": {
+            "get": _operation(
+                "getPublicationReadiness",
+                "Inspect production configuration readiness",
+                "Admin",
+                _ref("ReadinessResponse"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/init-db": {
+            "get": _operation(
+                "initializeDevelopmentDatabase",
+                "Initialize a non-production development database",
+                "Admin",
+                message,
+                security=True,
+                error_statuses=("401", "403", "409", "500"),
+            ),
+        },
+        "/openapi.json": {
+            "get": _operation(
+                "getOpenApiDocument",
+                "Get the runtime OpenAPI document",
+                "System",
+                _ref("OpenApiDocument"),
+                error_statuses=("500",),
+            ),
+        },
+        "/api/openapi.json": {
+            "get": _operation(
+                "getNamespacedOpenApiDocument",
+                "Get the runtime OpenAPI document through its API alias",
+                "System",
+                _ref("OpenApiDocument"),
+                error_statuses=("500",),
+            ),
+        },
+        "/docs": {
+            "get": _operation(
+                "getApiDocumentation",
+                "Open interactive API documentation",
+                "System",
+                {"type": "string"},
+                response_media_type="text/html",
+                error_statuses=("500",),
+            ),
+        },
+        "/api/docs": {
+            "get": _operation(
+                "getNamespacedApiDocumentation",
+                "Open interactive API documentation through its API alias",
+                "System",
+                {"type": "string"},
+                response_media_type="text/html",
                 error_statuses=("500",),
             ),
         },
@@ -1402,6 +2167,18 @@ def _paths() -> dict[str, Any]:
                 generic,
                 security=True,
                 error_statuses=("401", "404", "409", "429", "502", "503"),
+            ),
+        },
+        "/billing/stripe/webhook": {
+            "post": _operation(
+                "processStripeWebhook",
+                "Verify and process one Stripe webhook event",
+                "Billing",
+                _ref("StripeWebhookResponse"),
+                alternate_success_statuses=("202",),
+                request_schema=_ref("GenericObject"),
+                security_scheme="stripeSignature",
+                error_statuses=("400", "500", "503"),
             ),
         },
         "/dashboard/summary": {
@@ -1763,6 +2540,39 @@ def _paths() -> dict[str, Any]:
                 error_statuses=("500",),
             ),
         },
+        "/products/seed": {
+            "get": _operation(
+                "seedDemoProducts",
+                "Insert missing demonstration catalog products",
+                "Admin",
+                _ref("CatalogSeedResponse"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/products/cleanup-duplicates": {
+            "get": _operation(
+                "previewDuplicateProductCleanup",
+                "Preview duplicate and demonstration product cleanup",
+                "Admin",
+                _ref("CatalogCleanupResponse"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+            "post": _operation(
+                "applyDuplicateProductCleanup",
+                "Apply duplicate and demonstration product cleanup",
+                "Admin",
+                _ref("CatalogCleanupResponse"),
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "apply", {"type": "boolean", "default": False}, "Delete matches"
+                    )
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
         "/products": {
             "get": _operation(
                 "getProducts",
@@ -1887,6 +2697,50 @@ def _paths() -> dict[str, Any]:
                 validation_helper="validate_analysis_form",
             ),
         },
+        "/uploads/submissions/{filename}": {
+            "get": _operation(
+                "getSubmissionImage",
+                "Read an authorized local submission image",
+                "Submissions",
+                {"type": "string", "format": "binary"},
+                response_media_type="application/octet-stream",
+                security=True,
+                parameters=[
+                    _path_parameter("filename", {"type": "string"}, "Stored image path")
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/uploads/scans/{filename}": {
+            "get": _operation(
+                "getScanImage",
+                "Read an authorized temporary scan image",
+                "Scanning",
+                {"type": "string", "format": "binary"},
+                response_media_type="application/octet-stream",
+                security=True,
+                parameters=[
+                    _path_parameter("filename", {"type": "string"}, "Stored image path")
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/uploads/supabase-submissions/{object_path}": {
+            "get": _operation(
+                "getSupabaseSubmissionImage",
+                "Read an authorized private Supabase submission image",
+                "Submissions",
+                {"type": "string", "format": "binary"},
+                response_media_type="application/octet-stream",
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "object_path", {"type": "string"}, "Private storage object path"
+                    )
+                ],
+                error_statuses=("401", "403", "404", "500", "502", "503"),
+            ),
+        },
         "/submissions/{user_id}": {
             "get": _operation(
                 "getUserSubmissions",
@@ -1967,6 +2821,363 @@ def _paths() -> dict[str, Any]:
                 error_statuses=("400", "401", "403", "404", "500", "502"),
             ),
         },
+        "/users": {
+            "get": _operation(
+                "getAdminUsers",
+                "List users with plan and verification state",
+                "Admin",
+                _ref("AdminUserList"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/overview": {
+            "get": _operation(
+                "getAdminOverview",
+                "Get the compact administration overview",
+                "Admin",
+                _ref("AdminOverview"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/monitoring": {
+            "get": _operation(
+                "getAdminMonitoring",
+                "Get launch monitoring, catalog, payment and email diagnostics",
+                "Admin",
+                _ref("AdminMonitoringResponse"),
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "days",
+                        {"type": "integer", "minimum": 1, "maximum": 90, "default": 7},
+                        "Monitoring window in days",
+                    ),
+                    _query_parameter(
+                        "limit",
+                        {"type": "integer", "minimum": 5, "maximum": 50, "default": 16},
+                        "Maximum recent rows per section",
+                    ),
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/submissions": {
+            "get": _operation(
+                "getAdminSubmissions",
+                "List all community product submissions",
+                "Admin",
+                {"type": "array", "items": _ref("ProductSubmission")},
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/search-misses": {
+            "get": _operation(
+                "getAdminSearchMisses",
+                "Aggregate catalog searches with no result",
+                "Admin",
+                _ref("AdminSearchMissList"),
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "days",
+                        {"type": "integer", "minimum": 1, "maximum": 365, "default": 30},
+                        "Aggregation window in days",
+                    ),
+                    _query_parameter(
+                        "limit",
+                        {"type": "integer", "minimum": 1, "maximum": 200, "default": 50},
+                        "Maximum aggregated rows",
+                    ),
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/products/search": {
+            "get": _operation(
+                "searchAdminProducts",
+                "Search catalog products for administration",
+                "Admin",
+                product_list,
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "q",
+                        {"type": "string"},
+                        "Name, category, store or barcode query",
+                    ),
+                    _query_parameter(
+                        "limit",
+                        {"type": "integer", "minimum": 1, "maximum": 50, "default": 20},
+                        "Maximum products",
+                    ),
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/products/{product_id}": {
+            "patch": _operation(
+                "updateAdminProduct",
+                "Edit and optionally recalculate a catalog product",
+                "Admin",
+                _ref("AdminProductUpdateResponse"),
+                request_schema=_ref("AdminProductUpdateRequest"),
+                request_required=False,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "product_id",
+                        {"type": "integer", "minimum": 1},
+                        "Product identifier",
+                    )
+                ],
+                error_statuses=("400", "401", "403", "404", "500"),
+            ),
+            "delete": _operation(
+                "deleteAdminProduct",
+                "Delete a catalog product",
+                "Admin",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "product_id",
+                        {"type": "integer", "minimum": 1},
+                        "Product identifier",
+                    )
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/admin/catalog/quality": {
+            "get": _operation(
+                "getAdminCatalogQuality",
+                "Get catalog completeness and integrity metrics",
+                "Admin",
+                _ref("AdminCatalogQuality"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/catalog/recategorize": {
+            "get": _operation(
+                "previewAdminCatalogRecategorization",
+                "Preview one catalog recategorization batch",
+                "Admin",
+                _ref("AdminRecategorizeResponse"),
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "limit",
+                        {"type": "integer", "minimum": 1, "maximum": 1000, "default": 300},
+                        "Maximum products to scan",
+                    ),
+                    _query_parameter(
+                        "include_all", {"type": "boolean"}, "Include categorized products"
+                    ),
+                    _query_parameter(
+                        "min_id",
+                        {"type": "integer", "minimum": 1},
+                        "First product identifier in the batch",
+                    ),
+                    _query_parameter(
+                        "category", {"type": "string", "maxLength": 100}, "Category filter"
+                    ),
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+            "post": _operation(
+                "applyAdminCatalogRecategorization",
+                "Apply one catalog recategorization batch",
+                "Admin",
+                _ref("AdminRecategorizeResponse"),
+                request_schema=_ref("AdminRecategorizeRequest"),
+                request_required=False,
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "apply", {"type": "boolean", "default": False}, "Persist changes"
+                    )
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/missions/digest": {
+            "get": _operation(
+                "previewAdminMissionDigest",
+                "Preview recipients with missions near completion",
+                "Admin",
+                _ref("AdminMissionDigestResponse"),
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "limit",
+                        {"type": "integer", "minimum": 1, "maximum": 500, "default": 100},
+                        "Maximum users to inspect",
+                    )
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+            "post": _operation(
+                "sendAdminMissionDigest",
+                "Send mission digest emails to eligible users",
+                "Admin",
+                _ref("AdminMissionDigestResponse"),
+                request_schema=_ref("AdminMissionDigestRequest"),
+                request_required=False,
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "apply", {"type": "boolean", "default": False}, "Send emails"
+                    )
+                ],
+                error_statuses=("400", "401", "403", "500", "502", "503"),
+            ),
+        },
+        "/admin/retention": {
+            "get": _operation(
+                "previewAdminRetention",
+                "Preview records and files eligible for retention cleanup",
+                "Admin",
+                _ref("RetentionResponse"),
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+            "post": _operation(
+                "applyAdminRetention",
+                "Apply the configured data retention policy",
+                "Admin",
+                _ref("RetentionResponse"),
+                request_schema=_ref("RetentionRequest"),
+                request_required=False,
+                security=True,
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/internal/cron/maintenance": {
+            "post": _operation(
+                "runProductionMaintenance",
+                "Run the idempotent production maintenance batch",
+                "System",
+                _ref("CronMaintenanceResponse"),
+                request_schema=_ref("CronMaintenanceRequest"),
+                request_required=False,
+                security_scheme="cronBearer",
+                error_statuses=("400", "401", "409", "500"),
+            ),
+        },
+        "/admin/email-test": {
+            "post": _operation(
+                "sendAdminEmailTest",
+                "Send one transactional email configuration test",
+                "Admin",
+                _ref("AdminEmailTestResponse"),
+                request_schema=_ref("AdminEmailTestRequest"),
+                request_required=False,
+                security=True,
+                error_statuses=("400", "401", "403", "500", "502"),
+            ),
+        },
+        "/admin/users/resend-verification": {
+            "post": _operation(
+                "resendAdminUserVerification",
+                "Resend account verification to one user",
+                "Admin",
+                _ref("AdminVerificationResponse"),
+                request_schema=_ref("EmailRequest"),
+                security=True,
+                error_statuses=("400", "401", "403", "404", "409", "500", "502", "503"),
+            ),
+        },
+        "/admin/users/{user_id}/plan": {
+            "patch": _operation(
+                "updateAdminUserPlan",
+                "Update a user's plan and subscription state",
+                "Admin",
+                _ref("AdminPlanUpdateResponse"),
+                request_schema=_ref("AdminPlanUpdateRequest"),
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "user_id", {"type": "integer", "minimum": 1}, "User identifier"
+                    )
+                ],
+                error_statuses=("400", "401", "403", "404", "500"),
+            ),
+        },
+        "/admin/alternative-reports/{event_id}/resolve": {
+            "post": _operation(
+                "resolveAdminAlternativeReport",
+                "Resolve an unsuitable alternative report",
+                "Admin",
+                _ref("AdminAlternativeResolveResponse"),
+                request_schema=_ref("AdminAlternativeResolveRequest"),
+                request_required=False,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "event_id", {"type": "integer", "minimum": 1}, "Report event identifier"
+                    )
+                ],
+                error_statuses=("400", "401", "403", "404", "500"),
+            ),
+        },
+        "/admin/export/search-misses.csv": {
+            "get": _operation(
+                "exportAdminSearchMisses",
+                "Download search misses as CSV",
+                "Admin",
+                {"type": "string"},
+                response_media_type="text/csv",
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "days",
+                        {"type": "integer", "minimum": 1, "maximum": 180, "default": 30},
+                        "Export window in days",
+                    )
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/export/alternative-reports.csv": {
+            "get": _operation(
+                "exportAdminAlternativeReports",
+                "Download alternative reports as CSV",
+                "Admin",
+                {"type": "string"},
+                response_media_type="text/csv",
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "days",
+                        {"type": "integer", "minimum": 1, "maximum": 180, "default": 30},
+                        "Export window in days",
+                    )
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
+        "/admin/export/payment-events.csv": {
+            "get": _operation(
+                "exportAdminPaymentEvents",
+                "Download payment events as CSV",
+                "Admin",
+                {"type": "string"},
+                response_media_type="text/csv",
+                security=True,
+                parameters=[
+                    _query_parameter(
+                        "days",
+                        {"type": "integer", "minimum": 1, "maximum": 180, "default": 30},
+                        "Export window in days",
+                    )
+                ],
+                error_statuses=("401", "403", "500"),
+            ),
+        },
         "/prices/report": {
             "post": _operation(
                 "reportLocalPrice",
@@ -2045,6 +3256,7 @@ def build_openapi_spec(
             {"name": "Scanning"},
             {"name": "Submissions"},
             {"name": "Prices"},
+            {"name": "Admin"},
         ],
         "paths": _paths(),
         "components": {

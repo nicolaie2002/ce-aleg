@@ -9,12 +9,11 @@ Referinta executabila este expusa de backend:
 Documentul de fata explica regulile de integrare. Contractul OpenAPI ramane
 sursa principala pentru schema exacta a rutelor documentate.
 
-Fiecare operatie runtime are o schema pentru raspunsul de succes. Operatiile cu
-`x-contract-source: explicit` au contract de domeniu verificat prin teste;
-operatiile cu `x-contract-source: inferred` sunt incluse complet in document,
-dar folosesc temporar o schema generica si trebuie rafinate inaintea unei
-schimbari incompatibile. Politica de autentificare din OpenAPI este derivata din
-acelasi registru declarativ folosit de backend la executie.
+Toate cele 109 operatii runtime au schema explicita pentru raspuns, parametri,
+payload si tipul media relevant. Testele resping automat orice ruta noua care ar
+ramane cu `x-contract-source: inferred`. Politica de autentificare din OpenAPI
+este verificata fata de acelasi registru declarativ folosit de backend la
+executie, inclusiv semnatura Stripe si bearer-ul cron.
 
 ## URL-uri
 

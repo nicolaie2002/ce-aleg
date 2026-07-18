@@ -282,6 +282,13 @@ def test_openapi_covers_each_primary_payload_family(openapi_document):
 def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_document):
     paths = openapi_document["paths"]
     expected_operations = {
+        ("/", "get"),
+        ("/readiness", "get"),
+        ("/init-db", "get"),
+        ("/openapi.json", "get"),
+        ("/api/openapi.json", "get"),
+        ("/docs", "get"),
+        ("/api/docs", "get"),
         ("/auth/me", "get"),
         ("/account/delete/request", "post"),
         ("/account/delete/confirm", "post"),
@@ -318,11 +325,42 @@ def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_docum
         ("/submissions/item/{submission_id}", "delete"),
         ("/submissions/ai-review/{submission_id}", "post"),
         ("/submissions/approve/{submission_id}", "post"),
+        ("/users", "get"),
+        ("/admin/overview", "get"),
+        ("/admin/monitoring", "get"),
+        ("/admin/submissions", "get"),
+        ("/admin/search-misses", "get"),
+        ("/admin/products/search", "get"),
+        ("/admin/products/{product_id}", "patch"),
+        ("/admin/products/{product_id}", "delete"),
+        ("/admin/catalog/quality", "get"),
+        ("/admin/catalog/recategorize", "get"),
+        ("/admin/catalog/recategorize", "post"),
+        ("/admin/missions/digest", "get"),
+        ("/admin/missions/digest", "post"),
+        ("/admin/email-test", "post"),
+        ("/admin/users/resend-verification", "post"),
+        ("/admin/users/{user_id}/plan", "patch"),
+        ("/admin/alternative-reports/{event_id}/resolve", "post"),
+        ("/admin/export/search-misses.csv", "get"),
+        ("/admin/export/alternative-reports.csv", "get"),
+        ("/admin/export/payment-events.csv", "get"),
+        ("/admin/retention", "get"),
+        ("/admin/retention", "post"),
+        ("/billing/stripe/webhook", "post"),
+        ("/internal/cron/maintenance", "post"),
+        ("/products/seed", "get"),
+        ("/products/cleanup-duplicates", "get"),
+        ("/products/cleanup-duplicates", "post"),
+        ("/uploads/submissions/{filename}", "get"),
+        ("/uploads/scans/{filename}", "get"),
+        ("/uploads/supabase-submissions/{object_path}", "get"),
     }
     bodyless_mutations = {
         ("/account/delete/request", "post"),
         ("/submissions/ai-review/{submission_id}", "post"),
         ("/submissions/approve/{submission_id}", "post"),
+        ("/products/cleanup-duplicates", "post"),
     }
 
     for path, method in expected_operations:
@@ -351,6 +389,19 @@ def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_docum
     assert paths["/consent/log"]["post"]["x-validation-helper"] == (
         "validate_consent_log_payload"
     )
+    assert paths["/admin/export/search-misses.csv"]["get"]["responses"]["200"][
+        "content"
+    ].keys() == {"text/csv"}
+    assert paths["/admin/email-test"]["post"]["requestBody"]["required"] is False
+    assert paths["/billing/stripe/webhook"]["post"]["security"] == [
+        {"stripeSignature": []}
+    ]
+    assert paths["/internal/cron/maintenance"]["post"]["security"] == [
+        {"cronBearer": []}
+    ]
+    assert paths["/docs"]["get"]["responses"]["200"]["content"].keys() == {
+        "text/html"
+    }
 
 
 def test_openapi_operation_ids_are_unique_and_path_parameters_declared(
