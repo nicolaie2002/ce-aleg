@@ -5,8 +5,11 @@ Ultima actualizare: 2026-07-18
 ## Stare curenta
 
 - Portile locale sunt verzi: backend 357 teste si 73,13% coverage pentru `app.py`;
-  frontend 76 teste Jest; Playwright 32 trecute, 10 skip
+  frontend 84 teste Jest in 16 suite; Playwright 32 trecute, 10 skip
   intentionat si zero esecuri.
+- Coverage-ul ponderat este impus automat la minimum 60% separat pentru
+  `app/components` si `app/utils`; valorile curente sunt 61,37%/62,61%
+  statements/linii pentru componente si 88,56%/93,54% pentru utils.
 - PWA foloseste un service worker static, fara cache pentru API/date private;
   offline-ul este verificat desktop si mobil.
 - Render Key Value free este configurat pentru rate limit/cache distribuit.

@@ -18,7 +18,8 @@ backup/restore, deployment și test pe telefoane reale.
 | Poartă | Rezultat |
 | --- | --- |
 | Backend pytest | 357 teste trecute; 73,13% `app.py`, prag 70% |
-| Frontend Jest | 14 suite și 76 teste trecute |
+| Frontend Jest | 16 suite și 84 teste trecute |
+| Coverage țintit frontend | componente 61,37% statements / 62,61% lines; utils 88,56% / 93,54%; prag automat 60% |
 | Playwright full stack | 32 trecute, 10 sărite intenționat pe mobil, 0 eșuate |
 | ESLint și TypeScript | trecute fără warnings/errors |
 | Next.js build | trecut, 66 rute generate |
@@ -61,6 +62,9 @@ offline-ul rulează atât desktop, cât și mobil.
   buildul nu mai emite avertismentul de compatibilitate. Proxy-ul este inclus
   explicit în TypeScript/Jest și are praguri de minimum 90% linii/statements,
   75% branches și 100% funcții.
+- Fluxurile Family Profiles, statusul serviciilor AI și actualizarea PWA au teste
+  dedicate. CI recalculează coverage-ul ponderat și oprește regresiile sub 60%
+  statements/linii separat pentru `app/components` și `app/utils`.
 - CI extins cu audit de dependențe, Bandit, coverage 70%, E2E, Lighthouse,
   verificare Cloudflare Workers și smoke test al runtime-ului Linux.
 - Job gratuit GitHub Actions pentru maintenance zilnic și backup săptămânal;

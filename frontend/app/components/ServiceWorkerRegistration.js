@@ -20,6 +20,7 @@ export function ServiceWorkerRegistration() {
     }
 
     let disposed = false;
+    const serviceWorker = navigator.serviceWorker;
 
     function watchInstallingWorker(registration) {
       const worker = registration.installing;
@@ -29,7 +30,7 @@ export function ServiceWorkerRegistration() {
         if (
           !disposed &&
           worker.state === "installed" &&
-          navigator.serviceWorker.controller
+          serviceWorker.controller
         ) {
           setUpdateAvailable(true);
         }
@@ -42,18 +43,18 @@ export function ServiceWorkerRegistration() {
       }
     }
 
-    navigator.serviceWorker.addEventListener(
+    serviceWorker.addEventListener(
       "controllerchange",
       handleControllerChange
     );
 
-    navigator.serviceWorker
+    serviceWorker
       .register("/sw.js", { scope: "/", updateViaCache: "none" })
       .then((registration) => {
         if (disposed) return;
 
         registrationRef.current = registration;
-        if (registration.waiting && navigator.serviceWorker.controller) {
+        if (registration.waiting && serviceWorker.controller) {
           setUpdateAvailable(true);
         }
 
@@ -68,7 +69,7 @@ export function ServiceWorkerRegistration() {
 
     return () => {
       disposed = true;
-      navigator.serviceWorker.removeEventListener(
+      serviceWorker.removeEventListener(
         "controllerchange",
         handleControllerChange
       );

@@ -22,6 +22,7 @@ const customJestConfig = {
     "sentry.*.config.js",
     "!app/**/*.d.ts",
   ],
+  coverageReporters: ["text", "lcov", "clover", "json", "json-summary"],
   coverageThreshold: {
     "./proxy.js": {
       branches: 75,
