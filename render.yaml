@@ -10,7 +10,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn 'app:create_application()' --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5
+    startCommand: python migration.py release && exec gunicorn 'app:create_application()' --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5
     autoDeployTrigger: off
     healthCheckPath: /health
     envVars:

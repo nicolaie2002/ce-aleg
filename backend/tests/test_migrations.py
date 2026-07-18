@@ -21,7 +21,10 @@ def test_empty_database_upgrade_downgrade_and_upgrade(tmp_path):
     database_path = tmp_path / "migration-cycle.db"
     database_url = sqlite_url(database_path)
 
-    run_migrations("upgrade", database_url=database_url)
+    run_release(
+        database_url=database_url,
+        environ={"APP_ENV": "testing"},
+    )
 
     engine = create_engine(database_url)
     try:
@@ -86,7 +89,10 @@ def test_upgrade_adopts_legacy_database_without_losing_users(tmp_path):
     finally:
         engine.dispose()
 
-    run_migrations("upgrade", database_url=database_url)
+    run_release(
+        database_url=database_url,
+        environ={"APP_ENV": "testing"},
+    )
 
     engine = create_engine(database_url)
     try:
@@ -240,3 +246,13 @@ def test_migration_cli_fails_closed_on_database_error(tmp_path):
 
     assert result.returncode != 0
     assert "Database migration failed" in result.stderr
+
+
+def test_production_start_commands_release_before_gunicorn():
+    repository_root = BACKEND_DIR.parent
+    render_config = (repository_root / "render.yaml").read_text(encoding="utf-8")
+    dockerfile = (BACKEND_DIR / "Dockerfile").read_text(encoding="utf-8")
+
+    expected_order = "python migration.py release && exec gunicorn"
+    assert expected_order in render_config
+    assert expected_order in dockerfile

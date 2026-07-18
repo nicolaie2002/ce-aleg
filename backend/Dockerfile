@@ -35,4 +35,4 @@ EXPOSE 5001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD python -c "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('PORT', '5001') + '/health', timeout=3)"
 
-CMD ["sh", "-c", "exec gunicorn 'app:create_application()' --bind 0.0.0.0:${PORT} --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5 --access-logfile - --error-logfile -"]
+CMD ["sh", "-c", "python migration.py release && exec gunicorn 'app:create_application()' --bind 0.0.0.0:${PORT} --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5 --access-logfile - --error-logfile -"]
