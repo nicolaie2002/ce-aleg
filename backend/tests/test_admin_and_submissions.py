@@ -2,7 +2,7 @@ from werkzeug.security import generate_password_hash
 
 import app as app_module
 from database import db
-from models import Product, ProductSubmission, SearchEvent, Subscription, UsageEvent, User
+from models import Product, SearchEvent, Subscription, UsageEvent, User
 
 
 def create_user(email="user@example.com", *, admin=False, verified=True):
@@ -355,6 +355,102 @@ def test_internal_maintenance_cron_runs_all_free_jobs_with_valid_secret(
     assert payload["missionDigest"]["applied"] is False
     assert payload["retention"]["applied"] is True
     assert payload["catalogQuality"]["healthScore"] == 92.5
+    assert payload["status"] == "degraded"
+    assert payload["runId"].startswith("manual-")
+    assert payload["lock"] == "local"
+    assert payload["durationMs"] >= 0
+    assert set(payload["durationsMs"]) == {
+        "recategorize",
+        "missionDigest",
+        "retention",
+        "catalogQuality",
+    }
+    assert payload["warnings"]
+
+
+def test_internal_maintenance_cron_validates_run_id_and_rejects_overlap(
+    app, client, monkeypatch
+):
+    monkeypatch.setattr(app_module, "CRON_SECRET", "test-cron-secret")
+    headers = {"Authorization": "Bearer test-cron-secret"}
+
+    invalid = client.post(
+        "/internal/cron/maintenance",
+        json={"runId": "invalid run id"},
+        headers=headers,
+    )
+
+    assert invalid.status_code == 400
+
+    monkeypatch.setattr(
+        app_module,
+        "acquire_maintenance_lock",
+        lambda _run_id: ("redis", False),
+    )
+    overlapping = client.post(
+        "/internal/cron/maintenance",
+        json={"runId": "github-123-1"},
+        headers=headers,
+    )
+
+    assert overlapping.status_code == 409
+    assert overlapping.headers["Retry-After"] == "30"
+    assert overlapping.get_json()["status"] == "already_running"
+
+
+def test_maintenance_redis_lock_is_released_only_with_its_owner_token(monkeypatch):
+    class FakeRedis:
+        def __init__(self):
+            self.set_call = None
+            self.eval_call = None
+
+        def set(self, *args, **kwargs):
+            self.set_call = (args, kwargs)
+            return True
+
+        def eval(self, *args):
+            self.eval_call = args
+            return 1
+
+    redis = FakeRedis()
+    monkeypatch.setattr(app_module, "get_redis_client", lambda: redis)
+
+    lock_type, acquired = app_module.acquire_maintenance_lock("github-42-1")
+    app_module.release_maintenance_lock(lock_type, "github-42-1")
+
+    assert lock_type == "redis"
+    assert acquired is True
+    assert redis.set_call[0] == (
+        app_module.MAINTENANCE_LOCK_KEY,
+        "github-42-1",
+    )
+    assert redis.set_call[1]["nx"] is True
+    assert redis.eval_call[-2:] == (
+        app_module.MAINTENANCE_LOCK_KEY,
+        "github-42-1",
+    )
+
+
+def test_internal_maintenance_releases_local_lock_after_failure(
+    app, client, monkeypatch
+):
+    monkeypatch.setattr(app_module, "CRON_SECRET", "test-cron-secret")
+    monkeypatch.setattr(app_module, "get_redis_client", lambda: None)
+    monkeypatch.setattr(
+        app_module,
+        "execute_cron_maintenance",
+        lambda _data: (_ for _ in ()).throw(RuntimeError("maintenance failed")),
+    )
+
+    response = client.post(
+        "/internal/cron/maintenance",
+        json={"runId": "failure-test"},
+        headers={"Authorization": "Bearer test-cron-secret"},
+    )
+
+    assert response.status_code == 500
+    assert response.get_json()["status"] == "failed"
+    assert app_module.MAINTENANCE_LOCAL_LOCK.locked() is False
 
 
 def test_admin_readiness_monitoring_and_email_diagnostics_are_available(

@@ -78,6 +78,10 @@ partial active pentru mai multi provideri daca acestea fac diagnosticul ambiguu.
 
 Codul pastreaza ultima eroare provider in memoria procesului pentru diagnostic admin;
 aceasta se poate pierde la restart si nu inlocuieste logul providerului.
+Brevo si Resend au maximum doua incercari implicite pentru erori de retea, `429` si
+erori `5xx`; raspunsurile permanente precum `400`, `401` sau `403` nu sunt repetate.
+Limitele pot fi ajustate prin `EMAIL_HTTP_MAX_ATTEMPTS` si
+`EMAIL_HTTP_RETRY_DELAY_SECONDS`, fara a depasi limitele defensive din cod.
 
 ## 5. DNS si reputatie
 

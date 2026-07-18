@@ -47,6 +47,8 @@ corectata inainte de a acorda acces altor colaboratori.
 | `EMAIL_FROM` | nu | expeditor verificat la provider |
 | `EMAIL_FROM_NAME` | nu | numele public al expeditorului |
 | `CONTACT_EMAIL` | nu | Reply-To si destinatie suport, in prezent `contact@cealeg.shop` |
+| `EMAIL_HTTP_MAX_ATTEMPTS` | nu | maxim 1-3 incercari Brevo/Resend; implicit `2` |
+| `EMAIL_HTTP_RETRY_DELAY_SECONDS` | nu | pauza initiala intre retry-uri, limitata la 2 secunde; implicit `0.25` |
 | `ADMIN_EMAIL` | date de contact | destinatia alertelor administrative |
 | `ALERT_WEBHOOK_URL` | da, optional | webhook HTTPS pentru alerte operationale (Slack/Discord/gateway); alertele functioneaza si prin Sentry/email fara el |
 | `CRON_SECRET` | da, critic | aceeasi valoare in Render si GitHub Actions; protejeaza maintenance |
@@ -200,7 +202,8 @@ consimtamantului.
 | `SUPABASE_SERVICE_ROLE_KEY` | Render | actualizeaza imediat backend-ul si testeaza Storage |
 | Stripe secret/webhook | Render + Stripe | testeaza Checkout, portal si un eveniment semnat |
 | cheia provider email | Render + provider | trimite email test si verifica provider message ID |
-| `CRON_SECRET` | Render + GitHub Actions, temporar si Vercel | actualizeaza toate partile active in aceeasi fereastra si testeaza cron |
+| `CRON_SECRET` | Render + GitHub Actions, temporar si Vercel | actualizeaza toate partile active in aceeasi fereastra si testeaza maintenance/warm-up |
+| `RENDER_DEPLOY_HOOK_URL` | GitHub Actions, optional | deploy hook secret si gratuit, folosit numai de fallback-ul manual `Backend production release` |
 | `REDIS_URL` | Render | testeaza rate limiting si fallback-ul |
 | `OPENAI_API_KEY` | Render | testeaza numai daca functia este activata |
 | `SENTRY_AUTH_TOKEN` | Vercel | ruleaza build si confirma sourcemap upload fara a expune token-ul |
@@ -217,7 +220,7 @@ fi comparate dupa nume, iar valorile reale se verifica individual si mascat.
 Checklist productie:
 
 1. Nu exista chei test Stripe impreuna cu price ID-uri live sau invers.
-2. `CRON_SECRET` este identic in Render si GitHub Actions; cat timp Vercel ramane activ, si acolo foloseste aceeasi valoare.
+2. `CRON_SECRET` este identic in Render si GitHub Actions; cat timp Vercel ruleaza warm-up-ul protejat, si acolo foloseste aceeasi valoare.
 3. `FRONTEND_ORIGINS` nu contine localhost sau tuneluri de dezvoltare.
 4. `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_SECRET` si cheile API nu au prefix
    `NEXT_PUBLIC_`.

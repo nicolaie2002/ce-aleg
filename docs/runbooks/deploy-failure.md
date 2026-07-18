@@ -94,11 +94,12 @@ Configuratia asteptata este in `render.yaml`:
 
 - root `backend`;
 - build `pip install -r requirements.txt`;
-- start Gunicorn `app:app` cu worker `gthread`;
+- start `python migration.py release`, apoi Gunicorn `app:create_application()` cu
+  worker `gthread`;
 - health check `/health`;
 - Python 3.12.4 in blueprint.
 
-1. Verifica daca esecul este Build, Pre-deploy, Start sau Health Check.
+1. Verifica daca esecul este Build, migrare/start sau Health Check.
 2. Pentru build, cauta prima dependenta care nu se instaleaza.
 3. Pentru startup, cauta eroarea anterioara mesajului "exited". Aplicatia refuza
    intentionat productia fara `DATABASE_URL` sau cu `AUTH_SECRET` nesigur.
@@ -116,6 +117,13 @@ python -m pytest -q
 
 7. Daca problema apare doar la conectarea DB, urmeaza
    [database-supabase-outage.md](database-supabase-outage.md).
+
+Fluxul normal foloseste `autoDeployTrigger: checksPass`: Render publica numai dupa
+ce workflow-ul `CI` al commitului a trecut. Fallback-ul manual
+`.github/workflows/release-backend.yml` foloseste, daca este configurat, secretul
+repository `RENDER_DEPLOY_HOOK_URL`, trimite `ref=<commit SHA>` si asteapta pana
+cand `/version` raporteaza exact acel commit. Niciun flux nu necesita acces direct
+la baza de date din GitHub, deoarece migrarea versionata ruleaza la startup Render.
 
 ## 5. Reparatie sau rollback
 

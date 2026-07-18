@@ -8,6 +8,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: production-maintenance
+  cancel-in-progress: false
+
 jobs:
   maintenance:
     if: github.event_name == 'workflow_dispatch' || github.repository_owner == 'nicolaie2002'
@@ -15,13 +19,14 @@ jobs:
     timeout-minutes: 5
     env:
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      MAINTENANCE_RUN_ID: github-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Run protected backend maintenance
         shell: bash
         run: |
           if [ -z "$CRON_SECRET" ]; then
-            echo "::notice::CRON_SECRET is not configured in GitHub Actions; maintenance was skipped."
-            exit 0
+            echo "::error::CRON_SECRET is not configured in GitHub Actions."
+            exit 1
           fi
 
           response="$(curl \
@@ -30,9 +35,11 @@ jobs:
             --show-error \
             --retry 2 \
             --retry-all-errors \
+            --retry-delay 10 \
             --max-time 180 \
             --request POST \
             --header "Authorization: Bearer $CRON_SECRET" \
+            --header "X-Cron-Run-Id: $MAINTENANCE_RUN_ID" \
             --header "Content-Type: application/json" \
             --data '{"recategorize":true,"recategorizeLimit":300,"sendDigest":true,"digestLimit":100,"retention":true,"catalogQuality":true}' \
             https://cealeg-api.onrender.com/internal/cron/maintenance)"
@@ -43,5 +50,12 @@ jobs:
 
           payload = json.loads(sys.argv[1])
           assert payload.get("ok") is True, payload
-          print("Production maintenance completed successfully.")
+          print(
+              "Production maintenance completed:",
+              f"status={payload.get('status')}",
+              f"runId={payload.get('runId')}",
+              f"durationMs={payload.get('durationMs')}",
+          )
+          for warning in payload.get("warnings", []):
+              print(f"::warning::{warning}")
           PY

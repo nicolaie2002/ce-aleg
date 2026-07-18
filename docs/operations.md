@@ -98,7 +98,7 @@ se verifica din pagina `/admin`, nu se transforma in endpoint-uri publice.
 3. Verifica in Stripe evenimentele webhook nelivrate si platile esuate.
 4. Verifica in providerul de email bounce-uri, blocari si rata de livrare.
 5. Verifica in admin produse negasite, raportari si coada de contributii.
-6. Confirma rezultatul cron-urilor Vercel de warm-up si maintenance.
+6. Confirma warm-up-ul Vercel si workflow-ul GitHub Actions `Production maintenance`.
 
 ### Saptamanal
 

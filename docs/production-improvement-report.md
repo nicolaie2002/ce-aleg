@@ -17,7 +17,7 @@ backup/restore, deployment și test pe telefoane reale.
 
 | Poartă | Rezultat |
 | --- | --- |
-| Backend pytest | 351 teste trecute, 72,93% coverage, prag 70% |
+| Backend pytest | 357 teste trecute; 73,13% `app.py`, prag 70% |
 | Frontend Jest | 13 suite și 71 teste trecute |
 | Playwright full stack | 32 trecute, 10 sărite intenționat pe mobil, 0 eșuate |
 | ESLint și TypeScript | trecute fără warnings/errors |
@@ -57,9 +57,17 @@ offline-ul rulează atât desktop, cât și mobil.
 - PWA refăcută cu service worker static: offline stabil, update controlat și fără
   cache pentru API/Supabase sau date private. Au fost eliminate 182 de pachete
   tranzitive Workbox/PWA.
+- Convenția Next.js depreciată `middleware.js` a fost migrată la `proxy.js`;
+  buildul nu mai emite avertismentul de compatibilitate.
 - CI extins cu audit de dependențe, Bandit, coverage 70%, E2E, Lighthouse,
   verificare Cloudflare Workers și smoke test al runtime-ului Linux.
-- Job gratuit GitHub Actions pentru maintenance zilnic și backup săptămânal.
+- Job gratuit GitHub Actions pentru maintenance zilnic și backup săptămânal;
+  maintenance are lock Redis, identificator de rulare, durate și avertismente.
+- Auto-deploy backend Render numai după ce CI trece; deploy hook-ul gratuit rămâne
+  fallback manual cu verificarea commitului exact în `/version`, iar migrarea
+  rulează la startup.
+- Brevo/Resend au retry limitat pentru erori temporare și diagnostice mai precise
+  pentru sender invalid, cheie respinsă, rate limit și domeniu neverificat.
 - Configurație pregătită pentru Cloudflare Workers Free, fără Images/R2 sau alte
   servicii facturabile. Deploy-ul nu este activat automat.
 
@@ -79,7 +87,8 @@ proprietarul conectează contul/domeniul, fără card sau upgrade.
 ## Verificări externe rămase
 
 1. Confirmă workflow-urile GitHub după push, în special build-ul Cloudflare pe
-   Linux și adaugă secretul repository `CRON_SECRET` cu valoarea deja folosită.
+   Linux. `CRON_SECRET` este adăugat. Confirmă o singură dată în Render că
+   Auto-Deploy afișează `After CI Checks Pass`; deploy hook-ul este doar opțional.
 2. Repară livrarea Brevo: sender/domeniu SPF-DKIM, cheia API și testele Admin
    pentru confirmare cont, resetare și suport către `contact@cealeg.shop`.
 3. Rulează Stripe în test mode și apoi un test live controlat pentru Pro, Family,

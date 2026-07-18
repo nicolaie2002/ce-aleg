@@ -2,10 +2,11 @@ name: Backend production release
 
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
+    inputs:
+      commit_sha:
+        description: Full commit SHA to deploy (defaults to current main)
+        required: false
+        type: string
 
 concurrency:
   group: backend-production-release
@@ -15,52 +16,21 @@ permissions:
   contents: read
 
 jobs:
-  migrate-and-deploy:
-    name: Migrate, then deploy the same commit
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main')
+  deploy:
+    name: Manually deploy and verify a commit
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    environment: production
     env:
-      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
-      DATABASE_SSLMODE: require
-      ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+      RELEASE_SHA: ${{ inputs.commit_sha || github.sha }}
       RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
-    defaults:
-      run:
-        working-directory: backend
 
     steps:
-      - name: Check out release commit
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ env.RELEASE_SHA }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: backend/requirements.txt
-
-      - name: Install backend dependencies
-        run: python -m pip install --requirement requirements.txt
-
       - name: Require release secrets
         shell: bash
         run: |
-          test -n "$DATABASE_URL" || { echo "Missing production secret: PRODUCTION_DATABASE_URL"; exit 1; }
-          test -n "$RENDER_DEPLOY_HOOK_URL" || { echo "Missing production secret: RENDER_DEPLOY_HOOK_URL"; exit 1; }
+          test -n "$RENDER_DEPLOY_HOOK_URL" || { echo "::error::Missing repository secret: RENDER_DEPLOY_HOOK_URL"; exit 1; }
 
-      - name: Run versioned migration release gate
-        run: python migration.py release
-
-      - name: Trigger Render deploy for migrated commit
+      - name: Trigger Render deploy
         run: |
           python - <<'PY'
           import os
@@ -85,4 +55,43 @@ jobs:
               raise SystemExit(f"Render deploy hook returned HTTP {error.code}") from None
           except URLError:
               raise SystemExit("Render deploy hook request failed") from None
+          PY
+
+      - name: Wait for the released commit
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          expected = os.environ["RELEASE_SHA"].lower()
+          base_url = "https://cealeg-api.onrender.com"
+          deadline = time.monotonic() + 15 * 60
+          last_detail = "no response"
+
+          while time.monotonic() < deadline:
+              try:
+                  with urlopen(Request(f"{base_url}/health"), timeout=45) as response:
+                      health = json.load(response)
+                  with urlopen(Request(f"{base_url}/version"), timeout=45) as response:
+                      version = json.load(response)
+
+                  deployed = str(version.get("commit") or "").lower()
+                  last_detail = (
+                      f"health={health.get('ok')} deployed={deployed or 'unknown'} "
+                      f"expected={expected}"
+                  )
+                  if health.get("ok") is True and deployed == expected:
+                      print(f"Render release verified: {deployed[:7]}")
+                      raise SystemExit(0)
+              except (HTTPError, URLError, TimeoutError, ValueError) as error:
+                  last_detail = f"waiting for Render: {type(error).__name__}"
+
+              print(last_detail)
+              time.sleep(15)
+
+          raise SystemExit(f"Render did not publish the expected commit: {last_detail}")
           PY

@@ -122,6 +122,7 @@ APPROX_RON_EXCHANGE_RATES = {
 }
 RATE_LIMIT_BUCKETS = defaultdict(deque)
 RATE_LIMIT_BUCKETS_LOCK = threading.RLock()
+MAINTENANCE_LOCAL_LOCK = threading.Lock()
 REDIS_CLIENT = None
 REDIS_RETRY_AFTER = 0
 CACHE_METRICS = {"hits": 0, "misses": 0, "writes": 0, "errors": 0}
@@ -501,6 +502,14 @@ EMAIL_SMTP_PASSWORD = read_secret_env("EMAIL_SMTP_PASSWORD")
 EMAIL_FROM = os.environ.get("EMAIL_FROM", "").strip()
 EMAIL_FROM_NAME = os.environ.get("EMAIL_FROM_NAME", "Ce aleg?").strip()
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "contact@cealeg.shop").strip().lower()
+EMAIL_HTTP_MAX_ATTEMPTS = max(
+    1,
+    min(int(os.environ.get("EMAIL_HTTP_MAX_ATTEMPTS", "2")), 3),
+)
+EMAIL_HTTP_RETRY_DELAY_SECONDS = max(
+    0.0,
+    min(float(os.environ.get("EMAIL_HTTP_RETRY_DELAY_SECONDS", "0.25")), 2.0),
+)
 CRON_SECRET = read_secret_env("CRON_SECRET")
 REDIS_URL = read_secret_env("REDIS_URL")
 if not EMAIL_PROVIDER:
@@ -779,13 +788,13 @@ def get_account_deletion_serializer():
 
 def is_email_configured():
     if EMAIL_PROVIDER == "brevo":
-        return bool(BREVO_API_KEY and EMAIL_FROM)
+        return bool(BREVO_API_KEY and is_valid_email_address(EMAIL_FROM))
 
     if EMAIL_PROVIDER == "resend":
-        return bool(RESEND_API_KEY and EMAIL_FROM)
+        return bool(RESEND_API_KEY and is_valid_email_address(EMAIL_FROM))
 
     if EMAIL_PROVIDER == "smtp":
-        return bool(EMAIL_SMTP_HOST and EMAIL_FROM)
+        return bool(EMAIL_SMTP_HOST and is_valid_email_address(EMAIL_FROM))
 
     return False
 
@@ -799,6 +808,11 @@ def get_email_configuration_diagnostics():
 
     if not EMAIL_FROM:
         issues.append("EMAIL_FROM lipseste.")
+    elif not is_valid_email_address(EMAIL_FROM):
+        issues.append("EMAIL_FROM nu este o adresa de email valida.")
+
+    if CONTACT_EMAIL and not is_valid_email_address(CONTACT_EMAIL):
+        issues.append("CONTACT_EMAIL nu este valid; Reply-To va folosi EMAIL_FROM.")
 
     if EMAIL_PROVIDER == "brevo" and not BREVO_API_KEY:
         issues.append("BREVO_API_KEY lipseste pentru providerul Brevo.")
@@ -808,6 +822,9 @@ def get_email_configuration_diagnostics():
 
     if EMAIL_PROVIDER == "smtp" and not EMAIL_SMTP_HOST:
         issues.append("EMAIL_SMTP_HOST lipseste pentru providerul SMTP.")
+
+    if EMAIL_PROVIDER == "smtp" and EMAIL_USE_TLS and EMAIL_USE_SSL:
+        issues.append("Activeaza doar una dintre EMAIL_USE_TLS si EMAIL_USE_SSL.")
 
     email_from_domain = EMAIL_FROM.split("@")[-1].lower() if "@" in EMAIL_FROM else ""
     contact_domain = CONTACT_EMAIL.split("@")[-1].lower() if "@" in CONTACT_EMAIL else ""
@@ -829,6 +846,7 @@ def get_email_configuration_diagnostics():
         "fromName": EMAIL_FROM_NAME,
         "replyTo": get_email_reply_to() or EMAIL_FROM,
         "providerKeyOrHostConfigured": provider_key_configured,
+        "httpMaxAttempts": EMAIL_HTTP_MAX_ATTEMPTS,
         "issues": issues,
         "lastProviderError": LAST_EMAIL_PROVIDER_ERROR,
     }
@@ -906,6 +924,96 @@ def get_email_html_body(text_body, html_body=None):
     return "<br>".join(escaped_lines)
 
 
+EMAIL_HTTP_RETRYABLE_STATUSES = {408, 425, 429, 500, 502, 503, 504}
+
+
+def get_email_provider_failure_hint(provider_name, status_code):
+    if status_code in {401, 403}:
+        return "Verifica cheia API si permisiunile providerului."
+    if status_code == 429:
+        return "Providerul a limitat temporar trimiterea."
+    if status_code == 400:
+        return (
+            f"Verifica senderul {EMAIL_FROM}, domeniul si continutul cererii "
+            f"in {provider_name}."
+        )
+    if status_code >= 500:
+        return "Providerul are o problema temporara."
+    return "Verifica setarile providerului si expeditorul configurat."
+
+
+def send_http_provider_email(provider_name, url, headers, payload):
+    for attempt in range(1, EMAIL_HTTP_MAX_ATTEMPTS + 1):
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                json=payload,
+                timeout=10,
+            )
+        except requests.RequestException as error:
+            if attempt < EMAIL_HTTP_MAX_ATTEMPTS:
+                app.logger.warning(
+                    "%s email request failed on attempt %s/%s; retrying: %s",
+                    provider_name,
+                    attempt,
+                    EMAIL_HTTP_MAX_ATTEMPTS,
+                    error,
+                )
+                time.sleep(EMAIL_HTTP_RETRY_DELAY_SECONDS * attempt)
+                continue
+
+            set_email_provider_error(
+                f"{provider_name} network error after {attempt} attempts: {error}"
+            )
+            app.logger.warning("%s email request failed: %s", provider_name, error)
+            return False
+        except Exception as error:
+            set_email_provider_error(
+                f"{provider_name} unexpected client error: {type(error).__name__}: {error}"
+            )
+            app.logger.exception(
+                "%s email client raised an unexpected error.",
+                provider_name,
+            )
+            return False
+
+        if 200 <= response.status_code < 300:
+            set_email_provider_error("")
+            return True
+
+        response_text = str(getattr(response, "text", "") or "")[:300]
+        if (
+            response.status_code in EMAIL_HTTP_RETRYABLE_STATUSES
+            and attempt < EMAIL_HTTP_MAX_ATTEMPTS
+        ):
+            app.logger.warning(
+                "%s email returned HTTP %s on attempt %s/%s; retrying.",
+                provider_name,
+                response.status_code,
+                attempt,
+                EMAIL_HTTP_MAX_ATTEMPTS,
+            )
+            time.sleep(EMAIL_HTTP_RETRY_DELAY_SECONDS * attempt)
+            continue
+
+        hint = get_email_provider_failure_hint(provider_name, response.status_code)
+        set_email_provider_error(
+            f"{provider_name} HTTP {response.status_code} after {attempt} "
+            f"attempt(s): {response_text}. {hint}"
+        )
+        app.logger.warning(
+            "%s email failed with status %s after %s attempt(s): %s",
+            provider_name,
+            response.status_code,
+            attempt,
+            response_text,
+        )
+        return False
+
+    return False
+
+
 def send_brevo_email(to_email, subject, text_body, html_body=None):
     reply_to = get_email_reply_to()
     payload = {
@@ -925,33 +1033,16 @@ def send_brevo_email(to_email, subject, text_body, html_body=None):
             "email": reply_to,
         }
 
-    try:
-        response = requests.post(
-            "https://api.brevo.com/v3/smtp/email",
-            headers={
-                "accept": "application/json",
-                "api-key": BREVO_API_KEY,
-                "content-type": "application/json",
-            },
-            json=payload,
-            timeout=10,
-        )
-
-        if 200 <= response.status_code < 300:
-            set_email_provider_error("")
-            return True
-
-        set_email_provider_error(f"Brevo HTTP {response.status_code}: {response.text[:300]}")
-        app.logger.warning(
-            "Brevo email failed with status %s: %s",
-            response.status_code,
-            response.text[:300],
-        )
-        return False
-    except Exception as error:
-        set_email_provider_error(f"Brevo exception: {error}")
-        app.logger.warning("Brevo email failed: %s", error)
-        return False
+    return send_http_provider_email(
+        "Brevo",
+        "https://api.brevo.com/v3/smtp/email",
+        {
+            "accept": "application/json",
+            "api-key": BREVO_API_KEY,
+            "content-type": "application/json",
+        },
+        payload,
+    )
 
 
 def send_resend_email(to_email, subject, text_body, html_body=None):
@@ -967,32 +1058,15 @@ def send_resend_email(to_email, subject, text_body, html_body=None):
     if reply_to:
         payload["reply_to"] = reply_to
 
-    try:
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers={
-                "authorization": f"Bearer {RESEND_API_KEY}",
-                "content-type": "application/json",
-            },
-            json=payload,
-            timeout=10,
-        )
-
-        if 200 <= response.status_code < 300:
-            set_email_provider_error("")
-            return True
-
-        set_email_provider_error(f"Resend HTTP {response.status_code}: {response.text[:300]}")
-        app.logger.warning(
-            "Resend email failed with status %s: %s",
-            response.status_code,
-            response.text[:300],
-        )
-        return False
-    except Exception as error:
-        set_email_provider_error(f"Resend exception: {error}")
-        app.logger.warning("Resend email failed: %s", error)
-        return False
+    return send_http_provider_email(
+        "Resend",
+        "https://api.resend.com/emails",
+        {
+            "authorization": f"Bearer {RESEND_API_KEY}",
+            "content-type": "application/json",
+        },
+        payload,
+    )
 
 
 def send_smtp_email(to_email, subject, text_body, html_body=None):
@@ -10780,6 +10854,70 @@ def cron_request_is_authorized():
     return hmac.compare_digest(supplied, expected)
 
 
+MAINTENANCE_LOCK_KEY = "cealeg:lock:production-maintenance"
+MAINTENANCE_LOCK_SECONDS = 15 * 60
+
+
+def normalize_maintenance_run_id(value):
+    run_id = str(value or "").strip()
+
+    if not run_id:
+        return f"manual-{uuid4().hex}"
+
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,100}", run_id):
+        return ""
+
+    return run_id
+
+
+def acquire_maintenance_lock(run_id):
+    client = get_redis_client()
+
+    if client is not None:
+        try:
+            acquired = client.set(
+                MAINTENANCE_LOCK_KEY,
+                run_id,
+                nx=True,
+                ex=MAINTENANCE_LOCK_SECONDS,
+            )
+            return "redis", bool(acquired)
+        except Exception as error:
+            app.logger.warning(
+                "Redis maintenance lock unavailable; using local lock: %s",
+                error,
+            )
+
+    return "local", MAINTENANCE_LOCAL_LOCK.acquire(blocking=False)
+
+
+def release_maintenance_lock(lock_type, run_id):
+    if lock_type == "redis":
+        client = get_redis_client()
+
+        if client is None:
+            return
+
+        try:
+            client.eval(
+                """
+                if redis.call('get', KEYS[1]) == ARGV[1] then
+                    return redis.call('del', KEYS[1])
+                end
+                return 0
+                """,
+                1,
+                MAINTENANCE_LOCK_KEY,
+                run_id,
+            )
+        except Exception as error:
+            app.logger.warning("Could not release Redis maintenance lock: %s", error)
+        return
+
+    if MAINTENANCE_LOCAL_LOCK.locked():
+        MAINTENANCE_LOCAL_LOCK.release()
+
+
 def get_cron_recategorize_min_id(limit):
     max_product_id = db.session.query(func.max(Product.id)).scalar() or 1
     safe_limit = max(1, int(limit or 1))
@@ -10900,12 +11038,7 @@ def run_admin_retention():
     return jsonify(run_retention_cleanup(apply_changes=apply_changes))
 
 
-@route("/internal/cron/maintenance", methods=["POST"], access="internal-secret")
-def run_cron_maintenance():
-    if not cron_request_is_authorized():
-        return jsonify({"error": "Unauthorized"}), 401
-
-    data = request.get_json(silent=True) or {}
+def execute_cron_maintenance(data):
     recategorize_limit = max(1, min(int(data.get("recategorizeLimit") or 300), 500))
     digest_limit = max(1, min(int(data.get("digestLimit") or 100), 250))
     send_digest = str(data.get("sendDigest", "true")).lower() in {"1", "true", "yes", "on"}
@@ -10921,28 +11054,58 @@ def run_cron_maintenance():
         "missionDigest": None,
         "retention": None,
         "catalogQuality": None,
+        "warnings": [],
+        "durationsMs": {},
     }
 
     if run_recategorize:
+        step_started = time.perf_counter()
         recategorize_min_id = get_cron_recategorize_min_id(recategorize_limit)
         result["recategorize"] = recategorize_catalog_products(
             limit=recategorize_limit,
             apply_changes=True,
             min_id=recategorize_min_id,
         )
+        result["durationsMs"]["recategorize"] = round(
+            (time.perf_counter() - step_started) * 1000,
+            1,
+        )
 
     if send_digest:
+        step_started = time.perf_counter()
         result["missionDigest"] = build_mission_digest_batch(
             limit=digest_limit,
             apply_changes=is_email_configured(),
         )
         result["missionDigest"]["emailConfigured"] = is_email_configured()
+        result["durationsMs"]["missionDigest"] = round(
+            (time.perf_counter() - step_started) * 1000,
+            1,
+        )
+        if not is_email_configured():
+            result["warnings"].append(
+                "Digestul nu a fost trimis deoarece emailul nu este configurat complet."
+            )
+        elif int(result["missionDigest"].get("failed") or 0) > 0:
+            result["warnings"].append(
+                f"{result['missionDigest']['failed']} emailuri din digest au esuat."
+            )
 
     if run_retention:
+        step_started = time.perf_counter()
         result["retention"] = run_retention_cleanup(apply_changes=True)
+        result["durationsMs"]["retention"] = round(
+            (time.perf_counter() - step_started) * 1000,
+            1,
+        )
 
     if run_catalog_quality:
+        step_started = time.perf_counter()
         result["catalogQuality"] = get_catalog_quality_snapshot()
+        result["durationsMs"]["catalogQuality"] = round(
+            (time.perf_counter() - step_started) * 1000,
+            1,
+        )
         try:
             configured_threshold = float(
                 os.environ.get("CATALOG_QUALITY_ALERT_THRESHOLD", "65")
@@ -10967,7 +11130,60 @@ def run_cron_maintenance():
                 severity="warning",
             )
 
-    return jsonify(result)
+    result["status"] = "degraded" if result["warnings"] else "success"
+    return result
+
+
+@route("/internal/cron/maintenance", methods=["POST"], access="internal-secret")
+def run_cron_maintenance():
+    if not cron_request_is_authorized():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    run_id = normalize_maintenance_run_id(
+        data.get("runId") or request.headers.get("X-Cron-Run-Id")
+    )
+
+    if not run_id:
+        return jsonify({
+            "ok": False,
+            "error": "runId must contain only letters, numbers, dot, underscore, colon or dash.",
+        }), 400
+
+    lock_type, acquired = acquire_maintenance_lock(run_id)
+
+    if not acquired:
+        response = jsonify({
+            "ok": False,
+            "status": "already_running",
+            "error": "Production maintenance is already running.",
+            "runId": run_id,
+        })
+        response.status_code = 409
+        response.headers["Retry-After"] = "30"
+        return response
+
+    started = time.perf_counter()
+
+    try:
+        result = execute_cron_maintenance(data)
+        result["runId"] = run_id
+        result["lock"] = lock_type
+        result["completedAt"] = utcnow().isoformat() + "Z"
+        result["durationMs"] = round((time.perf_counter() - started) * 1000, 1)
+        return jsonify(result)
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Production maintenance failed. RunId=%s", run_id)
+        return jsonify({
+            "ok": False,
+            "status": "failed",
+            "error": "Production maintenance failed.",
+            "runId": run_id,
+            "durationMs": round((time.perf_counter() - started) * 1000, 1),
+        }), 500
+    finally:
+        release_maintenance_lock(lock_type, run_id)
 
 
 @route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"], access="admin")

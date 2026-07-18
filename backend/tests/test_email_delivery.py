@@ -61,6 +61,7 @@ def test_brevo_and_resend_transports_send_expected_payloads(monkeypatch):
 def test_http_email_transports_report_provider_and_network_failures(monkeypatch):
     monkeypatch.setattr(app_module, "EMAIL_FROM", "contact@cealeg.shop")
     monkeypatch.setattr(app_module, "CONTACT_EMAIL", "contact@cealeg.shop")
+    monkeypatch.setattr(app_module, "EMAIL_HTTP_RETRY_DELAY_SECONDS", 0)
     monkeypatch.setattr(
         app_module.requests,
         "post",
@@ -76,7 +77,68 @@ def test_http_email_transports_report_provider_and_network_failures(monkeypatch)
         lambda *_args, **_kwargs: (_ for _ in ()).throw(requests.RequestException("offline")),
     )
     assert app_module.send_resend_email("member@example.com", "Subject", "Text") is False
-    assert "Resend exception" in app_module.LAST_EMAIL_PROVIDER_ERROR
+    assert "Resend network error after 2 attempts" in app_module.LAST_EMAIL_PROVIDER_ERROR
+
+
+def test_http_email_transport_retries_only_transient_failures(monkeypatch):
+    calls = []
+    responses = iter([
+        FakeHttpResponse(503, "temporarily unavailable"),
+        FakeHttpResponse(202, "accepted"),
+    ])
+    monkeypatch.setattr(app_module, "EMAIL_FROM", "contact@cealeg.shop")
+    monkeypatch.setattr(app_module, "CONTACT_EMAIL", "contact@cealeg.shop")
+    monkeypatch.setattr(app_module, "EMAIL_HTTP_MAX_ATTEMPTS", 2)
+    monkeypatch.setattr(app_module, "EMAIL_HTTP_RETRY_DELAY_SECONDS", 0)
+    monkeypatch.setattr(
+        app_module.requests,
+        "post",
+        lambda *_args, **_kwargs: calls.append(True) or next(responses),
+    )
+
+    assert app_module.send_brevo_email(
+        "member@example.com", "Subject", "Text"
+    ) is True
+    assert len(calls) == 2
+    assert app_module.LAST_EMAIL_PROVIDER_ERROR == ""
+
+    calls.clear()
+    monkeypatch.setattr(
+        app_module.requests,
+        "post",
+        lambda *_args, **_kwargs: calls.append(True)
+        or FakeHttpResponse(400, "sender not verified"),
+    )
+
+    assert app_module.send_brevo_email(
+        "member@example.com", "Subject", "Text"
+    ) is False
+    assert len(calls) == 1
+    assert "senderul contact@cealeg.shop" in app_module.LAST_EMAIL_PROVIDER_ERROR
+
+    monkeypatch.setattr(
+        app_module.requests,
+        "post",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("client bug")),
+    )
+
+    assert app_module.send_resend_email(
+        "member@example.com", "Subject", "Text"
+    ) is False
+    assert "unexpected client error" in app_module.LAST_EMAIL_PROVIDER_ERROR
+
+
+def test_email_diagnostics_reject_invalid_sender_and_reply_to(monkeypatch):
+    monkeypatch.setattr(app_module, "EMAIL_PROVIDER", "brevo")
+    monkeypatch.setattr(app_module, "BREVO_API_KEY", "brevo-local-test")
+    monkeypatch.setattr(app_module, "EMAIL_FROM", "not-an-email")
+    monkeypatch.setattr(app_module, "CONTACT_EMAIL", "also-invalid")
+
+    diagnostics = app_module.get_email_configuration_diagnostics()
+
+    assert diagnostics["configured"] is False
+    assert "EMAIL_FROM nu este o adresa de email valida." in diagnostics["issues"]
+    assert any("CONTACT_EMAIL" in issue for issue in diagnostics["issues"])
 
 
 class FakeSmtpClient:

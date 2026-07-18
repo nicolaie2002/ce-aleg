@@ -4,13 +4,17 @@ Ultima actualizare: 2026-07-18
 
 ## Stare curenta
 
-- Portile locale sunt verzi: backend 351 teste si 72,93% coverage; frontend 71
-  teste Jest; Playwright 32 trecute, 10 skip intentionat si zero esecuri.
+- Portile locale sunt verzi: backend 357 teste si 73,13% coverage pentru `app.py`;
+  frontend 71 teste Jest; Playwright 32 trecute, 10 skip
+  intentionat si zero esecuri.
 - PWA foloseste un service worker static, fara cache pentru API/date private;
   offline-ul este verificat desktop si mobil.
 - Render Key Value free este configurat pentru rate limit/cache distribuit.
-- Maintenance ruleaza gratuit din GitHub Actions; adauga `CRON_SECRET` in
+- Maintenance ruleaza gratuit din GitHub Actions; `CRON_SECRET` a fost adaugat in
   repository Actions secrets cu aceeasi valoare din Render.
+- Render este configurat `checksPass`: dupa ce workflow-ul `CI` trece, publica
+  automat commitul. Deploy hook-ul GitHub ramane doar fallback manual optional si
+  verifica apoi commitul din `/version`.
 - Configuratia OpenNext/Cloudflare Workers Free este pregatita, dar nu se face
   deploy pana cand jobul Linux este verde si proprietarul conecteaza domeniul.
 - Emailurile live au fost raportate nefunctionale si raman blocant extern. Nu
@@ -61,11 +65,11 @@ Pachetul curent a adaugat import targetat Open Food Facts pentru Romania:
 Pachetul curent a adaugat automatizare cron pentru mentenanta:
 
 - Frontend: `frontend/app/api/cron/maintenance/route.js`
-- Config Vercel: `frontend/vercel.json`
+- Workflow: `.github/workflows/maintenance.yml`
 - Backend: `POST /internal/cron/maintenance`
-- Cron-ul Vercel ruleaza zilnic la `04:20 UTC`, verifica `CRON_SECRET`, apoi cheama backend-ul cu acelasi secret.
+- GitHub Actions ruleaza zilnic la `04:20 UTC`, verifica `CRON_SECRET`, apoi cheama direct backend-ul cu acelasi secret. Vercel pastreaza numai warm-up-ul programat, pentru a evita o executie dubla.
 - Mentenanta recategorizeaza automat un batch de produse `Altele` dintr-o zona diferita a catalogului in fiecare zi si trimite digest-ul de misiuni aproape gata cu cooldown-ul existent de 6 zile.
-- Pentru activare in productie, aceeasi valoare `CRON_SECRET` trebuie setata in Vercel si Render.
+- Backend-ul foloseste un lock Redis, cu fallback local, si returneaza `runId`, durate si avertismente. Pentru activare, aceeasi valoare `CRON_SECRET` trebuie setata in GitHub Actions si Render; Vercel o foloseste numai pentru ruta protejata de warm-up/manual maintenance.
 
 Pachetul curent a adaugat digest admin pentru misiuni aproape gata:
 

@@ -113,8 +113,9 @@ compatibila. Pentru schema incompatibila:
   le proceseaza idempotent inainte de a reporni fluxul.
 - Nu retrimite in masa evenimente in timpul rollback-ului.
 - Emailurile deja trimise nu pot fi retrase; evita dublarea lor dupa revenire.
-- Cron-urile Vercel `/api/cron/warmup` si `/api/cron/maintenance` se repornesc numai
-  dupa ce secretul si backend-ul au fost verificate.
+- Cron-ul Vercel `/api/cron/warmup` si workflow-ul GitHub `Production maintenance`
+  se repornesc numai dupa ce secretul si backend-ul au fost verificate. Ruta
+  `/api/cron/maintenance` ramane disponibila manual, dar nu este programata separat.
 - Daca release-ul a creditat CeCoins sau a schimbat planuri, reconciliaza separat;
   rollback-ul codului nu corecteaza soldurile.
 

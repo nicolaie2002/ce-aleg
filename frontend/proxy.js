@@ -48,7 +48,7 @@ async function verifySession(sessionToken, cookieHeader) {
   return user;
 }
 
-export async function middleware(request) {
+export async function proxy(request) {
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("next", request.nextUrl.pathname);
   const sessionToken = request.cookies.get("cealeg_session")?.value;
