@@ -55,7 +55,7 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "tailwindcss": "^4",
-    "typescript": "6.0.3",
+    "typescript": "7.0.2",
     "wrangler": "^4.112.0"
   },
   "overrides": {
