@@ -11,8 +11,8 @@ fisiere `.env` ignorate de Git.
 | Mediu | Frontend | Backend | Baza de date | Regula |
 | --- | --- | --- | --- | --- |
 | local | Next.js local | Flask local | Supabase de dezvoltare sau SQLite explicit | nu folosi chei live |
-| preview | Vercel Preview | backend de test dedicat, daca exista | proiect Supabase separat recomandat | nu directiona webhook live |
-| production | Vercel Production | Render `cealeg-api` | Supabase Postgres productie | numai secrete live si origin-uri publice |
+| preview | Vercel Preview, tranzitoriu | backend de test dedicat, daca exista | proiect Supabase separat recomandat | nu directiona webhook live |
+| production | Vercel curent; Cloudflare Workers Free pregatit | Render `cealeg-api` | Supabase Postgres productie | migrarea se face numai dupa CI Linux verde |
 
 Separarea reala preview/productie trebuie confirmata de proprietar. Daca preview
 foloseste baza sau Stripe live, aceasta este o problema de izolare ce trebuie
@@ -49,7 +49,7 @@ corectata inainte de a acorda acces altor colaboratori.
 | `CONTACT_EMAIL` | nu | Reply-To si destinatie suport, in prezent `contact@cealeg.shop` |
 | `ADMIN_EMAIL` | date de contact | destinatia alertelor administrative |
 | `ALERT_WEBHOOK_URL` | da, optional | webhook HTTPS pentru alerte operationale (Slack/Discord/gateway); alertele functioneaza si prin Sentry/email fara el |
-| `CRON_SECRET` | da, critic | aceeasi valoare in Render si Vercel; protejeaza maintenance |
+| `CRON_SECRET` | da, critic | aceeasi valoare in Render si GitHub Actions; protejeaza maintenance |
 
 `render.yaml` marcheaza valorile care trebuie introduse manual cu `sync: false`.
 
@@ -154,7 +154,7 @@ si `VERCEL_GIT_COMMIT_SHA` sunt fallback-uri optionale pentru `/version`.
 | --- | --- | --- |
 | `BACKEND_URL` | nu | URL intern/public al backend-ului Render, fara slash final |
 | `NEXT_PUBLIC_API_URL` | nu, public | `/api/backend` pentru proxy same-origin |
-| `CRON_SECRET` | da, critic | aceeasi valoare ca in Render; nu prefixa manual cu numele variabilei |
+| `CRON_SECRET` | da, critic | folosit de rutele cron cat timp frontendul ruleaza pe Vercel; aceeasi valoare ca in Render |
 | `SENTRY_DSN` | sensibil operational | DSN server/edge, daca Sentry este activ |
 | `SENTRY_ORG` | nu | organizatia Sentry pentru upload sourcemap |
 | `SENTRY_PROJECT` | nu | proiectul Sentry |
@@ -162,6 +162,14 @@ si `VERCEL_GIT_COMMIT_SHA` sunt fallback-uri optionale pentru `/version`.
 
 Vercel injecteaza `NODE_ENV`, `VERCEL_ENV`, `PORT` si `NEXT_RUNTIME` unde sunt
 relevante. `CI` este folosita in pipeline, nu se seteaza manual in productie.
+
+Vercel Hobby ramane doar tranzitoriu deoarece utilizarea comerciala nu este
+destinatia potrivita pentru acest plan. Configuratia gratuita alternativa este
+in `frontend/wrangler.jsonc` si `frontend/open-next.config.ts`. Build-ul
+Cloudflare foloseste imagini neoptimizate pentru a nu activa Cloudflare Images
+sau R2. Secretele nu se pun in `wrangler.jsonc`; daca devin necesare, se adauga
+prin `wrangler secret put`. Nu se ruleaza `cloudflare:deploy` pana cand jobul
+Linux `quality:cloudflare` nu este verde si contul/domeniul nu sunt confirmate.
 
 ## Frontend public
 
@@ -192,7 +200,7 @@ consimtamantului.
 | `SUPABASE_SERVICE_ROLE_KEY` | Render | actualizeaza imediat backend-ul si testeaza Storage |
 | Stripe secret/webhook | Render + Stripe | testeaza Checkout, portal si un eveniment semnat |
 | cheia provider email | Render + provider | trimite email test si verifica provider message ID |
-| `CRON_SECRET` | Render + Vercel | actualizeaza ambele parti in aceeasi fereastra si testeaza cron |
+| `CRON_SECRET` | Render + GitHub Actions, temporar si Vercel | actualizeaza toate partile active in aceeasi fereastra si testeaza cron |
 | `REDIS_URL` | Render | testeaza rate limiting si fallback-ul |
 | `OPENAI_API_KEY` | Render | testeaza numai daca functia este activata |
 | `SENTRY_AUTH_TOKEN` | Vercel | ruleaza build si confirma sourcemap upload fara a expune token-ul |
@@ -209,7 +217,7 @@ fi comparate dupa nume, iar valorile reale se verifica individual si mascat.
 Checklist productie:
 
 1. Nu exista chei test Stripe impreuna cu price ID-uri live sau invers.
-2. `CRON_SECRET` este identic in Vercel si Render.
+2. `CRON_SECRET` este identic in Render si GitHub Actions; cat timp Vercel ramane activ, si acolo foloseste aceeasi valoare.
 3. `FRONTEND_ORIGINS` nu contine localhost sau tuneluri de dezvoltare.
 4. `SUPABASE_SERVICE_ROLE_KEY`, `AUTH_SECRET` si cheile API nu au prefix
    `NEXT_PUBLIC_`.

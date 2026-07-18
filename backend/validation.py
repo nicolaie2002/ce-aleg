@@ -48,6 +48,10 @@ PRODUCT_REPORT_REASONS = frozenset(
 )
 SUBSCRIPTION_PLANS = frozenset({"pro", "family"})
 CECOIN_PACKS = frozenset({"bronze", "gold", "diamond"})
+CONSENT_CATEGORIES = frozenset(
+    {"necessary", "analytics", "marketing", "functional"}
+)
+CONSENT_VERSION_PATTERN = re.compile(r"^[A-Za-z0-9._-]{1,40}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,6 +708,86 @@ def validate_product_submission_payload(value: Any) -> ValidationResult:
     return ValidationResult(normalized, tuple(errors))
 
 
+def validate_consent_log_payload(value: Any) -> ValidationResult:
+    """Validate the public cookie-consent audit payload without coercion."""
+
+    data, errors = _payload(value)
+    raw_categories = data.get("categories")
+    categories: dict[str, bool] = {}
+
+    if not isinstance(raw_categories, Mapping):
+        errors.append(
+            _issue("categories", "invalid_type", "Categories must be a JSON object.")
+        )
+    else:
+        unknown = sorted(set(raw_categories) - CONSENT_CATEGORIES)
+        missing = sorted(CONSENT_CATEGORIES - set(raw_categories))
+
+        if unknown:
+            errors.append(
+                _issue(
+                    "categories",
+                    "unknown_values",
+                    "Unknown consent categories are not allowed.",
+                )
+            )
+        if missing:
+            errors.append(
+                _issue(
+                    "categories",
+                    "missing_values",
+                    "All consent categories are required.",
+                )
+            )
+
+        for category in CONSENT_CATEGORIES:
+            category_value = raw_categories.get(category)
+            if not isinstance(category_value, bool):
+                errors.append(
+                    _issue(
+                        f"categories.{category}",
+                        "invalid_type",
+                        "Consent category values must be boolean.",
+                    )
+                )
+            else:
+                categories[category] = category_value
+
+        if categories.get("necessary") is False:
+            errors.append(
+                _issue(
+                    "categories.necessary",
+                    "required_value",
+                    "Necessary storage cannot be disabled.",
+                )
+            )
+
+    version = _text(data.get("version"))
+    if not CONSENT_VERSION_PATTERN.fullmatch(version):
+        errors.append(
+            _issue(
+                "version",
+                "invalid_format",
+                "Consent policy version is invalid.",
+            )
+        )
+
+    timestamp = _text(data.get("timestamp"))
+    if timestamp and len(timestamp) > 40:
+        errors.append(
+            _issue("timestamp", "too_long", "Consent timestamp is too long.")
+        )
+
+    return ValidationResult(
+        {
+            "categories": categories,
+            "version": version,
+            "timestamp": timestamp,
+        },
+        tuple(errors),
+    )
+
+
 VALIDATORS: dict[str, Callable[..., ValidationResult]] = {
     "register": validate_register_payload,
     "login": validate_login_payload,
@@ -722,6 +806,7 @@ VALIDATORS: dict[str, Callable[..., ValidationResult]] = {
     "alternatives": validate_alternatives_payload,
     "analysis": validate_analysis_form,
     "product_submission": validate_product_submission_payload,
+    "consent_log": validate_consent_log_payload,
 }
 
 

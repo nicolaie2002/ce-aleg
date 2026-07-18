@@ -46,16 +46,12 @@
     "app/**/*.js",
     "app/**/*.jsx",
     "instrumentation*.js",
-    "proxy.js",
+    "middleware.js",
     "sentry.*.config.js",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "app/admin/page.js",
-    "app/alternatives/page.js",
-    "app/barcode-scan/page.js",
-    "app/dashboard/page.js"
+    "node_modules"
   ]
 }

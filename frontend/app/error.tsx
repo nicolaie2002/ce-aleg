@@ -25,15 +25,19 @@ export default function ErrorPage({
   }, [error]);
 
   return (
-    <main className="min-h-screen text-white">
+    <div className="min-h-screen text-white">
       <AppHeader actionLabel={pick("Scanează", "Scan")} />
-      <section className="ce-shell ce-page">
+      <section
+        className="ce-shell ce-page"
+        role="alert"
+        aria-labelledby="error-page-title"
+      >
         <div className="mx-auto max-w-2xl rounded-lg border border-red-300/25 bg-red-400/10 p-7 shadow-2xl">
           <p className="flex items-center gap-2 text-sm font-black text-red-100">
             <AlertTriangle aria-hidden="true" size={18} />
             {pick("Ceva nu a mers bine", "Something went wrong")}
           </p>
-          <h1 className="mt-4 text-4xl font-black">
+          <h1 id="error-page-title" className="mt-4 text-4xl font-black">
             {pick(
               "Reîncarcă pagina sau revino în panoul de control.",
               "Reload the page or return to your dashboard."
@@ -64,6 +68,6 @@ export default function ErrorPage({
           </div>
         </div>
       </section>
-    </main>
+    </div>
   );
 }

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useLocale } from "./LocaleProvider";
+import { CookieManager } from "./CookieManager";
 
 export function LegalFooter() {
   const { pick } = useLocale();
@@ -93,6 +94,7 @@ export function LegalFooter() {
                   {label}
                 </Link>
               ))}
+              <CookieManager className="flex min-h-11 w-full items-center gap-2 text-left text-sm font-semibold text-gray-300 hover:text-white" />
             </div>
           </nav>
 

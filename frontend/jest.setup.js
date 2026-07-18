@@ -1,5 +1,9 @@
 import "@testing-library/jest-dom";
 
+jest.mock("next-intl", () => ({
+  NextIntlClientProvider: ({ children }) => children,
+}));
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: jest.fn().mockImplementation((query) => ({

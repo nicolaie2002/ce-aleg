@@ -2,11 +2,12 @@ import io
 from types import SimpleNamespace
 from datetime import timedelta
 
+import pytest
 from werkzeug.security import generate_password_hash
 
 import app as app_module
 from database import db
-from models import ConsentRecord, Product, SearchEvent, User
+from models import ConsentLog, ConsentRecord, Product, SearchEvent, User
 from time_utils import utcnow
 from ai_provider import extract_response_text
 
@@ -365,6 +366,76 @@ def test_authenticated_consent_is_logged(app, client):
         assert record.granted is False
 
 
+def test_granular_consent_is_validated_and_pseudonymized(app, client):
+    raw_session_id = "browser-consent-session-123"
+    response = client.post(
+        "/consent/log",
+        json={
+            "categories": {
+                "necessary": True,
+                "analytics": True,
+                "marketing": False,
+                "functional": True,
+            },
+            "version": "2026-07",
+            "timestamp": "2026-07-18T10:30:00.000Z",
+        },
+        headers={"X-Session-ID": raw_session_id, "User-Agent": "Consent Test Browser"},
+    )
+
+    assert response.status_code == 201
+    with app.app_context():
+        record = ConsentLog.query.one()
+        assert record.categories == {
+            "necessary": True,
+            "analytics": True,
+            "marketing": False,
+            "functional": True,
+        }
+        assert record.session_id != raw_session_id
+        assert len(record.session_id) == 64
+        assert len(record.ip) == 64
+        assert len(record.user_agent) == 64
+        assert "Consent Test Browser" not in record.user_agent
+
+
+@pytest.mark.parametrize(
+    "categories",
+    [
+        {"analytics": False, "marketing": False, "functional": False},
+        {
+            "necessary": False,
+            "analytics": False,
+            "marketing": False,
+            "functional": False,
+        },
+        {
+            "necessary": True,
+            "analytics": "yes",
+            "marketing": False,
+            "functional": False,
+        },
+        {
+            "necessary": True,
+            "analytics": False,
+            "marketing": False,
+            "functional": False,
+            "tracking": True,
+        },
+    ],
+)
+def test_granular_consent_rejects_invalid_categories(app, client, categories):
+    response = client.post(
+        "/consent/log",
+        json={"categories": categories, "version": "2026-07"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["code"] == "validation_error"
+    with app.app_context():
+        assert ConsentLog.query.count() == 0
+
+
 def test_retention_supports_dry_run_and_apply(app):
     with app.app_context():
         user = create_user()
@@ -376,12 +447,27 @@ def test_retention_supports_dry_run_and_apply(app):
             created_at=utcnow() - timedelta(days=500),
         )
         db.session.add(old_search)
+        db.session.add(ConsentLog(
+            session_id="a" * 64,
+            categories={
+                "necessary": True,
+                "analytics": False,
+                "marketing": False,
+                "functional": False,
+            },
+            version="2026-07",
+            created_at=utcnow() - timedelta(days=1200),
+        ))
         db.session.commit()
 
         preview = app_module.run_retention_cleanup(apply_changes=False)
         assert preview["searchEvents"] == 1
+        assert preview["consentLogs"] == 1
         assert SearchEvent.query.count() == 1
+        assert ConsentLog.query.count() == 1
 
         applied = app_module.run_retention_cleanup(apply_changes=True)
         assert applied["searchEvents"] == 1
+        assert applied["consentLogs"] == 1
         assert SearchEvent.query.count() == 0
+        assert ConsentLog.query.count() == 0

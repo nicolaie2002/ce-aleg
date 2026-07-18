@@ -320,7 +320,7 @@ textarea:focus {
 
 @keyframes ce-fade-up {
   from {
-    opacity: 0;
+    opacity: 1;
     transform: translateY(18px);
   }
 

@@ -1,5 +1,10 @@
 # Ce aleg? - publicare pas cu pas
 
+> Stare curenta, 18 iulie 2026: portile locale de cod sunt verzi. Emailul live,
+> Stripe live, restore-ul si testul pe telefoane reale raman neverificate.
+> Vercel este gazda curenta tranzitorie; migrarea gratuita Cloudflare Workers
+> este pregatita in cod si asteapta validarea CI Linux si conectarea domeniului.
+
 ## Schema de productie
 
 ```text
@@ -289,12 +294,12 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Produsele Stripe de test sunt valide
 - [x] Endpointul Stripe de test a fost creat pentru backendul Render
 - [x] Brevo integrat
-- [x] Brevo trimite emailuri din productie
+- [ ] Brevo trimite emailuri din productie (raportat nefunctional la 18 iulie 2026)
 - [x] Pagini Privacy si Terms
 - [x] Privacy/Terms actualizate cu contact, furnizori, drepturi utilizator, cookies, plati si nota ca verdictul este orientativ
 - [x] Support actualizat cu contact clar si politica simpla pentru abonamente/rambursari
 - [x] Procedura backup/export Supabase documentata in `docs/supabase-backup.md`
-- [x] Resetare parola si stergere cont prin email
+- [ ] Resetare parola si stergere cont confirmate prin email live
 - [x] Rate limiting, limite payload si security headers
 - [x] Fisierele `.env`, bazele locale si uploadurile sunt ignorate de Git
 - [x] Buildul de productie trece
@@ -333,7 +338,7 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Proxy-ul public Vercel -> Render raspunde corect
 - [x] URL-urile Vercel/Render sunt configurate reciproc
 - [x] Creeaza webhookul Stripe public
-- [x] Testeaza emailurile din admin
+- [ ] Testeaza emailurile din admin dupa repararea configuratiei Brevo
 - [x] Testeaza inregistrare, login, scanare, cos, plata si stergere cont
 - [x] Cumpara si conecteaza domeniul
 - [x] Verifica textele legale si datele de contact de baza
@@ -356,7 +361,7 @@ Stripe webhook=https://api.cealeg.shop/billing/stripe/webhook
 - [x] Stripe test functioneaza si webhookul actualizeaza planurile
 - [x] Stripe live functioneaza si webhookul actualizeaza planurile
 - [x] Stripe nu permite schimbarea Pro/Family fara Checkout nou sau portal Stripe
-- [x] Emailurile ajung in inbox
+- [ ] Emailurile ajung in inbox
 - [x] Scanarea este testata pe telefon prin HTTPS
 
 ## Stare verificata la 17 iunie 2026
@@ -368,8 +373,8 @@ Supabase Storage:       OK
 Stripe test prices:     OK
 Frontend production:   OK
 Smoke tests:            33/33
-Brevo API:              OK
-Brevo email productie:  OK
+Brevo API:              DE REVERIFICAT
+Brevo email productie:  BLOCAT - nu livreaza la 18 iulie 2026
 Render deployment:      OK
 Vercel deployment:      OK
 Custom domain:          https://www.cealeg.shop

@@ -13,11 +13,20 @@ if (-not $FrontendDir) {
 $appDir = Join-Path $FrontendDir "app"
 $appDirFull = (Resolve-Path $appDir).Path.TrimEnd("\", "/")
 $proxyPath = Join-Path $FrontendDir "proxy.js"
+$middlewarePath = Join-Path $FrontendDir "middleware.js"
 $sitemapPath = Join-Path $appDir "sitemap.js"
 $robotsPath = Join-Path $appDir "robots.js"
 
 if (-not (Test-Path $appDir)) {
     throw "Frontend app directory not found: $appDir"
+}
+
+$routeGuardPath = if (Test-Path $proxyPath) {
+    $proxyPath
+} elseif (Test-Path $middlewarePath) {
+    $middlewarePath
+} else {
+    throw "Frontend route guard not found: expected proxy.js or middleware.js"
 }
 
 function Convert-PageFileToRoute {
@@ -106,10 +115,10 @@ $missingPages = @(
         Where-Object { $routes -notcontains $_ }
 )
 
-$proxy = Get-Content -Raw $proxyPath
+$routeGuard = Get-Content -Raw $routeGuardPath
 $missingProxyRoutes = @(
     $requiredProtectedPages |
-        Where-Object { $proxy -notmatch [regex]::Escape("$_/:path*") }
+        Where-Object { $routeGuard -notmatch [regex]::Escape("$_/:path*") }
 )
 
 $sitemap = Get-Content -Raw $sitemapPath
@@ -139,7 +148,7 @@ if ($missingPages.Count -or $missingProxyRoutes.Count -or $missingSitemapRoutes.
     }
 
     if ($missingProxyRoutes.Count) {
-        Write-Host "Protected pages missing from proxy matcher: $($missingProxyRoutes -join ', ')" -ForegroundColor Red
+        Write-Host "Protected pages missing from route guard matcher: $($missingProxyRoutes -join ', ')" -ForegroundColor Red
     }
 
     if ($missingSitemapRoutes.Count) {

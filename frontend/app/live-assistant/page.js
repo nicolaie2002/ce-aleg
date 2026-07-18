@@ -22,6 +22,7 @@ import { AppHeader } from "../components/AppHeader";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile, readProfilePreferences, saveProfilePreferences } from "../utils/profilePreferences";
 import { getAIProvider } from "../../components/AIProvider";
+import { getApiErrorMessage, localizeApiMessage } from "../utils/apiResponse";
 
 const MAX_CAMERA_SESSION_MS = 2 * 60 * 1000;
 
@@ -442,7 +443,12 @@ useEffect(() => {
 
     if (data.code === "scan_limit_reached") {
       setBillingGate(data);
-      setMessage(data.error || pick("Limita gratuită a fost atinsă.", "The free scan limit has been reached."));
+      setMessage(getApiErrorMessage(
+        data,
+        pick,
+        "Limita gratuită a fost atinsă.",
+        "The free scan limit has been reached."
+      ));
       return;
     }
 
@@ -454,7 +460,7 @@ useEffect(() => {
     detectedBarcodeRef.current = false;
     barcodeCandidateRef.current = { code: "", count: 0 };
     setMessage(
-      data.message ||
+      (data.message && localizeApiMessage(data.message, pick, data.code)) ||
         pick(
           "Am citit un cod, dar nu am găsit produsul. Reîncadrez camera și încerc din nou.",
           "I read a code, but could not find the product. I will keep looking."

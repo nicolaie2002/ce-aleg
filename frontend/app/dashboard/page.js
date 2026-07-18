@@ -36,7 +36,7 @@ import { InteractiveSurface } from "../components/InteractiveSurface";
 import { useLocale } from "../components/LocaleProvider";
 import { getActiveProfile } from "../utils/profilePreferences";
 import { clearAuthenticatedSession, storeAuthenticatedUser } from "../utils/authStorage";
-import { getApiErrorMessage, readApiJson } from "../utils/apiResponse";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 import { trackEvent } from "../utils/analytics";
 
 const ACTION_TONES = {
@@ -72,11 +72,7 @@ const FamilyProfiles = dynamic(
   () => import("../components/FamilyProfiles").then((mod) => mod.FamilyProfiles),
   {
     ssr: false,
-    loading: () => (
-      <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm font-bold text-gray-300">
-        Se încarcă profilurile familiei... / Loading family profiles...
-      </div>
-    ),
+    loading: () => <FamilyProfilesLoading />,
   }
 );
 
@@ -89,6 +85,16 @@ const CECOIN_ASSET_REPLACEMENTS = {
   "/brand/Diamond_icon.png": "/brand/Diamond_icon.webp",
   "/brand/CeCoin.png": "/brand/CeCoin.webp",
 };
+
+function FamilyProfilesLoading() {
+  const { pick } = useLocale();
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm font-bold text-gray-300">
+      {pick("Se încarcă profilurile familiei...", "Loading family profiles...")}
+    </div>
+  );
+}
 
 function normalizeCecoinAsset(src, fallback = "/brand/CeCoin.webp") {
   if (!src) return fallback;
@@ -115,6 +121,7 @@ export default function DashboardPage() {
   const [isGamificationLoading, setIsGamificationLoading] = useState(false);
   const [gamificationError, setGamificationError] = useState("");
   const [buyingPackId, setBuyingPackId] = useState("");
+  const [isOpeningBillingPortal, setIsOpeningBillingPortal] = useState(false);
   const [shopMessage, setShopMessage] = useState("");
   const [privacyMessage, setPrivacyMessage] = useState("");
   const [isPrivacyUpdating, setIsPrivacyUpdating] = useState(false);
@@ -153,7 +160,12 @@ export default function DashboardPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Datele nu au putut fi încărcate. Reîncearcă în câteva clipe.", "Your data could not be loaded. Try again in a few moments."));
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Datele nu au putut fi încărcate. Reîncearcă în câteva clipe.",
+          "Your data could not be loaded. Try again in a few moments."
+        ));
       }
 
       setCounts({
@@ -179,7 +191,12 @@ export default function DashboardPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Misiunile nu s-au putut încărca.", "Missions could not be loaded."));
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Misiunile nu s-au putut încărca.",
+          "Missions could not be loaded."
+        ));
       }
 
       setGamification(data);
@@ -209,11 +226,20 @@ export default function DashboardPage() {
     const data = await readApiJson(response);
 
     if (!response.ok) {
-      throw new Error(data.error || pick("CeCoins nu au putut fi actualizate.", "CeCoins could not be updated."));
+      throw new Error(getApiErrorMessage(
+        data,
+        pick,
+        "CeCoins nu au putut fi actualizate.",
+        "CeCoins could not be updated."
+      ));
     }
 
     setGamification(data.summary);
-    setShopMessage(data.message || pick("CeCoins au fost actualizate.", "CeCoins have been updated."));
+    setShopMessage(
+      data.message
+        ? localizeApiMessage(data.message, pick, data.code)
+        : pick("CeCoins au fost actualizate.", "CeCoins have been updated.")
+    );
     return true;
   }, [pick]);
 
@@ -228,7 +254,7 @@ export default function DashboardPage() {
         window.cancelIdleCallback(gamificationIdleHandle);
       }
       if (gamificationTimeoutHandle !== null) {
-        window.clearTimeout(gamificationTimeoutHandle);
+        globalThis.clearTimeout(gamificationTimeoutHandle);
       }
 
       gamificationIdleHandle = null;
@@ -248,7 +274,7 @@ export default function DashboardPage() {
       if ("requestIdleCallback" in window) {
         gamificationIdleHandle = window.requestIdleCallback(run, { timeout: 1800 });
       } else {
-        gamificationTimeoutHandle = window.setTimeout(run, 350);
+        gamificationTimeoutHandle = globalThis.setTimeout(run, 350);
       }
     }
 
@@ -352,6 +378,47 @@ export default function DashboardPage() {
     window.location.assign("/");
   }
 
+  async function handleOpenBillingPortal() {
+    if (isOpeningBillingPortal) return;
+
+    setIsOpeningBillingPortal(true);
+    setShopMessage(pick("Se deschide administrarea abonamentului...", "Opening subscription management..."));
+
+    try {
+      const response = await fetch(`${API_URL}/billing/portal`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const data = await readApiJson(response);
+
+      if (response.status === 401) {
+        window.location.assign("/login?next=/dashboard");
+        return;
+      }
+
+      if (!response.ok || !data.portalUrl) {
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Portalul de abonament nu poate fi deschis acum.",
+          "The billing portal cannot be opened right now."
+        ));
+      }
+
+      window.location.assign(data.portalUrl);
+    } catch (error) {
+      setShopMessage(
+        error.message || pick(
+          "Portalul de abonament nu poate fi deschis acum.",
+          "The billing portal cannot be opened right now."
+        )
+      );
+    } finally {
+      setIsOpeningBillingPortal(false);
+    }
+  }
+
   async function requestAccountDeletion() {
     setIsDeleteRequesting(true);
     setDeleteRequestError("");
@@ -364,10 +431,15 @@ export default function DashboardPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Emailul de confirmare nu a putut fi trimis.", "The confirmation email could not be sent."));
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Emailul de confirmare nu a putut fi trimis.",
+          "The confirmation email could not be sent."
+        ));
       }
 
       setDeleteRequestNotice(
@@ -376,7 +448,9 @@ export default function DashboardPage() {
               `Am trimis confirmarea la ${data.email}. Contul nu se șterge până nu confirmi din email.`,
               `We sent the confirmation to ${data.email}. The account is not deleted until you confirm by email.`
             )
-          : data.message || pick("Verifică emailul pentru confirmare.", "Check your email to confirm.")
+          : data.message
+            ? localizeApiMessage(data.message, pick, data.code)
+            : pick("Verifică emailul pentru confirmare.", "Check your email to confirm.")
       );
 
       if (data.devDeletionLink) {
@@ -637,10 +711,11 @@ export default function DashboardPage() {
       detail: hasUnlimitedScans ? pick("scanări nelimitate", "unlimited scans") : pick("5 scanări gratuite lunar", "5 free scans monthly"),
       icon: Trophy,
       tone: "border-violet-300/25 bg-violet-300/[0.08] text-violet-100",
-      actionHref: "/pricing",
-      actionLabel: pick("Vezi planurile", "See plans"),
+      actionHref: usage.plan === "pro" || usage.plan === "family" ? "" : "/pricing",
+      actionLabel: usage.plan === "pro" || usage.plan === "family"
+        ? pick("Administrează abonamentul", "Manage subscription")
+        : pick("Vezi planurile", "See plans"),
       actionOnClick: usage.plan === "pro" || usage.plan === "family" ? handleOpenBillingPortal : undefined,
-      actionLabelOverride: usage.plan === "pro" || usage.plan === "family" ? pick("Administrează abonamentul", "Manage subscription") : undefined,
     },
     {
       label: pick("Scanări", "Scans"),
@@ -751,7 +826,7 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid w-full grid-cols-2 gap-2 xl:w-[480px]">
-              {walletCards.map(({ label, value, detail, icon: Icon, image, tone, actionHref, actionLabel }) => (
+              {walletCards.map(({ label, value, detail, icon: Icon, image, tone, actionHref, actionLabel, actionOnClick }) => (
                 <div key={label} className={`relative rounded-lg border p-3 pr-9 ${tone}`}>
                   <div className="flex items-center justify-between gap-3">
                     <p className="text-xs font-black uppercase tracking-wide opacity-80">{label}</p>
@@ -763,7 +838,18 @@ export default function DashboardPage() {
                   </div>
                   <p className="mt-1 truncate text-xl font-black">{value}</p>
                   <p className="mt-1 text-xs font-bold opacity-75">{detail}</p>
-                  {actionHref && (
+                  {actionOnClick ? (
+                    <button
+                      type="button"
+                      onClick={actionOnClick}
+                      disabled={isOpeningBillingPortal}
+                      className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white hover:text-black disabled:cursor-wait disabled:opacity-50"
+                      aria-label={actionLabel}
+                      title={actionLabel}
+                    >
+                      <Plus size={14} strokeWidth={3} />
+                    </button>
+                  ) : actionHref ? (
                     <Link
                       href={actionHref}
                       className="absolute bottom-2 right-2 inline-flex h-7 w-7 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white hover:text-black"
@@ -772,7 +858,7 @@ export default function DashboardPage() {
                     >
                       <Plus size={14} strokeWidth={3} />
                     </Link>
-                  )}
+                  ) : null}
                 </div>
               ))}
             </div>

@@ -82,6 +82,15 @@ describe("API response utilities", () => {
       localizeApiMessage("Pentru cont trebuie acordul unui parinte.", pickEnglish)
     ).toMatch(/^To create an account/);
     expect(localizeApiMessage("", pickEnglish)).toBe("");
+    expect(localizeApiMessage("ignored", pickEnglish, "scan_limit_reached")).toBe(
+      "The free scan limit has been reached."
+    );
+    expect(
+      localizeApiMessage("Produsul pare corect și complet.", pickEnglish)
+    ).toBe("The product appears correct and complete.");
+    expect(
+      localizeApiMessage("Lipsește poza cu eticheta nutrițională.", pickEnglish)
+    ).toBe("The nutrition label photo is missing.");
   });
 
   it.each([
@@ -101,6 +110,10 @@ describe("API response utilities", () => {
     [
       "Fi\u0219ierul eticheta.jpg este prea mare.",
       "eticheta.jpg is too large.",
+    ],
+    [
+      "Provider necunoscut: mailgun. Foloseste brevo, resend sau smtp.",
+      "Unknown provider: mailgun. Use brevo, resend or smtp.",
     ],
   ])("localizes the dynamic API message %s", (message, expected) => {
     expect(localizeApiMessage(message, pickEnglish)).toBe(expected);

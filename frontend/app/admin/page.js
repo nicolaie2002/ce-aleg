@@ -26,7 +26,8 @@ import {
 import { API_URL } from "../config";
 import { AppHeader } from "../components/AppHeader";
 import { ProductImage } from "../components/ProductImage";
-import { readApiJson } from "../utils/apiResponse";
+import { useLocale } from "../components/LocaleProvider";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
 
@@ -82,7 +83,10 @@ function formatDate(value) {
   if (!value) return "-";
 
   try {
-    return new Date(value).toLocaleString("ro-RO", {
+    const locale = typeof document !== "undefined" && document.documentElement.lang === "en"
+      ? "en-GB"
+      : "ro-RO";
+    return new Date(value).toLocaleString(locale, {
       dateStyle: "short",
       timeStyle: "short",
     });
@@ -92,7 +96,10 @@ function formatDate(value) {
 }
 
 function compactNumber(value) {
-  return new Intl.NumberFormat("ro-RO").format(Number(value || 0));
+  const locale = typeof document !== "undefined" && document.documentElement.lang === "en"
+    ? "en-GB"
+    : "ro-RO";
+  return new Intl.NumberFormat(locale).format(Number(value || 0));
 }
 
 function monitorTone(status) {
@@ -101,6 +108,15 @@ function monitorTone(status) {
   return "border-cyan-300/25 bg-cyan-300/10 text-cyan-100";
 }
 
+/**
+ * @param {{
+ *   label: import("react").ReactNode,
+ *   value: import("react").ReactNode,
+ *   icon?: import("react").ElementType,
+ *   tone?: string,
+ *   detail?: import("react").ReactNode,
+ * }} props
+ */
 function StatCard({ label, value, icon: Icon, tone = "default", detail }) {
   const toneClass =
     tone === "danger"
@@ -156,6 +172,7 @@ function ExportLink({ href, children }) {
 }
 
 export default function AdminPage() {
+  const { locale, pick } = useLocale();
   const [overview, setOverview] = useState({});
   const [monitoring, setMonitoring] = useState(null);
   const [submissions, setSubmissions] = useState([]);
@@ -180,6 +197,26 @@ export default function AdminPage() {
   const [reportCategoryEdits, setReportCategoryEdits] = useState({});
   const [missionDigestBusy, setMissionDigestBusy] = useState("");
   const [missionDigestPreview, setMissionDigestPreview] = useState(null);
+
+  function localizedResponseMessage(data, fallbackRo, fallbackEn) {
+    const rawMessage = data?.message || data?.error;
+
+    if (!rawMessage) return pick(fallbackRo, fallbackEn);
+
+    const localized = localizeApiMessage(rawMessage, pick, data?.code);
+    if (locale === "en" && localized === String(rawMessage).trim() && fallbackEn) {
+      return fallbackEn;
+    }
+
+    return localized;
+  }
+
+  function localizedDiagnosticIssues(issues = []) {
+    return issues
+      .map((issue) => localizeApiMessage(issue, pick))
+      .filter(Boolean)
+      .join(" ");
+  }
 
   async function loadAdmin() {
     setIsLoading(true);
@@ -232,7 +269,11 @@ export default function AdminPage() {
       method: "POST",
     });
     const data = await readApiJson(response);
-    setMessage(data.message || data.error);
+    setMessage(localizedResponseMessage(
+      data,
+      "Verificarea propunerii s-a încheiat.",
+      "Submission review completed."
+    ));
     await loadAdmin();
   }
 
@@ -243,9 +284,16 @@ export default function AdminPage() {
     const data = await readApiJson(response);
     const reward = data.reward || {};
     const rewardText = response.ok && reward
-      ? ` Bonus: +${reward.bonusScans || 0} scanări, +${reward.coins || 0} CeCoins.`
+      ? pick(
+          ` Bonus: +${reward.bonusScans || 0} scanări, +${reward.coins || 0} CeCoins.`,
+          ` Bonus: +${reward.bonusScans || 0} scans, +${reward.coins || 0} CeCoins.`
+        )
       : "";
-    setMessage(`${data.message || data.error || ""}${rewardText}`);
+    setMessage(`${localizedResponseMessage(
+      data,
+      "Propunerea a fost procesată.",
+      "The submission was processed."
+    )}${rewardText}`);
     await loadAdmin();
   }
 
@@ -255,7 +303,7 @@ export default function AdminPage() {
       method: "DELETE",
     });
     const data = await readApiJson(response);
-    setMessage(data.message || data.error);
+    setMessage(localizedResponseMessage(data, "Propunerea a fost ștearsă.", "The submission was deleted."));
     await loadAdmin();
   }
 
@@ -266,7 +314,7 @@ export default function AdminPage() {
       body: JSON.stringify({ plan, status: "active" }),
     });
     const data = await readApiJson(response);
-    setMessage(data.message || data.error);
+    setMessage(localizedResponseMessage(data, "Planul a fost actualizat.", "The plan was updated."));
     await loadAdmin();
   }
 
@@ -281,13 +329,16 @@ export default function AdminPage() {
         body: JSON.stringify({ to: emailTestAddress || CONTACT_EMAIL }),
       });
       const data = await readApiJson(response);
-      const diagnosticIssues = data.diagnostics?.issues?.length
-        ? ` Detalii: ${data.diagnostics.issues.join(" ")}`
+      const localizedIssues = localizedDiagnosticIssues(data.diagnostics?.issues);
+      const diagnosticIssues = localizedIssues
+        ? pick(` Detalii: ${localizedIssues}`, ` Details: ${localizedIssues}`)
         : "";
       setMessage(
-        `${data.message ||
-          data.error ||
-          (response.ok ? "Test email finalizat." : "Emailul de test nu a putut fi trimis.")}${diagnosticIssues}`
+        `${localizedResponseMessage(
+          data,
+          response.ok ? "Test email finalizat." : "Emailul de test nu a putut fi trimis.",
+          response.ok ? "Email test completed." : "The test email could not be sent."
+        )}${diagnosticIssues}`
       );
       await loadAdmin();
     } catch {
@@ -327,12 +378,15 @@ export default function AdminPage() {
         return;
       }
 
-      const diagnosticIssues = data.diagnostics?.issues?.length
-        ? ` ${data.diagnostics.issues.join(" ")}`
+      const localizedIssues = localizedDiagnosticIssues(data.diagnostics?.issues);
+      const diagnosticIssues = localizedIssues
+        ? ` ${localizedIssues}`
         : "";
-      const resultMessage = `${
-        data.message || data.error || "Emailul de confirmare nu a putut fi procesat."
-      }${diagnosticIssues}`;
+      const resultMessage = `${localizedResponseMessage(
+        data,
+        "Emailul de confirmare nu a putut fi procesat.",
+        "The confirmation email could not be processed."
+      )}${diagnosticIssues}`;
 
       setVerificationResult({
         ok: response.ok,
@@ -366,11 +420,20 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Digest-ul de misiuni nu a putut fi procesat.");
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Digest-ul de misiuni nu a putut fi procesat.",
+          "The mission digest could not be processed."
+        ));
       }
 
       setMissionDigestPreview(data);
-      setMessage(data.message || "Digest-ul de misiuni a fost verificat.");
+      setMessage(localizedResponseMessage(
+        data,
+        "Digest-ul de misiuni a fost verificat.",
+        "The mission digest was checked."
+      ));
       await loadAdmin();
     } catch (error) {
       setMessage(error.message || "Digest-ul de misiuni nu a putut fi procesat.");
@@ -410,11 +473,20 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Catalogul nu a putut fi verificat.");
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Catalogul nu a putut fi verificat.",
+          "The catalog could not be checked."
+        ));
       }
 
       setCatalogPreview(data);
-      setMessage(data.message || "Verificarea catalogului s-a terminat.");
+      setMessage(localizedResponseMessage(
+        data,
+        "Verificarea catalogului s-a terminat.",
+        "Catalog check completed."
+      ));
       await loadAdmin();
     } catch (error) {
       setMessage(error.message || "Catalogul nu a putut fi verificat.");
@@ -466,7 +538,12 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Produsele nu au putut fi căutate.");
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Produsele nu au putut fi căutate.",
+          "Products could not be searched."
+        ));
       }
 
       const items = Array.isArray(data) ? data : [];
@@ -498,7 +575,12 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Produsul nu a putut fi salvat.");
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Produsul nu a putut fi salvat.",
+          "The product could not be saved."
+        ));
       }
 
       const updatedProduct = data.product;
@@ -506,7 +588,7 @@ export default function AdminPage() {
       setCatalogResults((current) =>
         current.map((item) => (item.id === updatedProduct.id ? updatedProduct : item))
       );
-      setMessage(data.message || "Produs actualizat.");
+      setMessage(localizedResponseMessage(data, "Produs actualizat.", "Product updated."));
       await loadAdmin();
     } catch (error) {
       setMessage(error.message || "Produsul nu a putut fi salvat.");
@@ -528,10 +610,15 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Raportarea nu a putut fi rezolvată.");
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Raportarea nu a putut fi rezolvată.",
+          "The report could not be resolved."
+        ));
       }
 
-      setMessage(data.message || "Raportarea a fost rezolvată.");
+      setMessage(localizedResponseMessage(data, "Raportarea a fost rezolvată.", "The report was resolved."));
       setReportCategoryEdits((current) => {
         const next = { ...current };
         delete next[eventId];
@@ -566,7 +653,12 @@ export default function AdminPage() {
       const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || "Produsul raportat nu a putut fi căutat.");
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Produsul raportat nu a putut fi căutat.",
+          "The reported product could not be searched."
+        ));
       }
 
       const items = Array.isArray(data) ? data : [];
@@ -608,14 +700,14 @@ export default function AdminPage() {
         return leftMeta.priority - rightMeta.priority;
       }
 
-      return new Date(right.created_at || 0) - new Date(left.created_at || 0);
+      return new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime();
     })
   ), [submissions]);
   const pendingSubmissionCount = submissions.filter((item) => item.status !== "approved").length;
   const publishableSubmissionCount = submissions.filter((item) => item.status === "ai_approved").length;
 
   return (
-    <main className="min-h-screen bg-[#080c10] text-white">
+    <main className="min-h-screen bg-[#080c10] text-white" data-locale={locale}>
       <AppHeader actionHref="/dashboard" actionLabel="Dashboard" />
       <section className="ce-shell ce-page">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
@@ -993,7 +1085,9 @@ export default function AdminPage() {
                       </EventPill>
                     </div>
                     {event.metadata?.error && (
-                      <p className="mt-3 text-sm leading-6 text-red-100">{event.metadata.error}</p>
+                      <p className="mt-3 text-sm leading-6 text-red-100">
+                        {localizeApiMessage(event.metadata.error, pick)}
+                      </p>
                     )}
                     {event.metadata?.coins && (
                       <p className="mt-3 text-sm font-bold text-yellow-100">

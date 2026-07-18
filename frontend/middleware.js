@@ -48,7 +48,7 @@ async function verifySession(sessionToken, cookieHeader) {
   return user;
 }
 
-export async function proxy(request) {
+export async function middleware(request) {
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("next", request.nextUrl.pathname);
   const sessionToken = request.cookies.get("cealeg_session")?.value;
@@ -67,10 +67,8 @@ export async function proxy(request) {
       return NextResponse.redirect(loginUrl);
     }
 
-    if (request.nextUrl.pathname.startsWith("/admin")) {
-      if (!user.isAdmin) {
-        return NextResponse.redirect(new URL("/dashboard", request.url));
-      }
+    if (request.nextUrl.pathname.startsWith("/admin") && !user.isAdmin) {
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   } catch {
     return NextResponse.redirect(loginUrl);

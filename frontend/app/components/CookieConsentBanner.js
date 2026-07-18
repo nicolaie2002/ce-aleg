@@ -2,100 +2,204 @@
 
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { BarChart3, X } from "lucide-react";
+import { BarChart3, Check, Settings2, X } from "lucide-react";
 import { useLocale } from "./LocaleProvider";
 import {
   ANALYTICS_CONSENT_EVENT,
   ANALYTICS_CONSENT_KEY,
 } from "../utils/analytics";
+import {
+  CONSENT_CHANGE_EVENT,
+  CONSENT_MANAGER_EVENT,
+  CONSENT_POLICY_VERSION,
+  createConsentState,
+  getConsentSessionId,
+  persistConsent,
+  readStoredConsent,
+} from "../utils/consent";
 
-const GA_ID = process.env.NEXT_PUBLIC_GA_ID || "";
-const META_PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID || "";
-const TIKTOK_PIXEL_ID = process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID || "";
-const HAS_ANALYTICS_PROVIDER = Boolean(GA_ID || META_PIXEL_ID || TIKTOK_PIXEL_ID);
-const CONSENT_POLICY_VERSION = "2026-07";
+const HAS_OPTIONAL_PROVIDER = Boolean(
+  process.env.NEXT_PUBLIC_GA_ID
+  || process.env.NEXT_PUBLIC_META_PIXEL_ID
+  || process.env.NEXT_PUBLIC_TIKTOK_PIXEL_ID
+  || process.env.NEXT_PUBLIC_POSTHOG_KEY
+);
 const STORED_USER_KEY = "cealeg_user";
 
-function recordAuthenticatedConsent(granted) {
+const CATEGORY_DEFINITIONS = [
+  {
+    id: "necessary",
+    required: true,
+    label: ["Necesare", "Necessary"],
+    description: ["Sesiune, securitate și alegerea limbii.", "Session, security and language choice."],
+  },
+  {
+    id: "analytics",
+    label: ["Statistici", "Analytics"],
+    description: ["Ne ajută să înțelegem ce funcționează.", "Helps us understand what works."],
+  },
+  {
+    id: "marketing",
+    label: ["Marketing", "Marketing"],
+    description: ["Măsurarea campaniilor Meta sau TikTok.", "Measures Meta or TikTok campaigns."],
+  },
+  {
+    id: "functional",
+    label: ["Funcționale", "Functional"],
+    description: ["Preferințe și funcții opționale personalizate.", "Optional preferences and personalized features."],
+  },
+];
+
+function hasSignedInAccount() {
   try {
-    const storedUser = localStorage.getItem(STORED_USER_KEY);
-    const user = storedUser ? JSON.parse(storedUser) : null;
-    const storedUserId = user?.id;
-    const userId =
-      typeof storedUserId === "number" ||
-      (typeof storedUserId === "string" && /^\d+$/.test(storedUserId.trim()))
-        ? Number(storedUserId)
-        : Number.NaN;
-
-    if (!Number.isSafeInteger(userId) || userId <= 0) return;
-
-    void Promise.allSettled([
-      fetch("/api/backend/privacy/consent", {
-        method: "POST",
-        credentials: "include",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "analytics",
-          granted,
-          policyVersion: CONSENT_POLICY_VERSION,
-          source: "web-banner",
-        }),
-      }),
-      fetch("/api/backend/account/consent", {
-        method: "POST",
-        credentials: "include",
-        keepalive: true,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analytics: granted }),
-      }),
-    ]);
+    const storedUser = JSON.parse(localStorage.getItem(STORED_USER_KEY) || "null");
+    return Boolean(storedUser?.id);
   } catch {
-    // Consent remains saved locally when the cached account is missing or invalid.
+    return false;
   }
 }
 
-function saveConsent(value) {
-  localStorage.setItem(ANALYTICS_CONSENT_KEY, value);
-
-  const granted = value === "accepted";
-  recordAuthenticatedConsent(granted);
+function applyProviderConsent(consent) {
   window.gtag?.("consent", "update", {
-    analytics_storage: granted ? "granted" : "denied",
-    ad_storage: granted ? "granted" : "denied",
-    ad_user_data: granted ? "granted" : "denied",
-    ad_personalization: granted ? "granted" : "denied",
+    analytics_storage: consent.analytics ? "granted" : "denied",
+    ad_storage: consent.marketing ? "granted" : "denied",
+    ad_user_data: consent.marketing ? "granted" : "denied",
+    ad_personalization: consent.marketing ? "granted" : "denied",
   });
 
-  if (granted) {
+  if (consent.marketing) {
     window.fbq?.("grantConsent");
     window.ttq?.grantConsent?.();
   } else {
     window.fbq?.("revokeConsent");
     window.ttq?.revokeConsent?.();
   }
+}
 
-  window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT));
+function recordConsent(consent) {
+  const categories = {
+    necessary: true,
+    analytics: consent.analytics,
+    marketing: consent.marketing,
+    functional: consent.functional,
+  };
+  const requests = [
+    fetch("/api/backend/consent/log", {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-ID": getConsentSessionId(),
+      },
+      body: JSON.stringify({
+        categories,
+        version: CONSENT_POLICY_VERSION,
+        timestamp: consent.timestamp,
+      }),
+    }),
+  ];
+
+  if (hasSignedInAccount()) {
+    for (const type of ["analytics", "marketing", "functional"]) {
+      requests.push(fetch("/api/backend/privacy/consent", {
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          granted: consent[type],
+          policyVersion: CONSENT_POLICY_VERSION,
+          source: "web-cookie-manager",
+        }),
+      }));
+    }
+
+    requests.push(fetch("/api/backend/account/consent", {
+      method: "POST",
+      credentials: "include",
+      keepalive: true,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ analytics: consent.analytics }),
+    }));
+  }
+
+  void Promise.allSettled(requests);
 }
 
 export function CookieConsentBanner() {
   const { pick } = useLocale();
   const titleId = useId();
   const descriptionId = useId();
-  const [choice, setChoice] = useState("loading");
+  const [open, setOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [consent, setConsent] = useState(() => createConsentState());
   const [announcement, setAnnouncement] = useState("");
 
   useEffect(() => {
     queueMicrotask(() => {
-      setChoice(localStorage.getItem(ANALYTICS_CONSENT_KEY) || "pending");
+      const stored = readStoredConsent();
+      if (stored) {
+        setConsent(stored);
+        applyProviderConsent(stored);
+        return;
+      }
+
+      const legacyChoice = localStorage.getItem(ANALYTICS_CONSENT_KEY);
+      if (legacyChoice === "accepted" || legacyChoice === "declined") {
+        const migrated = persistConsent(createConsentState({
+          analytics: legacyChoice === "accepted",
+          marketing: legacyChoice === "accepted",
+        }));
+        setConsent(migrated);
+        applyProviderConsent(migrated);
+        return;
+      }
+
+      setOpen(HAS_OPTIONAL_PROVIDER);
     });
+
+    function openCookieManager() {
+      setShowSettings(true);
+      setOpen(true);
+    }
+
+    window.addEventListener(CONSENT_MANAGER_EVENT, openCookieManager);
+    return () => window.removeEventListener(CONSENT_MANAGER_EVENT, openCookieManager);
   }, []);
 
-  if (!HAS_ANALYTICS_PROVIDER) {
-    return null;
+  function save(nextConsent, message) {
+    const saved = persistConsent(createConsentState(nextConsent));
+    setConsent(saved);
+    recordConsent(saved);
+    applyProviderConsent(saved);
+    window.dispatchEvent(new CustomEvent(CONSENT_CHANGE_EVENT, { detail: saved }));
+    window.dispatchEvent(new Event(ANALYTICS_CONSENT_EVENT));
+    setAnnouncement(message);
+    setShowSettings(false);
+    setOpen(false);
   }
 
-  if (choice !== "pending") {
+  function acceptAll() {
+    save(
+      { analytics: true, marketing: true, functional: true },
+      pick("Preferințele pentru cookie-uri au fost salvate.", "Cookie preferences saved.")
+    );
+  }
+
+  function rejectOptional() {
+    save(
+      { analytics: false, marketing: false, functional: false },
+      pick("Cookie-urile opționale au fost refuzate.", "Optional cookies declined.")
+    );
+  }
+
+  function saveCustom() {
+    save(consent, pick("Preferințele pentru cookie-uri au fost salvate.", "Cookie preferences saved."));
+  }
+
+  if (!open) {
     return announcement ? (
       <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {announcement}
@@ -103,64 +207,96 @@ export function CookieConsentBanner() {
     ) : null;
   }
 
-  function acceptAnalytics() {
-    saveConsent("accepted");
-    setAnnouncement(pick("Preferința pentru statistici a fost salvată.", "Analytics preference saved."));
-    setChoice("accepted");
-  }
-
-  function declineAnalytics() {
-    saveConsent("declined");
-    setAnnouncement(pick("Statisticile opționale au fost refuzate.", "Optional analytics declined."));
-    setChoice("declined");
-  }
-
   return (
     <div className="fixed inset-x-0 bottom-0 z-[90] px-3 pb-3 sm:px-5 sm:pb-5">
       <div
-        className="mx-auto max-w-5xl rounded-2xl border border-[color:var(--surface-edge)] bg-[var(--surface-strong)] p-4 text-foreground shadow-[0_24px_80px_rgba(0,0,0,.45)] backdrop-blur-xl"
-        role="region"
+        className="mx-auto max-w-5xl rounded-lg border border-[color:var(--surface-edge)] bg-[var(--surface-strong)] p-4 text-foreground shadow-[0_24px_80px_rgba(0,0,0,.45)] backdrop-blur-xl"
+        role="dialog"
+        aria-modal="false"
         aria-labelledby={titleId}
         aria-describedby={descriptionId}
       >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-300/12 text-cyan-200">
-              <BarChart3 size={21} aria-hidden="true" />
-            </span>
-            <div>
-              <h2 id={titleId} className="text-base font-black">
-                {pick("Ajută-ne să îmbunătățim site-ul", "Help us improve the site")}
-              </h2>
-              <p id={descriptionId} className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">
-                {pick(
-                  "Folosim cookie-uri opționale doar dacă accepți, pentru statistici, erori și măsurarea reclamelor. Poți continua fără tracking.",
-                  "We use optional cookies only if you accept, for analytics, errors and ad measurement. You can continue without tracking."
-                )}{" "}
-                <Link href="/privacy" className="font-bold text-cyan-200 hover:text-foreground">
-                  {pick("Confidențialitate", "Privacy")}
-                </Link>
-              </p>
-            </div>
+        <div className="flex gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-300/12 text-cyan-200">
+            <BarChart3 size={21} aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="text-base font-black">
+              {pick("Alege cookie-urile opționale", "Choose optional cookies")}
+            </h2>
+            <p id={descriptionId} className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">
+              {pick(
+                "Cele necesare păstrează site-ul sigur. Celelalte se activează numai cu acordul tău.",
+                "Necessary storage keeps the site secure. Everything else activates only with your consent."
+              )}{" "}
+              <Link href="/privacy" className="font-bold text-cyan-200 hover:text-foreground">
+                {pick("Confidențialitate", "Privacy")}
+              </Link>
+            </p>
           </div>
+        </div>
 
-          <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
-            <button
-              type="button"
-              onClick={declineAnalytics}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-[color:var(--surface-edge)] px-4 py-3 text-sm font-black hover:bg-[var(--surface-faint)]"
-            >
-              <X size={16} aria-hidden="true" />
-              {pick("Refuz", "Decline")}
-            </button>
-            <button
-              type="button"
-              onClick={acceptAnalytics}
-              className="rounded-lg bg-cyan-200 px-5 py-3 text-sm font-black text-slate-950 shadow-[0_0_28px_rgba(103,232,249,.18)] hover:bg-white"
-            >
-              {pick("Accept statistici", "Accept analytics")}
-            </button>
+        {showSettings ? (
+          <div className="mt-4 divide-y divide-white/10 border-y border-white/10">
+            {CATEGORY_DEFINITIONS.map((category) => (
+              <label key={category.id} className="flex min-h-16 items-center justify-between gap-4 py-3">
+                <span className="min-w-0">
+                  <span className="block text-sm font-black">{pick(...category.label)}</span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--text-soft)]">
+                    {pick(...category.description)}
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={category.required || consent[category.id]}
+                  disabled={category.required}
+                  onChange={(event) => setConsent((current) => ({
+                    ...current,
+                    [category.id]: event.target.checked,
+                  }))}
+                  className="h-5 w-5 shrink-0 accent-cyan-300"
+                />
+              </label>
+            ))}
           </div>
+        ) : null}
+
+        <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={rejectOptional}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-[color:var(--surface-edge)] px-4 text-sm font-black hover:bg-[var(--surface-faint)]"
+          >
+            <X size={16} aria-hidden="true" />
+            {pick("Refuz opționale", "Reject optional")}
+          </button>
+          {showSettings ? (
+            <button
+              type="button"
+              onClick={saveCustom}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200/40 px-4 text-sm font-black text-cyan-100 hover:bg-cyan-200/10"
+            >
+              <Check size={16} aria-hidden="true" />
+              {pick("Salvează alegerile", "Save choices")}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-cyan-200/40 px-4 text-sm font-black text-cyan-100 hover:bg-cyan-200/10"
+            >
+              <Settings2 size={16} aria-hidden="true" />
+              {pick("Personalizează", "Customize")}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={acceptAll}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-cyan-200 px-5 text-sm font-black text-slate-950 hover:bg-white"
+          >
+            <Check size={16} aria-hidden="true" />
+            {pick("Accept toate", "Accept all")}
+          </button>
         </div>
       </div>
     </div>

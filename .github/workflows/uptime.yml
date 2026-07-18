@@ -2,7 +2,9 @@ name: Production uptime
 
 on:
   schedule:
-    - cron: "3,18,33,48 * * * *"
+    # Availability check only. A 15-minute keep-warm schedule exhausts the
+    # included GitHub Actions minutes for private repositories.
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -10,6 +12,7 @@ permissions:
 
 jobs:
   smoke:
+    if: github.event_name == 'workflow_dispatch' || github.repository_owner == 'nicolaie2002'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

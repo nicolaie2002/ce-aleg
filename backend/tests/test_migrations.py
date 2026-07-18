@@ -10,7 +10,7 @@ from migration import assert_database_at_head, run_migrations, run_release
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "d3ca3c532cd6"
+HEAD_REVISION = "a84f5c6e9d21"
 
 
 def sqlite_url(database_path):

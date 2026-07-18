@@ -1,5 +1,5 @@
 services:
-  - type: redis
+  - type: keyvalue
     name: cealeg-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
@@ -10,7 +10,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5
+    startCommand: gunicorn 'app:create_application()' --bind 0.0.0.0:$PORT --worker-class gthread --workers 1 --threads 4 --timeout 60 --graceful-timeout 30 --keep-alive 5
     autoDeployTrigger: off
     healthCheckPath: /health
     envVars:
@@ -101,17 +101,20 @@ services:
       - key: CRON_SECRET
         sync: false
       - key: REDIS_URL
-        sync: false
-      - key: UPSTASH_REDIS_URL
-        sync: false
-      - key: UPSTASH_REDIS_TOKEN
-        sync: false
+        fromService:
+          type: keyvalue
+          name: cealeg-redis
+          property: connectionString
       - key: LOG_FORMAT
         value: json
       - key: LOG_LEVEL
         value: INFO
       - key: TERMS_VERSION
         value: "2026-07"
+      - key: CONSENT_POLICY_VERSION
+        value: "2026-07"
+      - key: CONSENT_RETENTION_DAYS
+        value: "1095"
       - key: SEARCH_RETENTION_DAYS
         value: "180"
       - key: ANALYTICS_RETENTION_DAYS

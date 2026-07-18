@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cealeg-frontend",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-07-18",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "global_fetch_strictly_public"
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "cealeg-frontend"
+    }
+  ],
+  "vars": {
+    "BACKEND_URL": "https://cealeg-api.onrender.com",
+    "NEXT_PUBLIC_API_URL": "/api/backend",
+    "NEXT_PUBLIC_SITE_URL": "https://www.cealeg.shop",
+    "NEXT_PUBLIC_APP_ENV": "production"
+  }
+}

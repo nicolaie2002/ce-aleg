@@ -356,7 +356,9 @@ def stable_identity_key(product_data):
     if not source_value:
         return ""
 
-    digest = hashlib.sha1(source_value.encode("utf-8")).hexdigest()[:18]
+    digest = hashlib.sha1(
+        source_value.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()[:18]
     return f"name:{digest}"
 
 
@@ -386,7 +388,9 @@ def existing_identity_sets():
         )
 
         if key_source:
-            digest = hashlib.sha1(key_source.encode("utf-8")).hexdigest()[:18]
+            digest = hashlib.sha1(
+                key_source.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()[:18]
             name_keys.add(f"name:{digest}")
 
     return barcodes, name_keys
@@ -508,9 +512,16 @@ def import_export(
                         continue
 
                     if not product_barcode:
-                        digest = identity_key.split(":", 1)[1] if ":" in identity_key else hashlib.sha1(
-                            json.dumps(raw_product, sort_keys=True, default=str).encode("utf-8")
-                        ).hexdigest()[:18]
+                        digest = (
+                            identity_key.split(":", 1)[1]
+                            if ":" in identity_key
+                            else hashlib.sha1(
+                                json.dumps(raw_product, sort_keys=True, default=str).encode(
+                                    "utf-8"
+                                ),
+                                usedforsecurity=False,
+                            ).hexdigest()[:18]
+                        )
                         product_data["barcode"] = f"off-name-{digest}"
 
                     if dry_run:

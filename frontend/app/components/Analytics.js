@@ -2,27 +2,18 @@
 
 import { useEffect, useRef, Suspense } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { usePostHog } from "@posthog/react";
-import { setPostHogInstance } from "../utils/analytics";
 import {
   ANALYTICS_CONSENT_EVENT,
+  ANALYTICS_READY_EVENT,
+  getPostHogInstance,
   hasAnalyticsConsent,
   isSensitiveAnalyticsPath,
 } from "../utils/analytics";
 
-const ANALYTICS_READY_EVENT = "cealeg:analytics-ready";
-
 function PageViewTracker() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const posthog = usePostHog();
   const lastTrackedPathRef = useRef("");
-
-  useEffect(() => {
-    if (posthog) {
-      setPostHogInstance(posthog);
-    }
-  }, [posthog]);
 
   useEffect(() => {
     function trackPageView() {
@@ -34,6 +25,7 @@ function PageViewTracker() {
       }
 
       const fullPath = pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : "");
+      const posthog = getPostHogInstance();
 
       if (posthog && lastTrackedPathRef.current !== fullPath) {
         posthog.capture("$pageview", {
@@ -52,7 +44,7 @@ function PageViewTracker() {
       window.removeEventListener(ANALYTICS_READY_EVENT, trackPageView);
       window.removeEventListener(ANALYTICS_CONSENT_EVENT, trackPageView);
     };
-  }, [pathname, searchParams, posthog]);
+  }, [pathname, searchParams]);
 
   return null;
 }
@@ -66,13 +58,5 @@ function PageViewTrackerWithSuspense() {
 }
 
 export function Analytics() {
-  const posthog = usePostHog();
-
-  useEffect(() => {
-    if (posthog) {
-      setPostHogInstance(posthog);
-    }
-  }, [posthog]);
-
   return <PageViewTrackerWithSuspense />;
 }

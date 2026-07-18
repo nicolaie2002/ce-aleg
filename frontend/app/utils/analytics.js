@@ -1,5 +1,8 @@
+import { readStoredConsent } from "./consent";
+
 export const ANALYTICS_CONSENT_KEY = "cealeg_analytics_consent";
 export const ANALYTICS_CONSENT_EVENT = "cealeg:analytics-consent";
+export const ANALYTICS_READY_EVENT = "cealeg:analytics-ready";
 
 const META_STANDARD_EVENTS = {
   barcode_lookup: "Search",
@@ -71,6 +74,8 @@ function normalizeMetadataKey(key) {
 
 export function hasAnalyticsConsent() {
   if (typeof window === "undefined") return false;
+  const granularConsent = readStoredConsent();
+  if (granularConsent) return granularConsent.analytics;
   return window.localStorage?.getItem(ANALYTICS_CONSENT_KEY) === "accepted";
 }
 
@@ -98,6 +103,10 @@ let posthogInstance = null;
 
 export function setPostHogInstance(instance) {
   posthogInstance = instance;
+}
+
+export function getPostHogInstance() {
+  return posthogInstance;
 }
 
 export function trackEvent(name, metadata = {}) {

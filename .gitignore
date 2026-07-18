@@ -10,6 +10,7 @@ __pycache__/
 .mypy_cache/
 .coverage
 coverage.xml
+coverage-current.json
 venv/
 backend/venv/
 backend/libretranslate-venv/
@@ -25,6 +26,7 @@ frontend/out/
 frontend/instance/
 frontend/uploads/
 frontend/.next-codex-*.log
+frontend/.lighthouseci/
 frontend/.open-next/
 frontend/.wrangler/
 frontend/.dev.vars

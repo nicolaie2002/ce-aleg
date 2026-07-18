@@ -6,9 +6,13 @@ import {
 } from "../app/utils/authStorage";
 import {
   ANALYTICS_CONSENT_KEY,
+  getPostHogInstance,
+  hasAnalyticsConsent,
   isSensitiveAnalyticsPath,
+  setPostHogInstance,
   trackEvent,
 } from "../app/utils/analytics";
+import { CONSENT_STORAGE_KEY, createConsentState } from "../app/utils/consent";
 
 let locale = "en";
 
@@ -93,6 +97,7 @@ describe("privacy-aware analytics", () => {
   });
 
   afterEach(() => {
+    setPostHogInstance(null);
     delete window.gtag;
     delete window.fbq;
     delete window.ttq;
@@ -147,6 +152,28 @@ describe("privacy-aware analytics", () => {
         keepalive: true,
       })
     );
+  });
+
+  it("uses granular consent and routes custom events through PostHog and Meta safely", () => {
+    const posthog = { capture: jest.fn() };
+    setPostHogInstance(posthog);
+    expect(getPostHogInstance()).toBe(posthog);
+    localStorage.setItem(
+      CONSENT_STORAGE_KEY,
+      JSON.stringify(createConsentState({ analytics: true, marketing: false }))
+    );
+
+    expect(hasAnalyticsConsent()).toBe(true);
+    trackEvent("custom event", {
+      topic: "catalog",
+      password: "never-send-this",
+    });
+    trackEvent("", { topic: "ignored" });
+
+    const safeMetadata = { topic: "catalog" };
+    expect(posthog.capture).toHaveBeenCalledWith("custom_event", safeMetadata);
+    expect(window.fbq).toHaveBeenCalledWith("trackCustom", "custom_event", safeMetadata);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });
 

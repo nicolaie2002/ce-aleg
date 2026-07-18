@@ -1,4 +1,4 @@
-﻿from flask import Flask, request, jsonify, send_from_directory, g
+from flask import Flask, current_app, request, jsonify, send_from_directory, g
 from flask import Response, has_request_context
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -58,7 +58,7 @@ from api_docs import build_openapi_spec, render_swagger_ui
 from catalog_quality import build_catalog_quality_report
 from config import DEFAULT_AUTH_SECRET, RuntimeConfig, read_secret_env
 from time_utils import utcnow
-from routes import register_blueprints, route
+from routes import get_route_access_policy, register_blueprints, route
 from validation import validate_payload
 from models import (
     User,
@@ -480,6 +480,8 @@ RETENTION_UNVERIFIED_ACCOUNT_DAYS = max(
 )
 RETENTION_SCAN_FILE_HOURS = max(1, int(os.environ.get("RETENTION_SCAN_FILE_HOURS", "48")))
 TERMS_VERSION = os.environ.get("TERMS_VERSION", "2026-07").strip() or "2026-07"
+CONSENT_POLICY_VERSION = os.environ.get("CONSENT_POLICY_VERSION", "2026-07").strip() or "2026-07"
+CONSENT_RETENTION_DAYS = max(365, int(os.environ.get("CONSENT_RETENTION_DAYS", "1095")))
 SEARCH_RETENTION_DAYS = max(30, int(os.environ.get("SEARCH_RETENTION_DAYS", "180")))
 ANALYTICS_RETENTION_DAYS = max(30, int(os.environ.get("ANALYTICS_RETENTION_DAYS", "365")))
 SCAN_FILE_RETENTION_DAYS = max(1, int(os.environ.get("SCAN_FILE_RETENTION_DAYS", "30")))
@@ -751,26 +753,26 @@ MISSION_CATALOG = build_mission_catalog()
 
 
 def get_auth_serializer():
-    return URLSafeTimedSerializer(app.config["AUTH_SECRET"], salt="cealeg-auth")
+    return URLSafeTimedSerializer(current_app.config["AUTH_SECRET"], salt="cealeg-auth")
 
 
 def get_password_reset_serializer():
     return URLSafeTimedSerializer(
-        app.config["AUTH_SECRET"],
+        current_app.config["AUTH_SECRET"],
         salt="cealeg-password-reset",
     )
 
 
 def get_email_verification_serializer():
     return URLSafeTimedSerializer(
-        app.config["AUTH_SECRET"],
+        current_app.config["AUTH_SECRET"],
         salt="cealeg-email-verification",
     )
 
 
 def get_account_deletion_serializer():
     return URLSafeTimedSerializer(
-        app.config["AUTH_SECRET"],
+        current_app.config["AUTH_SECRET"],
         salt="cealeg-account-deletion",
     )
 
@@ -2138,6 +2140,10 @@ def delete_account_data(user):
     FamilyProfile.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     UsageEvent.query.filter_by(user_id=user_id).delete(synchronize_session=False)
     ConsentRecord.query.filter_by(user_id=user_id).delete(synchronize_session=False)
+    ConsentLog.query.filter_by(user_id=user_id).update(
+        {ConsentLog.user_id: None},
+        synchronize_session=False,
+    )
     User.query.filter_by(referred_by_user_id=user_id).update(
         {User.referred_by_user_id: None},
         synchronize_session=False,
@@ -2596,11 +2602,40 @@ def distributed_cache_set(namespace, key, value, ttl_seconds):
         return False
 
 
+def distributed_cache_delete_namespace(namespace):
+    client = get_redis_client()
+
+    if client is None:
+        return 0
+
+    try:
+        keys = list(client.scan_iter(match=f"cealeg:cache:{namespace}:*", count=100))
+        if not keys:
+            return 0
+        return int(client.delete(*keys) or 0)
+    except Exception as error:
+        CACHE_METRICS["errors"] += 1
+        app.logger.warning("Redis cache invalidation failed for %s: %s", namespace, error)
+        return 0
+
+
+def remember_rate_limit(limit, current_count, reset_after_seconds):
+    if not has_request_context():
+        return
+
+    safe_limit = max(1, int(limit))
+    g.rate_limit_info = {
+        "limit": safe_limit,
+        "remaining": max(0, safe_limit - int(current_count)),
+        "reset_after": max(1, int(math.ceil(reset_after_seconds))),
+    }
+
+
 def rate_limit(scope, limit, window_seconds, identity_value=None):
     remote_address = str(identity_value or request.remote_addr or "unknown")
     now = time.time()
     identity = hmac.new(
-        app.config["AUTH_SECRET"].encode("utf-8"),
+        current_app.config["AUTH_SECRET"].encode("utf-8"),
         remote_address.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()[:24]
@@ -2616,6 +2651,11 @@ def rate_limit(scope, limit, window_seconds, identity_value=None):
             pipeline.incr(redis_key)
             pipeline.expire(redis_key, window + 2)
             current_count, _ = pipeline.execute()
+            remember_rate_limit(
+                limit,
+                current_count,
+                window - (now % window),
+            )
             return int(current_count) <= int(limit)
         except Exception as error:
             app.logger.warning("Redis rate limiter unavailable; using local fallback: %s", error)
@@ -2629,9 +2669,19 @@ def rate_limit(scope, limit, window_seconds, identity_value=None):
             bucket.popleft()
 
         if len(bucket) >= limit:
+            remember_rate_limit(
+                limit,
+                len(bucket),
+                window_seconds - (now - bucket[0]),
+            )
             return False
 
         bucket.append(now)
+        remember_rate_limit(
+            limit,
+            len(bucket),
+            window_seconds - (now - bucket[0]),
+        )
         return True
 
 
@@ -2729,14 +2779,19 @@ def origin_looks_local(origin):
     except ValueError:
         return True
 
-    return hostname in {"localhost", "127.0.0.1", "0.0.0.0"} or hostname.startswith("192.168.")
+    any_ipv4_interface = ".".join(("0", "0", "0", "0"))
+    return hostname in {
+        "localhost",
+        "127.0.0.1",
+        any_ipv4_interface,
+    } or hostname.startswith("192.168.")
 
 
 def get_publication_readiness():
     blockers = []
     warnings = []
 
-    auth_secret = app.config["AUTH_SECRET"]
+    auth_secret = current_app.config["AUTH_SECRET"]
     cookie_secure = env_flag("COOKIE_SECURE", False)
     flask_debug = env_flag("FLASK_DEBUG", False)
     payment_provider = PAYMENT_PROVIDER
@@ -2965,7 +3020,7 @@ def build_stripe_idempotency_key(scope, user_id, *parts, window_seconds=120):
         operation_marker,
     ])
     digest = hmac.new(
-        app.config["AUTH_SECRET"].encode("utf-8"),
+        current_app.config["AUTH_SECRET"].encode("utf-8"),
         raw_value.encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
@@ -4155,6 +4210,7 @@ def calculate_bulk_user_coins(user_ids, metrics_by_user=None):
 
 def clear_leaderboard_cache():
     LEADERBOARD_CACHE.clear()
+    distributed_cache_delete_namespace("leaderboard")
 
 
 def empty_leaderboard(current_user_id=None, metrics=None, coins=0):
@@ -4544,9 +4600,12 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
     safe_limit = max(1, min(limit, 25))
     since_key = since.isoformat() if since else "all_time"
     cache_key = (safe_limit, since_key)
+    distributed_rows = distributed_cache_get("leaderboard", cache_key)
     cached = LEADERBOARD_CACHE.get(cache_key)
 
-    if cached and time.time() - cached["created_at"] < LEADERBOARD_CACHE_TTL:
+    if isinstance(distributed_rows, list):
+        rows = [dict(row) for row in distributed_rows]
+    elif cached and time.time() - cached["created_at"] < LEADERBOARD_CACHE_TTL:
         rows = [dict(row) for row in cached["rows"]]
     else:
         users = User.query.order_by(User.created_at.asc()).all()
@@ -4599,6 +4658,12 @@ def build_user_leaderboard(current_user_id=None, limit=10, since=None):
             "created_at": time.time(),
             "rows": [dict(row) for row in rows],
         }
+        distributed_cache_set(
+            "leaderboard",
+            cache_key,
+            rows,
+            LEADERBOARD_CACHE_TTL,
+        )
 
     for row in rows:
         row["isCurrentUser"] = row["userId"] == current_user_id
@@ -4831,6 +4896,15 @@ def enforce_access_controls():
     if endpoint == "health":
         return None
 
+    access_policy = get_route_access_policy(endpoint)
+
+    if access_policy is None:
+        app.logger.critical("Route %s has no explicit access policy", endpoint)
+        return jsonify({
+            "error": "Ruta nu are o politică de acces configurată.",
+            "code": "route_policy_missing",
+        }), 503
+
     if not rate_limit("global", GLOBAL_RATE_LIMIT, GLOBAL_RATE_LIMIT_WINDOW):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
@@ -4870,7 +4944,7 @@ def enforce_access_controls():
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
 
-    if endpoint in {"contact_support", "track_analytics_event", "report_alternative_issue", "report_product_issue"} and not rate_limit(
+    if endpoint in {"contact_support", "log_consent", "track_analytics_event", "report_alternative_issue", "report_product_issue"} and not rate_limit(
         endpoint, 20, 60
     ):
         return jsonify({"error": "Prea multe cereri. Reîncearcă în câteva secunde."}), 429
@@ -4892,11 +4966,7 @@ def enforce_access_controls():
             "code": "rate_limit_exceeded",
         }), 429
 
-    needs_auth = (
-        endpoint in AUTH_ENDPOINTS
-        or endpoint in ADMIN_ENDPOINTS
-        or endpoint in USER_PATH_ENDPOINTS
-    )
+    needs_auth = access_policy in {"authenticated", "admin"}
 
     if not needs_auth:
         return validate_endpoint_input(endpoint)
@@ -4925,7 +4995,7 @@ def enforce_access_controls():
         user.processing_restricted
         and request.method in {"POST", "PUT", "PATCH", "DELETE"}
         and endpoint not in restriction_exceptions
-        and endpoint not in ADMIN_ENDPOINTS
+        and access_policy != "admin"
     ):
         return jsonify({
             "error": "Prelucrarea datelor acestui cont este restricționată.",
@@ -4938,7 +5008,7 @@ def enforce_access_controls():
             "code": "processing_restricted",
         }), 423
 
-    if endpoint in ADMIN_ENDPOINTS and not user.is_admin:
+    if access_policy == "admin" and not user.is_admin:
         return jsonify({"error": "Acces rezervat administratorului.", "code": "admin_required"}), 403
 
     if endpoint in USER_PATH_ENDPOINTS:
@@ -4972,10 +5042,9 @@ def enforce_access_controls():
 @app.after_request
 def add_security_headers(response):
     endpoint = endpoint_name(request.endpoint)
+    access_policy = get_route_access_policy(endpoint)
     is_sensitive_response = (
-        endpoint in AUTH_ENDPOINTS
-        or endpoint in ADMIN_ENDPOINTS
-        or endpoint in USER_PATH_ENDPOINTS
+        access_policy in {"authenticated", "admin", "signed-webhook", "internal-secret"}
         or endpoint
         in {
             "login",
@@ -5019,6 +5088,17 @@ def add_security_headers(response):
     if request_started_at is not None:
         duration_ms = max(0, (time.perf_counter() - request_started_at) * 1000)
         response.headers.setdefault("Server-Timing", f"app;dur={duration_ms:.1f}")
+
+    rate_limit_info = getattr(g, "rate_limit_info", None)
+    if isinstance(rate_limit_info, dict):
+        response.headers.setdefault("X-RateLimit-Limit", str(rate_limit_info["limit"]))
+        response.headers.setdefault("X-RateLimit-Remaining", str(rate_limit_info["remaining"]))
+        response.headers.setdefault(
+            "X-RateLimit-Reset",
+            str(int(time.time()) + rate_limit_info["reset_after"]),
+        )
+        if response.status_code == 429:
+            response.headers.setdefault("Retry-After", str(rate_limit_info["reset_after"]))
 
     if is_sensitive_response:
         response.headers["Cache-Control"] = "no-store, max-age=0"
@@ -5073,7 +5153,7 @@ def handle_method_not_allowed(_error):
 @app.errorhandler(500)
 def handle_internal_server_error(error):
     request_id = getattr(g, "request_id", uuid4().hex)
-    app.logger.error(
+    current_app.logger.error(
         "Unhandled server error. request_id=%s endpoint=%s",
         request_id,
         request.endpoint,
@@ -5452,6 +5532,7 @@ REQUEST_VALIDATOR_RULES = {
     "start_cecoin_checkout": ("cecoin_checkout", "json"),
     "sync_cecoin_checkout_session": ("checkout_sync", "json"),
     "track_analytics_event": ("analytics", "json"),
+    "log_consent": ("consent_log", "json"),
     "contact_support": ("support", "json"),
     "report_alternative_issue": ("alternative_feedback", "json"),
     "report_product_issue": ("product_feedback", "json"),
@@ -5490,7 +5571,7 @@ def validate_endpoint_input(endpoint):
     return None
 
 
-@route("/analytics/event", methods=["POST"])
+@route("/analytics/event", methods=["POST"], access="public")
 def track_analytics_event():
     data = request.get_json(silent=True) or {}
     event_name = str(data.get("name") or "").strip().lower().replace(" ", "_")
@@ -5521,7 +5602,7 @@ def track_analytics_event():
     return jsonify({"ok": True})
 
 
-@route("/feedback/alternative", methods=["POST"])
+@route("/feedback/alternative", methods=["POST"], access="authenticated")
 def report_alternative_issue():
     user = g.current_user
     data = request.get_json(silent=True) or {}
@@ -5602,7 +5683,7 @@ PRODUCT_REPORT_REASONS = {
 }
 
 
-@route("/feedback/product", methods=["POST"])
+@route("/feedback/product", methods=["POST"], access="authenticated")
 def report_product_issue():
     user = g.current_user
     data = request.get_json(silent=True) or {}
@@ -5669,7 +5750,7 @@ def report_product_issue():
     })
 
 
-@route("/support/contact", methods=["POST"])
+@route("/support/contact", methods=["POST"], access="public")
 def contact_support():
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
@@ -7697,7 +7778,7 @@ def ensure_invite_codes_for_existing_users():
 # Main routes
 # =========================
 
-@route("/", methods=["GET"])
+@route("/", methods=["GET"], access="public")
 def home():
     return jsonify({
         "message": "Backend Ce Aleg funcționează.",
@@ -7705,7 +7786,7 @@ def home():
     })
 
 
-@route("/health", methods=["GET"])
+@route("/health", methods=["GET"], access="public")
 def health():
     return jsonify({
         "ok": True,
@@ -7713,7 +7794,7 @@ def health():
     })
 
 
-@route("/version", methods=["GET"])
+@route("/version", methods=["GET"], access="public")
 def get_version():
     return jsonify({
         "ok": True,
@@ -7740,8 +7821,8 @@ def flask_rule_to_openapi(rule):
     return path, parameters
 
 
-@route("/openapi.json", methods=["GET"])
-@route("/api/openapi.json", methods=["GET"])
+@route("/openapi.json", methods=["GET"], access="public")
+@route("/api/openapi.json", methods=["GET"], access="public")
 def get_openapi_spec():
     version = get_application_version()["shortCommit"]
     document = build_openapi_spec(
@@ -7759,7 +7840,7 @@ def get_openapi_spec():
         if isinstance(operation, dict) and operation.get("operationId")
     }
 
-    for rule in app.url_map.iter_rules():
+    for rule in current_app.url_map.iter_rules():
         if rule.endpoint == "static":
             continue
 
@@ -7829,8 +7910,8 @@ def get_openapi_spec():
     return jsonify(document)
 
 
-@route("/docs", methods=["GET"])
-@route("/api/docs", methods=["GET"])
+@route("/docs", methods=["GET"], access="public")
+@route("/api/docs", methods=["GET"], access="public")
 def api_docs():
     spec_url = "/api/openapi.json" if request.path.startswith("/api/") else "/openapi.json"
     return Response(
@@ -7839,12 +7920,12 @@ def api_docs():
     )
 
 
-@route("/readiness", methods=["GET"])
+@route("/readiness", methods=["GET"], access="admin")
 def get_readiness():
     return jsonify(get_publication_readiness())
 
 
-@route("/admin/email-test", methods=["POST"])
+@route("/admin/email-test", methods=["POST"], access="admin")
 def send_admin_email_test():
     data = request.get_json(silent=True) or {}
     diagnostics = get_email_configuration_diagnostics()
@@ -7940,7 +8021,7 @@ def send_admin_email_test():
     })
 
 
-@route("/admin/users/resend-verification", methods=["POST"])
+@route("/admin/users/resend-verification", methods=["POST"], access="admin")
 def admin_resend_email_verification():
     data = request.get_json(silent=True) or {}
     email = str(data.get("email") or "").strip().lower()
@@ -8013,9 +8094,13 @@ def admin_resend_email_verification():
     })
 
 
-@route("/ai/status", methods=["GET"])
+@route("/ai/status", methods=["GET"], access="public")
 def get_ai_status():
     now = time.time()
+    distributed_status = distributed_cache_get("ai-status", "public-v1")
+
+    if isinstance(distributed_status, dict):
+        return jsonify(distributed_status)
 
     if (
         AI_STATUS_CACHE["data"]
@@ -8063,11 +8148,21 @@ def get_ai_status():
     }
     AI_STATUS_CACHE["created_at"] = now
     AI_STATUS_CACHE["data"] = status_data
+    distributed_cache_set("ai-status", "public-v1", status_data, AI_STATUS_CACHE_TTL)
     return jsonify(status_data)
 
 
-@route("/init-db", methods=["GET"])
+@route("/init-db", methods=["GET"], access="admin")
 def init_db():
+    runtime_config = current_app.extensions.get(
+        "cealeg_runtime_config", RUNTIME_CONFIG
+    )
+    if runtime_config.production_mode:
+        return jsonify({
+            "error": "Schema de producție se actualizează numai prin migrarea de release.",
+            "code": "release_migration_required",
+        }), 409
+
     db.create_all()
     ensure_database_columns()
     ensure_database_indexes()
@@ -8082,7 +8177,7 @@ def init_db():
 # Auth
 # =========================
 
-@route("/register", methods=["POST"])
+@route("/register", methods=["POST"], access="public")
 def register():
     data = request.get_json(silent=True) or {}
 
@@ -8165,7 +8260,7 @@ def register():
     return response, 201
 
 
-@route("/auth/verify-email", methods=["POST"])
+@route("/auth/verify-email", methods=["POST"], access="public")
 def verify_email():
     data = request.get_json(silent=True) or {}
     token = data.get("token", "").strip()
@@ -8203,7 +8298,7 @@ def verify_email():
     return set_auth_cookie(response, user)
 
 
-@route("/auth/resend-verification", methods=["POST"])
+@route("/auth/resend-verification", methods=["POST"], access="public")
 def resend_email_verification():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
@@ -8234,7 +8329,7 @@ def resend_email_verification():
     return jsonify(response)
 
 
-@route("/login", methods=["POST"])
+@route("/login", methods=["POST"], access="public")
 def login():
     data = request.get_json(silent=True) or {}
 
@@ -8261,14 +8356,14 @@ def login():
     })
 
 
-@route("/auth/password-strength", methods=["POST"])
+@route("/auth/password-strength", methods=["POST"], access="public")
 def get_password_strength():
     data = request.get_json(silent=True) or {}
     password = data.get("password", "")
     return jsonify(validate_password_strength(password))
 
 
-@route("/forgot-password", methods=["POST"])
+@route("/forgot-password", methods=["POST"], access="public")
 def forgot_password():
     data = request.get_json(silent=True) or {}
     email = data.get("email", "").strip().lower()
@@ -8299,7 +8394,7 @@ def forgot_password():
     return jsonify(response)
 
 
-@route("/reset-password", methods=["POST"])
+@route("/reset-password", methods=["POST"], access="public")
 def reset_password():
     data = request.get_json(silent=True) or {}
     token = data.get("token", "").strip()
@@ -8335,7 +8430,7 @@ def reset_password():
     return set_auth_cookie(response, user)
 
 
-@route("/account/delete/request", methods=["POST"])
+@route("/account/delete/request", methods=["POST"], access="authenticated")
 def request_account_deletion():
     user = g.current_user
     sent, deletion_url = send_account_deletion_email(user)
@@ -8362,7 +8457,7 @@ def request_account_deletion():
     return jsonify(response)
 
 
-@route("/account/privacy", methods=["GET"])
+@route("/account/privacy", methods=["GET"], access="authenticated")
 def get_account_privacy():
     user = g.current_user
     return jsonify({
@@ -8376,7 +8471,7 @@ def get_account_privacy():
     })
 
 
-@route("/account/consent", methods=["POST"])
+@route("/account/consent", methods=["POST"], access="authenticated")
 def update_account_consent():
     data = request.get_json(silent=True) or {}
 
@@ -8400,7 +8495,7 @@ def update_account_consent():
     })
 
 
-@route("/account/delete/confirm", methods=["POST"])
+@route("/account/delete/confirm", methods=["POST"], access="public")
 def confirm_account_deletion():
     data = request.get_json(silent=True) or {}
     token = data.get("token", "").strip()
@@ -8434,7 +8529,7 @@ def confirm_account_deletion():
     return response
 
 
-@route("/auth/me", methods=["GET"])
+@route("/auth/me", methods=["GET"], access="authenticated")
 def get_authenticated_user():
     user = get_current_user()
 
@@ -8525,10 +8620,18 @@ def build_account_export(user):
             }
             for item in ConsentRecord.query.filter_by(user_id=user.id).all()
         ],
+        "cookieConsents": [
+            {
+                "categories": item.categories,
+                "policyVersion": item.version,
+                "createdAt": item.created_at.isoformat() + "Z",
+            }
+            for item in ConsentLog.query.filter_by(user_id=user.id).all()
+        ],
     }
 
 
-@route("/account/data", methods=["GET"])
+@route("/account/data", methods=["GET"], access="authenticated")
 def get_account_data():
     payload = build_account_export(g.current_user)
     return jsonify({
@@ -8543,8 +8646,8 @@ def get_account_data():
     })
 
 
-@route("/account/export", methods=["GET"])
-@route("/account/data-export", methods=["GET"])
+@route("/account/export", methods=["GET"], access="authenticated")
+@route("/account/data-export", methods=["GET"], access="authenticated")
 def export_account_data():
     payload = build_account_export(g.current_user)
     return Response(
@@ -8558,7 +8661,7 @@ def export_account_data():
     )
 
 
-@route("/account/restriction", methods=["POST"])
+@route("/account/restriction", methods=["POST"], access="authenticated")
 def update_processing_restriction():
     data = request.get_json(silent=True) or {}
     restricted = data.get("restricted", True)
@@ -8592,7 +8695,7 @@ def update_processing_restriction():
     })
 
 
-@route("/privacy/consent", methods=["POST"])
+@route("/privacy/consent", methods=["POST"], access="authenticated")
 def record_privacy_consent():
     data = request.get_json(silent=True) or {}
     consent_type = str(data.get("type") or "").strip().lower()
@@ -8604,7 +8707,7 @@ def record_privacy_consent():
 
     policy_version = str(data.get("policyVersion") or "2026-07").strip()[:40]
     identity_hash = hmac.new(
-        app.config["AUTH_SECRET"].encode("utf-8"),
+        current_app.config["AUTH_SECRET"].encode("utf-8"),
         (request.remote_addr or "unknown").encode("utf-8"),
         hashlib.sha256,
     ).hexdigest()
@@ -8621,7 +8724,40 @@ def record_privacy_consent():
     return jsonify({"recorded": True, "consentId": record.id}), 201
 
 
-@route("/logout", methods=["POST"])
+@route("/consent/log", methods=["POST"], access="public")
+def log_consent():
+    data = g.validated_data
+
+    def consent_identifier_hash(purpose, value):
+        normalized = str(value or "anonymous")[:512]
+        return hmac.new(
+            current_app.config["AUTH_SECRET"].encode("utf-8"),
+            f"consent:{purpose}:{normalized}".encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+    client_session_id = request.headers.get("X-Session-ID", "anonymous")
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,128}", client_session_id):
+        client_session_id = "anonymous"
+
+    user = get_current_user()
+
+    log = ConsentLog(
+        user_id=user.id if user else None,
+        session_id=consent_identifier_hash("session", client_session_id),
+        categories=data["categories"],
+        version=data["version"] or CONSENT_POLICY_VERSION,
+        ip=consent_identifier_hash("network", request.remote_addr),
+        user_agent=consent_identifier_hash(
+            "agent", request.headers.get("User-Agent", "unknown")
+        ),
+    )
+    db.session.add(log)
+    db.session.commit()
+    return jsonify({"logged": True, "id": log.id}), 201
+
+
+@route("/logout", methods=["POST"], access="authenticated")
 def logout():
     response = jsonify({"message": "Deconectare reusita."})
     response.delete_cookie(AUTH_COOKIE_NAME, path="/")
@@ -8640,7 +8776,7 @@ def persist_login_session(response):
 
     return response
 
-@route("/users", methods=["GET"])
+@route("/users", methods=["GET"], access="admin")
 def get_users():
     users = User.query.all()
 
@@ -8659,7 +8795,7 @@ def get_users():
     ])
 
 
-@route("/billing/status", methods=["GET"])
+@route("/billing/status", methods=["GET"], access="authenticated")
 def get_billing_status():
     user = g.current_user
     if request.args.get("sync") == "stripe":
@@ -8675,7 +8811,7 @@ def get_billing_status():
     })
 
 
-@route("/dashboard/summary", methods=["GET"])
+@route("/dashboard/summary", methods=["GET"], access="authenticated")
 def get_dashboard_summary():
     user = g.current_user
     requested_profile_id = get_requested_family_profile_id()
@@ -8706,7 +8842,7 @@ def get_dashboard_summary():
     })
 
 
-@route("/family/profiles", methods=["GET"])
+@route("/family/profiles", methods=["GET"], access="authenticated")
 def get_family_profiles():
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8724,7 +8860,7 @@ def get_family_profiles():
     })
 
 
-@route("/family/profiles", methods=["POST"])
+@route("/family/profiles", methods=["POST"], access="authenticated")
 def create_family_profile():
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8761,7 +8897,7 @@ def create_family_profile():
     return jsonify({"profile": family_profile_to_dict(profile)}), 201
 
 
-@route("/family/profiles/<int:profile_id>", methods=["PATCH"])
+@route("/family/profiles/<int:profile_id>", methods=["PATCH"], access="authenticated")
 def update_family_profile(profile_id):
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8793,7 +8929,7 @@ def update_family_profile(profile_id):
     return jsonify({"profile": family_profile_to_dict(profile)})
 
 
-@route("/family/profiles/<int:profile_id>", methods=["DELETE"])
+@route("/family/profiles/<int:profile_id>", methods=["DELETE"], access="authenticated")
 def delete_family_profile(profile_id):
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -8821,7 +8957,7 @@ def delete_family_profile(profile_id):
     return jsonify({"deleted": True})
 
 
-@route("/billing/checkout", methods=["POST"])
+@route("/billing/checkout", methods=["POST"], access="authenticated")
 def start_checkout():
     data = request.get_json(silent=True) or {}
     plan = str(data.get("plan") or "pro").strip().lower()
@@ -8981,7 +9117,7 @@ def start_checkout():
     })
 
 
-@route("/billing/portal", methods=["POST"])
+@route("/billing/portal", methods=["POST"], access="authenticated")
 def start_billing_portal():
     user = g.current_user
     subscription = get_or_create_subscription(user)
@@ -9032,7 +9168,7 @@ def start_billing_portal():
     return jsonify({"portalUrl": portal_session.url})
 
 
-@route("/billing/stripe/webhook", methods=["POST"])
+@route("/billing/stripe/webhook", methods=["POST"], access="signed-webhook")
 def stripe_webhook():
     if stripe is None:
         return jsonify({"error": "Stripe SDK nu este instalat."}), 503
@@ -9168,12 +9304,12 @@ def stripe_webhook():
 # Gamification
 # =========================
 
-@route("/gamification/coin-packs", methods=["GET"])
+@route("/gamification/coin-packs", methods=["GET"], access="public")
 def get_cecoin_packs():
     return jsonify({"coinPacks": get_public_cecoin_packs()})
 
 
-@route("/gamification/summary", methods=["GET"])
+@route("/gamification/summary", methods=["GET"], access="authenticated")
 def get_gamification_summary():
     try:
         include_leaderboard = request.args.get("leaderboard") == "1"
@@ -9189,7 +9325,7 @@ def get_gamification_summary():
         }), 500
 
 
-@route("/gamification/leaderboard", methods=["GET"])
+@route("/gamification/leaderboard", methods=["GET"], access="authenticated")
 def get_gamification_leaderboard():
     try:
         period = str(request.args.get("period") or "weekly").strip().lower()
@@ -9209,7 +9345,7 @@ def get_gamification_leaderboard():
         }), 500
 
 
-@route("/gamification/claim", methods=["POST"])
+@route("/gamification/claim", methods=["POST"], access="authenticated")
 def claim_gamification_mission():
     data = request.get_json(silent=True) or {}
     mission_id = str(data.get("missionId") or "").strip()
@@ -9303,7 +9439,7 @@ def claim_gamification_mission():
     })
 
 
-@route("/gamification/redeem", methods=["POST"])
+@route("/gamification/redeem", methods=["POST"], access="authenticated")
 def redeem_cecoin_reward():
     data = request.get_json(silent=True) or {}
     item_id = str(data.get("itemId") or "").strip()
@@ -9371,7 +9507,7 @@ def redeem_cecoin_reward():
     })
 
 
-@route("/gamification/coin-checkout", methods=["POST"])
+@route("/gamification/coin-checkout", methods=["POST"], access="authenticated")
 def start_cecoin_checkout():
     data = request.get_json(silent=True) or {}
     pack = get_cecoin_pack(data.get("packId"))
@@ -9495,7 +9631,7 @@ def start_cecoin_checkout():
     })
 
 
-@route("/gamification/coin-checkout/sync", methods=["POST"])
+@route("/gamification/coin-checkout/sync", methods=["POST"], access="authenticated")
 def sync_cecoin_checkout_session():
     data = request.get_json(silent=True) or {}
     session_id = str(data.get("sessionId") or "").strip()
@@ -9778,14 +9914,25 @@ def build_public_catalog_romania_stats():
     }
 
 
-@route("/catalog/romania/stats", methods=["GET"])
+@route("/catalog/romania/stats", methods=["GET"], access="public")
 def get_public_catalog_romania_stats():
+    distributed_stats = distributed_cache_get("catalog-stats", "public-v1")
+
+    if isinstance(distributed_stats, dict):
+        return jsonify(distributed_stats)
+
     if public_catalog_stats_cache_is_fresh():
         return jsonify(PUBLIC_CATALOG_STATS_CACHE["data"])
 
     data = build_public_catalog_romania_stats()
     PUBLIC_CATALOG_STATS_CACHE["data"] = data
     PUBLIC_CATALOG_STATS_CACHE["expires_at"] = time.time() + PUBLIC_CATALOG_STATS_CACHE_TTL
+    distributed_cache_set(
+        "catalog-stats",
+        "public-v1",
+        data,
+        PUBLIC_CATALOG_STATS_CACHE_TTL,
+    )
     return jsonify(data)
 
 
@@ -9900,7 +10047,7 @@ def recategorize_catalog_products(
     }
 
 
-@route("/admin/monitoring", methods=["GET"])
+@route("/admin/monitoring", methods=["GET"], access="admin")
 def get_admin_monitoring():
     days = request.args.get("days", default=7, type=int)
     limit = request.args.get("limit", default=16, type=int)
@@ -10098,7 +10245,7 @@ def get_admin_monitoring():
     })
 
 
-@route("/admin/export/search-misses.csv", methods=["GET"])
+@route("/admin/export/search-misses.csv", methods=["GET"], access="admin")
 def export_admin_search_misses():
     days = request.args.get("days", default=30, type=int)
     safe_days = max(1, min(days or 30, 180))
@@ -10140,7 +10287,7 @@ def export_admin_search_misses():
     )
 
 
-@route("/admin/export/alternative-reports.csv", methods=["GET"])
+@route("/admin/export/alternative-reports.csv", methods=["GET"], access="admin")
 def export_admin_alternative_reports():
     days = request.args.get("days", default=30, type=int)
     safe_days = max(1, min(days or 30, 180))
@@ -10187,7 +10334,7 @@ def export_admin_alternative_reports():
     )
 
 
-@route("/admin/export/payment-events.csv", methods=["GET"])
+@route("/admin/export/payment-events.csv", methods=["GET"], access="admin")
 def export_admin_payment_events():
     days = request.args.get("days", default=30, type=int)
     safe_days = max(1, min(days or 30, 180))
@@ -10239,7 +10386,7 @@ def export_admin_payment_events():
     )
 
 
-@route("/admin/overview", methods=["GET"])
+@route("/admin/overview", methods=["GET"], access="admin")
 def get_admin_overview():
     return jsonify({
         "users": User.query.count(),
@@ -10258,7 +10405,7 @@ def get_admin_overview():
     })
 
 
-@route("/admin/submissions", methods=["GET"])
+@route("/admin/submissions", methods=["GET"], access="admin")
 def get_admin_submissions():
     submissions = ProductSubmission.query.order_by(
         ProductSubmission.created_at.desc()
@@ -10266,7 +10413,7 @@ def get_admin_submissions():
     return jsonify([product_submission_to_dict(item) for item in submissions])
 
 
-@route("/admin/search-misses", methods=["GET"])
+@route("/admin/search-misses", methods=["GET"], access="admin")
 def get_admin_search_misses():
     days = request.args.get("days", default=30, type=int)
     limit = request.args.get("limit", default=50, type=int)
@@ -10319,7 +10466,7 @@ def parse_admin_optional_float(data, key, label):
         return None, f"{label} trebuie sa fie numar valid.", True
 
 
-@route("/admin/products/search", methods=["GET"])
+@route("/admin/products/search", methods=["GET"], access="admin")
 def search_admin_products():
     query_text = str(request.args.get("q", "") or "").strip()
     limit = request.args.get("limit", default=20, type=int)
@@ -10364,7 +10511,7 @@ def search_admin_products():
     return jsonify([product_to_dict(product) for product in products])
 
 
-@route("/admin/products/<int:product_id>", methods=["PATCH"])
+@route("/admin/products/<int:product_id>", methods=["PATCH"], access="admin")
 def update_admin_product(product_id):
     product = db.session.get(Product, product_id)
 
@@ -10539,14 +10686,14 @@ def update_admin_product(product_id):
     })
 
 
-@route("/admin/catalog/quality", methods=["GET"])
+@route("/admin/catalog/quality", methods=["GET"], access="admin")
 def get_admin_catalog_quality():
     report = get_catalog_quality_snapshot()
     report["generatedAt"] = utcnow().isoformat() + "Z"
     return jsonify(report)
 
 
-@route("/admin/catalog/recategorize", methods=["GET", "POST"])
+@route("/admin/catalog/recategorize", methods=["GET", "POST"], access="admin")
 def recategorize_admin_catalog():
     data = request.get_json(silent=True) or {}
     limit = request.args.get("limit", data.get("limit", 300), type=int)
@@ -10593,7 +10740,7 @@ def recategorize_admin_catalog():
     })
 
 
-@route("/admin/missions/digest", methods=["GET", "POST"])
+@route("/admin/missions/digest", methods=["GET", "POST"], access="admin")
 def send_admin_mission_digest():
     data = request.get_json(silent=True) or {}
     limit = request.args.get("limit", data.get("limit", 100), type=int)
@@ -10648,6 +10795,7 @@ def run_retention_cleanup(apply_changes=False):
     account_cutoff = now - timedelta(days=RETENTION_UNVERIFIED_ACCOUNT_DAYS)
     rejected_submission_cutoff = now - timedelta(days=REJECTED_SUBMISSION_RETENTION_DAYS)
     scan_cutoff = time.time() - RETENTION_SCAN_FILE_HOURS * 3600
+    consent_cutoff = now - timedelta(days=CONSENT_RETENTION_DAYS)
     ephemeral_event_types = {
         "alternative_report",
         "email_test",
@@ -10672,6 +10820,7 @@ def run_retention_cleanup(apply_changes=False):
         StripeWebhookEvent.status == "processed",
         StripeWebhookEvent.updated_at < activity_cutoff,
     )
+    consent_query = ConsentLog.query.filter(ConsentLog.created_at < consent_cutoff)
     unverified_users = (
         User.query.outerjoin(Subscription, Subscription.user_id == User.id)
         .filter(
@@ -10706,9 +10855,11 @@ def run_retention_cleanup(apply_changes=False):
         "searchCutoff": search_cutoff.isoformat() + "Z",
         "unverifiedAccountCutoff": account_cutoff.isoformat() + "Z",
         "rejectedSubmissionCutoff": rejected_submission_cutoff.isoformat() + "Z",
+        "consentCutoff": consent_cutoff.isoformat() + "Z",
         "usageEvents": usage_query.count(),
         "searchEvents": search_query.count(),
         "webhookEvents": webhook_query.count(),
+        "consentLogs": consent_query.count(),
         "unverifiedAccounts": len(unverified_users),
         "rejectedSubmissions": len(rejected_submissions),
         "scanFiles": len(expired_scan_files),
@@ -10728,6 +10879,7 @@ def run_retention_cleanup(apply_changes=False):
     usage_query.delete(synchronize_session=False)
     search_query.delete(synchronize_session=False)
     webhook_query.delete(synchronize_session=False)
+    consent_query.delete(synchronize_session=False)
     db.session.commit()
 
     for filepath in expired_scan_files:
@@ -10739,7 +10891,7 @@ def run_retention_cleanup(apply_changes=False):
     return result
 
 
-@route("/admin/retention", methods=["GET", "POST"])
+@route("/admin/retention", methods=["GET", "POST"], access="admin")
 def run_admin_retention():
     apply_changes = request.method == "POST" and (
         str((request.get_json(silent=True) or {}).get("apply", "false")).lower()
@@ -10748,7 +10900,7 @@ def run_admin_retention():
     return jsonify(run_retention_cleanup(apply_changes=apply_changes))
 
 
-@route("/internal/cron/maintenance", methods=["POST"])
+@route("/internal/cron/maintenance", methods=["POST"], access="internal-secret")
 def run_cron_maintenance():
     if not cron_request_is_authorized():
         return jsonify({"error": "Unauthorized"}), 401
@@ -10818,7 +10970,7 @@ def run_cron_maintenance():
     return jsonify(result)
 
 
-@route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"])
+@route("/admin/alternative-reports/<int:event_id>/resolve", methods=["POST"], access="admin")
 def resolve_admin_alternative_report(event_id):
     event = UsageEvent.query.filter_by(
         id=event_id,
@@ -10935,7 +11087,7 @@ def resolve_admin_alternative_report(event_id):
     })
 
 
-@route("/admin/products/<int:product_id>", methods=["DELETE"])
+@route("/admin/products/<int:product_id>", methods=["DELETE"], access="admin")
 def delete_admin_product(product_id):
     product = db.session.get(Product, product_id)
 
@@ -10947,7 +11099,7 @@ def delete_admin_product(product_id):
     return jsonify({"message": "Produs șters din catalog."})
 
 
-@route("/admin/users/<int:user_id>/plan", methods=["PATCH"])
+@route("/admin/users/<int:user_id>/plan", methods=["PATCH"], access="admin")
 def admin_update_user_plan(user_id):
     data = request.get_json(silent=True) or {}
     plan = str(data.get("plan") or "").strip().lower()
@@ -10983,10 +11135,8 @@ def admin_update_user_plan(user_id):
 # Products
 # =========================
 
-@route("/products/seed", methods=["GET"])
+@route("/products/seed", methods=["GET"], access="admin")
 def seed_products():
-    db.create_all()
-
     inserted = 0
 
     for product_data in PRODUCTS_DB_SEED:
@@ -11028,7 +11178,7 @@ def seed_products():
     })
 
 
-@route("/products", methods=["GET"])
+@route("/products", methods=["GET"], access="public")
 def get_products():
     store = request.args.get("store")
     limit = min(max(request.args.get("limit", default=200, type=int) or 200, 1), 500)
@@ -11044,7 +11194,7 @@ def get_products():
     return jsonify([product_to_dict(product) for product in products])
 
 
-@route("/products/search", methods=["GET"])
+@route("/products/search", methods=["GET"], access="public")
 def search_products():
     query_text = request.args.get("q", "").strip()
     store_id = request.args.get("store", "").strip()
@@ -11156,7 +11306,7 @@ def search_products():
     return response
 
 
-@route("/products/search-label", methods=["GET"])
+@route("/products/search-label", methods=["GET"], access="public")
 def search_products_by_label():
     label_text = request.args.get("q", "").strip()
 
@@ -11192,7 +11342,7 @@ def search_products_by_label():
     return jsonify(results[:5])
 
 
-@route("/alternatives/open-food-facts", methods=["POST"])
+@route("/alternatives/open-food-facts", methods=["POST"], access="authenticated")
 def get_open_food_facts_alternatives():
     data = request.get_json(silent=True) or {}
     scanned_product = data.get("product") or {}
@@ -11462,7 +11612,7 @@ def get_open_food_facts_alternatives():
     })
 
 
-@route("/analyze", methods=["POST"])
+@route("/analyze", methods=["POST"], access="authenticated")
 def analyze_product():
     if "image" not in request.files:
         return jsonify({
@@ -11579,7 +11729,7 @@ def analyze_product():
 # Cart
 # =========================
 
-@route("/cart/<int:user_id>", methods=["GET"])
+@route("/cart/<int:user_id>", methods=["GET"], access="authenticated")
 def get_cart(user_id):
     user = db.session.get(User, user_id)
 
@@ -11595,7 +11745,7 @@ def get_cart(user_id):
     return jsonify([cart_item_to_dict(item) for item in items])
 
 
-@route("/cart/add", methods=["POST"])
+@route("/cart/add", methods=["POST"], access="authenticated")
 def add_to_cart():
     data = request.get_json()
 
@@ -11682,7 +11832,7 @@ def add_to_cart():
     }), 201
 
 
-@route("/cart/item/<int:item_id>", methods=["PATCH"])
+@route("/cart/item/<int:item_id>", methods=["PATCH"], access="authenticated")
 def update_cart_item(item_id):
     item = db.session.get(CartItem, item_id)
 
@@ -11715,7 +11865,7 @@ def update_cart_item(item_id):
     })
 
 
-@route("/cart/item/<int:item_id>", methods=["DELETE"])
+@route("/cart/item/<int:item_id>", methods=["DELETE"], access="authenticated")
 def delete_cart_item(item_id):
     item = db.session.get(CartItem, item_id)
 
@@ -11728,7 +11878,7 @@ def delete_cart_item(item_id):
     return jsonify({"message": "Produs șters din coș."})
 
 
-@route("/cart/clear/<int:user_id>", methods=["DELETE"])
+@route("/cart/clear/<int:user_id>", methods=["DELETE"], access="authenticated")
 def clear_cart(user_id):
     user = db.session.get(User, user_id)
 
@@ -11747,7 +11897,7 @@ def clear_cart(user_id):
 # Favorites
 # =========================
 
-@route("/favorites/<int:user_id>", methods=["GET"])
+@route("/favorites/<int:user_id>", methods=["GET"], access="authenticated")
 def get_favorites(user_id):
     user = db.session.get(User, user_id)
 
@@ -11761,7 +11911,7 @@ def get_favorites(user_id):
     return jsonify([favorite_item_to_dict(item) for item in items])
 
 
-@route("/favorites/add", methods=["POST"])
+@route("/favorites/add", methods=["POST"], access="authenticated")
 def add_to_favorites():
     data = request.get_json()
 
@@ -11812,7 +11962,7 @@ def add_to_favorites():
     }), 201
 
 
-@route("/favorites/item/<int:favorite_id>", methods=["DELETE"])
+@route("/favorites/item/<int:favorite_id>", methods=["DELETE"], access="authenticated")
 def delete_favorite_item(favorite_id):
     item = db.session.get(Favorite, favorite_id)
 
@@ -11825,7 +11975,7 @@ def delete_favorite_item(favorite_id):
     return jsonify({"message": "Produs șters din favorite."})
 
 
-@route("/favorites/clear/<int:user_id>", methods=["DELETE"])
+@route("/favorites/clear/<int:user_id>", methods=["DELETE"], access="authenticated")
 def clear_favorites(user_id):
     user = db.session.get(User, user_id)
 
@@ -11842,7 +11992,7 @@ def clear_favorites(user_id):
 # History
 # =========================
 
-@route("/history/<int:user_id>", methods=["GET"])
+@route("/history/<int:user_id>", methods=["GET"], access="authenticated")
 def get_scan_history(user_id):
     user = db.session.get(User, user_id)
 
@@ -11856,7 +12006,7 @@ def get_scan_history(user_id):
     return jsonify([scan_history_item_to_dict(item) for item in items])
 
 
-@route("/history/add", methods=["POST"])
+@route("/history/add", methods=["POST"], access="authenticated")
 def add_scan_history():
     data = request.get_json()
 
@@ -11896,7 +12046,7 @@ def add_scan_history():
     }), 201
 
 
-@route("/history/item/<int:history_id>", methods=["DELETE"])
+@route("/history/item/<int:history_id>", methods=["DELETE"], access="authenticated")
 def delete_scan_history_item(history_id):
     item = db.session.get(ScanHistory, history_id)
 
@@ -11909,7 +12059,7 @@ def delete_scan_history_item(history_id):
     return jsonify({"message": "Scanare ștearsă din istoric."})
 
 
-@route("/history/clear/<int:user_id>", methods=["DELETE"])
+@route("/history/clear/<int:user_id>", methods=["DELETE"], access="authenticated")
 def clear_scan_history(user_id):
     user = db.session.get(User, user_id)
 
@@ -11926,7 +12076,7 @@ def clear_scan_history(user_id):
 # Product submissions
 # =========================
 
-@route("/uploads/submissions/<path:filename>", methods=["GET"])
+@route("/uploads/submissions/<path:filename>", methods=["GET"], access="authenticated")
 def get_submission_image(filename):
     image_path = f"/uploads/submissions/{filename}"
 
@@ -11936,7 +12086,7 @@ def get_submission_image(filename):
     return send_from_directory(SUBMISSIONS_FOLDER, filename)
 
 
-@route("/uploads/scans/<path:filename>", methods=["GET"])
+@route("/uploads/scans/<path:filename>", methods=["GET"], access="authenticated")
 @require_auth
 def get_scan_image(filename):
     expected_prefix = f"scan_{g.current_user.id}_"
@@ -11947,7 +12097,7 @@ def get_scan_image(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
 
 
-@route("/uploads/supabase-submissions/<path:object_path>", methods=["GET"])
+@route("/uploads/supabase-submissions/<path:object_path>", methods=["GET"], access="authenticated")
 def get_supabase_submission_image(object_path):
     image_path = f"/uploads/supabase-submissions/{object_path}"
 
@@ -11965,10 +12115,10 @@ def get_supabase_submission_image(object_path):
     except requests.RequestException:
         return jsonify({"error": "Imaginea nu a putut fi încărcată."}), 502
 
-    return app.response_class(image_bytes, mimetype=content_type)
+    return current_app.response_class(image_bytes, mimetype=content_type)
 
 
-@route("/submissions/<int:user_id>", methods=["GET"])
+@route("/submissions/<int:user_id>", methods=["GET"], access="authenticated")
 def get_user_submissions(user_id):
     user = db.session.get(User, user_id)
 
@@ -11982,7 +12132,7 @@ def get_user_submissions(user_id):
     return jsonify([product_submission_to_dict(item) for item in submissions])
 
 
-@route("/submissions/add", methods=["POST"])
+@route("/submissions/add", methods=["POST"], access="authenticated")
 def add_product_submission():
     user_id = request.form.get("user_id")
     product_name = request.form.get("product_name", "").strip()
@@ -12126,7 +12276,7 @@ def add_product_submission():
     }), 201
 
 
-@route("/submissions/item/<int:submission_id>", methods=["DELETE"])
+@route("/submissions/item/<int:submission_id>", methods=["DELETE"], access="authenticated")
 def delete_product_submission(submission_id):
     submission = db.session.get(ProductSubmission, submission_id)
 
@@ -12139,7 +12289,7 @@ def delete_product_submission(submission_id):
     return jsonify({"message": "Propunerea a fost ștearsă."})
 
 
-@route("/submissions/ai-review/<int:submission_id>", methods=["POST"])
+@route("/submissions/ai-review/<int:submission_id>", methods=["POST"], access="admin")
 def ai_review_product_submission(submission_id):
     submission = db.session.get(ProductSubmission, submission_id)
 
@@ -12161,7 +12311,7 @@ def ai_review_product_submission(submission_id):
     })
 
 
-@route("/submissions/approve/<int:submission_id>", methods=["POST"])
+@route("/submissions/approve/<int:submission_id>", methods=["POST"], access="admin")
 def approve_product_submission(submission_id):
     submission = db.session.get(ProductSubmission, submission_id)
 
@@ -12307,7 +12457,7 @@ def approve_product_submission(submission_id):
         "submission": product_submission_to_dict(submission),
     })
 
-@route("/ai/extract-product-info", methods=["POST"])
+@route("/ai/extract-product-info", methods=["POST"], access="authenticated")
 def ai_extract_product_info():
     front_image = request.files.get("front_image")
     nutrition_image = request.files.get("nutrition_image")
@@ -12471,7 +12621,7 @@ def find_demo_products():
     ]
 
 
-@route("/products/cleanup-duplicates", methods=["POST", "GET"])
+@route("/products/cleanup-duplicates", methods=["POST", "GET"], access="admin")
 def cleanup_duplicate_products():
     duplicates = find_duplicate_products()
     demo_products = find_demo_products()
@@ -12591,7 +12741,7 @@ def translate_catalog_text(text_value, target_language):
         return text_value
 
 
-@route("/translate", methods=["POST"])
+@route("/translate", methods=["POST"], access="authenticated")
 def translate_text():
     data = request.get_json(silent=True) or {}
     text_value = str(data.get("text") or "").strip()
@@ -12900,6 +13050,11 @@ def get_open_prices_summary(barcode):
         return None
 
     now = time.time()
+    distributed_result = distributed_cache_get("open-prices", barcode)
+
+    if isinstance(distributed_result, dict) and "summary" in distributed_result:
+        return distributed_result["summary"]
+
     cache_item = OPEN_PRICES_CACHE.get(barcode)
 
     if cache_item and now - cache_item["created_at"] < OPEN_PRICES_CACHE_TTL:
@@ -12982,6 +13137,12 @@ def get_open_prices_summary(barcode):
         },
         OPEN_PRICES_CACHE_MAX_ITEMS,
     )
+    distributed_cache_set(
+        "open-prices",
+        barcode,
+        {"summary": summary},
+        OPEN_PRICES_CACHE_TTL,
+    )
     return summary
 
 
@@ -13037,7 +13198,7 @@ def product_to_dict_with_open_price(product):
     return product_data
 
 
-@route("/prices/report", methods=["POST"])
+@route("/prices/report", methods=["POST"], access="authenticated")
 def report_local_price():
     data = request.get_json(silent=True) or {}
     barcode = str(data.get("barcode") or "").strip()
@@ -13078,7 +13239,7 @@ def report_local_price():
     }), 201
 
 
-@route("/prices/<barcode>", methods=["GET"])
+@route("/prices/<barcode>", methods=["GET"], access="public")
 def get_latest_local_price(barcode):
     barcode_error = validate_barcode(barcode, required=True)
 
@@ -17553,7 +17714,7 @@ def save_product_to_local_database(product_data):
     return product
 
 
-@route("/barcode/import", methods=["POST"])
+@route("/barcode/import", methods=["POST"], access="authenticated")
 def import_barcode_product():
     data = request.get_json(silent=True) or {}
     barcode = str(data.get("barcode") or "").strip()
@@ -17594,7 +17755,7 @@ def import_barcode_product():
     }), 201
 
 
-@route("/ai/identify-product-frame", methods=["POST"])
+@route("/ai/identify-product-frame", methods=["POST"], access="authenticated")
 def identify_product_frame():
     subscription = get_or_create_subscription(g.current_user)
 
@@ -17753,7 +17914,7 @@ Setează identified=false dacă produsul nu poate fi identificat rezonabil.
     })
 
 
-@route("/barcode/lookup/<barcode>", methods=["GET"])
+@route("/barcode/lookup/<barcode>", methods=["GET"], access="authenticated")
 def lookup_barcode(barcode):
     barcode = barcode.strip()
 
@@ -17878,7 +18039,54 @@ def lookup_barcode(barcode):
         "matchedBarcode": matched_barcode,
         "product": product_to_dict_with_open_price(local_product),
         "usage": scan_gate["usage"],
-    })                                    
+    })
+
+
+def create_application(runtime_config=None, config_overrides=None):
+    """Build a fully configured application for Gunicorn and isolated tests."""
+    resolved_config = runtime_config or RuntimeConfig.from_env()
+
+    def initialize_database(flask_app):
+        db.init_app(flask_app)
+
+    def initialize_cors(flask_app):
+        CORS(
+            flask_app,
+            resources={r"/*": {"origins": get_frontend_origins()}},
+            supports_credentials=True,
+        )
+
+    flask_app = create_app(
+        __name__,
+        resolved_config,
+        config_overrides=config_overrides,
+        app_class=Flask,
+        extension_initializers=(initialize_cors, initialize_database),
+        before_request_handlers=(enforce_access_controls,),
+        after_request_handlers=(add_security_headers, persist_login_session),
+        error_handlers={
+            413: handle_request_too_large,
+            405: handle_method_not_allowed,
+            500: handle_internal_server_error,
+        },
+        blueprint_registrar=register_blueprints,
+    )
+    flask_app.logger.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
+
+    if os.environ.get(
+        "LOG_FORMAT", "json" if resolved_config.production_mode else "text"
+    ).lower() == "json":
+        formatter = JsonLogFormatter()
+        for handler in flask_app.logger.handlers:
+            handler.setFormatter(formatter)
+
+    if resolved_config.production_mode:
+        from migration import assert_database_at_head
+
+        assert_database_at_head(database_url=resolved_config.database_url)
+
+    return flask_app
+
 
 register_blueprints(app)
 
@@ -17892,7 +18100,7 @@ if PRODUCTION_MODE:
 
 if __name__ == "__main__":
     app.run(
-        host="0.0.0.0",
+        host=os.environ.get("FLASK_RUN_HOST", "127.0.0.1"),
         debug=os.environ.get("FLASK_DEBUG", "false").lower() == "true",
         port=int(os.environ.get("PORT", "5001")),
     )

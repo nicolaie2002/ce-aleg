@@ -298,6 +298,7 @@ export default function BarcodeScanPage() {
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState("");
   const [scanStatus, setScanStatus] = useState("Camera este oprită.");
+  /** @type {"auto" | "native" | "zxing"} */
   const scannerMode = "auto";
   const [liveVisionEnabled, setLiveVisionEnabled] = useState(false);
   const [, setIsVisionAnalyzing] = useState(false);
@@ -554,7 +555,9 @@ export default function BarcodeScanPage() {
   }
 
   async function startNativeBarcodeDetector(deviceId) {
-    if (!("BarcodeDetector" in window)) {
+    const BarcodeDetector = window.BarcodeDetector;
+
+    if (!BarcodeDetector) {
       if (scannerMode === "native") {
         setMessage(pick("Browserul tău nu suportă scannerul nativ. Folosește modul ZXing.", "Your browser does not support the native scanner. Use ZXing mode."));
       }
@@ -580,13 +583,13 @@ export default function BarcodeScanPage() {
 
       const preferredFormats = ["ean_13", "ean_8", "upc_a", "itf"];
       const supportedFormats =
-        typeof window.BarcodeDetector.getSupportedFormats === "function"
-          ? await window.BarcodeDetector.getSupportedFormats()
+        typeof BarcodeDetector.getSupportedFormats === "function"
+          ? await BarcodeDetector.getSupportedFormats()
           : preferredFormats;
       const detectorFormats = preferredFormats.filter((format) =>
         supportedFormats.includes(format)
       );
-      const detector = new window.BarcodeDetector({
+      const detector = new BarcodeDetector({
         formats: detectorFormats.length ? detectorFormats : preferredFormats.slice(0, 3),
       });
 

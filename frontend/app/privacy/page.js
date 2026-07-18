@@ -21,6 +21,7 @@ import {
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
 import { useLocale } from "../components/LocaleProvider";
+import { CookieManager } from "../components/CookieManager";
 
 const CONTACT_EMAIL = "contact@cealeg.shop";
 const LAST_UPDATED_RO = "4 iulie 2026";
@@ -221,6 +222,7 @@ export default function PrivacyPage() {
                   "We use cookies and localStorage needed for session, security, language, theme and preferences. Google Analytics, Meta Pixel and TikTok Pixel load only if you accept optional cookies in the banner."
                 )}
               </p>
+              <CookieManager className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg border border-cyan-200/35 px-4 text-sm font-black text-cyan-100 hover:bg-cyan-200/10" />
             </InfoCard>
 
             <InfoCard icon={BarChart3} title={pick("Analytics", "Analytics")}>
@@ -295,7 +297,7 @@ export default function PrivacyPage() {
                 European Commission - GDPR rights
               </a>
               <a className="hover:text-white" href="https://www.dataprotection.ro/?lang=ro&page=Transmiterea_plangerilor_catre_ANSPDCP" target="_blank" rel="noreferrer">
-                ANSPDCP - drepturi și plângeri
+                {pick("ANSPDCP - drepturi și plângeri", "ANSPDCP - rights and complaints")}
               </a>
               <a className="hover:text-white" href="https://commission.europa.eu/cookies-policy_en" target="_blank" rel="noreferrer">
                 European Commission - cookies

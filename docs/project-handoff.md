@@ -1,6 +1,23 @@
 # Ce aleg? - handoff proiect
 
-Ultima actualizare: 2026-07-12
+Ultima actualizare: 2026-07-18
+
+## Stare curenta
+
+- Portile locale sunt verzi: backend 351 teste si 72,93% coverage; frontend 71
+  teste Jest; Playwright 32 trecute, 10 skip intentionat si zero esecuri.
+- PWA foloseste un service worker static, fara cache pentru API/date private;
+  offline-ul este verificat desktop si mobil.
+- Render Key Value free este configurat pentru rate limit/cache distribuit.
+- Maintenance ruleaza gratuit din GitHub Actions; adauga `CRON_SECRET` in
+  repository Actions secrets cu aceeasi valoare din Render.
+- Configuratia OpenNext/Cloudflare Workers Free este pregatita, dar nu se face
+  deploy pana cand jobul Linux este verde si proprietarul conecteaza domeniul.
+- Emailurile live au fost raportate nefunctionale si raman blocant extern. Nu
+  considera vechile mentiuni `Brevo OK` drept dovada curenta.
+- Detaliile si cifrele authoritative sunt in
+  `docs/production-improvement-report.md`; sectiunile de mai jos pastreaza si
+  istoricul implementarilor anterioare.
 
 Pachetul curent a adaugat warm-up pentru reducerea cold start-ului si a reparat smoke-ul pentru email verification:
 

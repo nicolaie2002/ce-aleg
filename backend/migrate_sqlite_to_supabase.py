@@ -33,9 +33,13 @@ MODELS = [
     (Subscription, "subscriptions"),
     (UsageEvent, "usage_events"),
 ]
+ALLOWED_TABLES = frozenset(table_name for _, table_name in MODELS)
 
 
 def get_rows(connection, table_name):
+    if table_name not in ALLOWED_TABLES:
+        raise ValueError(f"Unsupported migration table: {table_name}")
+
     tables = {
         row["name"]
         for row in connection.execute(
@@ -46,7 +50,8 @@ def get_rows(connection, table_name):
     if table_name not in tables:
         return []
 
-    return connection.execute(f"select * from {table_name}").fetchall()
+    # SQLite cannot bind identifiers; table_name is restricted to ALLOWED_TABLES.
+    return connection.execute(f'SELECT * FROM "{table_name}"').fetchall()  # nosec B608
 
 
 def migrate_table(connection, model, table_name):

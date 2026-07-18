@@ -40,6 +40,20 @@ class FakeRedisClient:
         self.values[key] = value
         self.values[f"{key}:ttl"] = ttl
 
+    def scan_iter(self, match, count=100):
+        assert count == 100
+        prefix = match.removesuffix("*")
+        return iter(key for key in self.values if key.startswith(prefix) and not key.endswith(":ttl"))
+
+    def delete(self, *keys):
+        removed = 0
+        for key in keys:
+            if key in self.values:
+                self.values.pop(key, None)
+                self.values.pop(f"{key}:ttl", None)
+                removed += 1
+        return removed
+
     def pipeline(self, transaction=True):
         assert transaction is True
         return FakePipeline(self)
@@ -127,6 +141,38 @@ def test_distributed_cache_round_trip_metrics_and_error_fallback(monkeypatch):
     assert app_module.CACHE_METRICS["errors"] == 2
 
 
+def test_distributed_cache_namespace_invalidation(monkeypatch):
+    reset_distributed_state()
+    client = FakeRedisClient()
+    monkeypatch.setattr(app_module, "get_redis_client", lambda: client)
+
+    assert app_module.distributed_cache_set("leaderboard", "weekly", [1], 60)
+    assert app_module.distributed_cache_set("leaderboard", "monthly", [2], 60)
+    assert app_module.distributed_cache_set("catalog", "stats", {"total": 3}, 60)
+
+    assert app_module.distributed_cache_delete_namespace("leaderboard") == 2
+    assert app_module.distributed_cache_get("leaderboard", "weekly") is None
+    assert app_module.distributed_cache_get("catalog", "stats") == {"total": 3}
+
+
+def test_open_prices_reuses_distributed_negative_cache(monkeypatch):
+    monkeypatch.setattr(app_module, "OPEN_PRICES_ENABLED", True)
+    monkeypatch.setattr(
+        app_module,
+        "distributed_cache_get",
+        lambda namespace, key: {"summary": None}
+        if (namespace, key) == ("open-prices", "5941234567890")
+        else None,
+    )
+    monkeypatch.setattr(
+        app_module.requests,
+        "get",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("network called")),
+    )
+
+    assert app_module.get_open_prices_summary("5941234567890") is None
+
+
 def test_redis_rate_limit_is_shared_across_requests_and_identities(app, monkeypatch):
     reset_distributed_state()
     shared_redis = FakeRedisClient()
@@ -184,3 +230,22 @@ def test_local_rate_limit_is_atomic_across_server_threads(app, monkeypatch):
 
     assert results.count(True) == 1
     assert results.count(False) == 23
+
+
+def test_rate_limit_responses_include_retry_metadata(app, client, monkeypatch):
+    reset_distributed_state()
+    monkeypatch.setattr(app_module, "get_redis_client", lambda: None)
+    monkeypatch.setattr(app_module, "GLOBAL_RATE_LIMIT", 1)
+    monkeypatch.setattr(app_module.time, "time", lambda: 300.0)
+
+    first = client.get("/version", environ_base={"REMOTE_ADDR": "10.0.0.9"})
+    limited = client.get("/version", environ_base={"REMOTE_ADDR": "10.0.0.9"})
+
+    assert first.status_code == 200
+    assert first.headers["X-RateLimit-Limit"] == "1"
+    assert first.headers["X-RateLimit-Remaining"] == "0"
+    assert limited.status_code == 429
+    assert limited.headers["X-RateLimit-Limit"] == "1"
+    assert limited.headers["X-RateLimit-Remaining"] == "0"
+    assert limited.headers["Retry-After"] == "60"
+    assert limited.headers["X-RateLimit-Reset"] == "360"

@@ -29,6 +29,12 @@ BLUEPRINTS = (
     ai_blueprint,
 )
 
+VALID_ACCESS_POLICIES = frozenset(
+    {"public", "authenticated", "admin", "signed-webhook", "internal-secret"}
+)
+ROUTE_ACCESS_POLICIES = {}
+ROUTE_OWNERS = {}
+
 
 def blueprint_for_rule(rule):
     if rule.startswith("/admin/") or rule in {"/users", "/init-db"}:
@@ -70,8 +76,33 @@ def blueprint_for_rule(rule):
     return system_blueprint
 
 
-def route(rule, **options):
-    return blueprint_for_rule(rule).route(rule, **options)
+def route(rule, *, access, **options):
+    """Register a route with explicit ownership and a fail-closed access policy."""
+    if access not in VALID_ACCESS_POLICIES:
+        raise ValueError(f"Invalid access policy {access!r} for {rule}")
+
+    blueprint = blueprint_for_rule(rule)
+
+    def decorator(view):
+        endpoint = str(options.get("endpoint") or view.__name__)
+        existing_policy = ROUTE_ACCESS_POLICIES.get(endpoint)
+
+        if existing_policy and existing_policy != access:
+            raise ValueError(
+                f"Conflicting access policies for endpoint {endpoint}: "
+                f"{existing_policy!r} and {access!r}"
+            )
+
+        ROUTE_ACCESS_POLICIES[endpoint] = access
+        ROUTE_OWNERS[endpoint] = blueprint.name
+        return blueprint.route(rule, **options)(view)
+
+    return decorator
+
+
+def get_route_access_policy(endpoint):
+    normalized_endpoint = str(endpoint or "").rsplit(".", 1)[-1]
+    return ROUTE_ACCESS_POLICIES.get(normalized_endpoint)
 
 
 def register_blueprints(flask_app):

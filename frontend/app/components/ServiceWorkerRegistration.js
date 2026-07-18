@@ -1,41 +1,87 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Workbox } from "workbox-window";
+import { RefreshCw } from "lucide-react";
+import { useLocale } from "./LocaleProvider";
 
 export function ServiceWorkerRegistration() {
+  const { pick } = useLocale();
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const wbRef = useRef(null);
+  const registrationRef = useRef(null);
+  const updateRequestedRef = useRef(false);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== "production" || typeof window === "undefined") {
+    if (
+      process.env.NODE_ENV !== "production" ||
+      typeof window === "undefined" ||
+      !("serviceWorker" in navigator)
+    ) {
       return;
     }
 
-    const wbInstance = new Workbox("/sw.js", { scope: "/" });
-    wbRef.current = wbInstance;
+    let disposed = false;
 
-    wbInstance.addEventListener("waiting", () => {
-      setUpdateAvailable(true);
-    });
+    function watchInstallingWorker(registration) {
+      const worker = registration.installing;
+      if (!worker) return;
 
-    wbInstance.addEventListener("controlling", () => {
-      window.location.reload();
-    });
+      worker.addEventListener("statechange", () => {
+        if (
+          !disposed &&
+          worker.state === "installed" &&
+          navigator.serviceWorker.controller
+        ) {
+          setUpdateAvailable(true);
+        }
+      });
+    }
 
-    wbInstance.register().catch(() => {});
+    function handleControllerChange() {
+      if (updateRequestedRef.current) {
+        window.location.reload();
+      }
+    }
+
+    navigator.serviceWorker.addEventListener(
+      "controllerchange",
+      handleControllerChange
+    );
+
+    navigator.serviceWorker
+      .register("/sw.js", { scope: "/", updateViaCache: "none" })
+      .then((registration) => {
+        if (disposed) return;
+
+        registrationRef.current = registration;
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          setUpdateAvailable(true);
+        }
+
+        registration.addEventListener("updatefound", () => {
+          watchInstallingWorker(registration);
+        });
+        watchInstallingWorker(registration);
+      })
+      .catch((error) => {
+        console.warn("Service worker registration failed", error);
+      });
 
     return () => {
-      wbInstance.removeEventListener("waiting", () => setUpdateAvailable(true));
-      wbInstance.removeEventListener("controlling", () => window.location.reload());
+      disposed = true;
+      navigator.serviceWorker.removeEventListener(
+        "controllerchange",
+        handleControllerChange
+      );
     };
   }, []);
 
   const handleUpdate = () => {
-    if (wbRef.current) {
-      wbRef.current.messageSkipWaiting();
-      setUpdateAvailable(false);
-    }
+    const waitingWorker = registrationRef.current?.waiting;
+    if (!waitingWorker) return;
+
+    updateRequestedRef.current = true;
+    waitingWorker.postMessage({ type: "SKIP_WAITING" });
+    setUpdateAvailable(false);
   };
 
   if (!updateAvailable) return null;
@@ -46,35 +92,30 @@ export function ServiceWorkerRegistration() {
       role="alert"
       aria-live="polite"
     >
-      <div className="ce-card p-4 max-w-sm shadow-xl border border-white/10">
+      <div className="ce-card max-w-sm border border-white/10 p-4 shadow-xl">
         <div className="flex items-start gap-3">
-          <svg
-            className="w-5 h-5 text-cyan-400 flex-shrink-0 mt-0.5"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          <RefreshCw
+            className="mt-0.5 h-5 w-5 flex-shrink-0 text-cyan-400"
             aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+          />
           <div className="flex-1">
             <p className="text-sm font-medium text-white">
-              Actualizare disponibilă
+              {pick("Actualizare disponibilă", "Update available")}
             </p>
-            <p className="text-xs text-white/60 mt-1">
-              O versiune nouă a aplicației e gata. Reîncarcă pentru a o folosi.
+            <p className="mt-1 text-xs text-white/60">
+              {pick(
+                "O versiune nouă a aplicației este gata. Reîncarcă pentru a o folosi.",
+                "A new version of the app is ready. Reload to use it."
+              )}
             </p>
           </div>
           <button
+            type="button"
             onClick={handleUpdate}
-            className="px-3 py-1.5 text-xs font-bold text-black bg-white rounded-lg hover:bg-cyan-100 transition-colors flex-shrink-0"
+            aria-label={pick("Instalează actualizarea", "Install update")}
+            className="flex-shrink-0 rounded-lg bg-white px-3 py-1.5 text-xs font-bold text-black transition-colors hover:bg-cyan-100"
           >
-            Reîncarcă
+            {pick("Reîncarcă", "Reload")}
           </button>
         </div>
       </div>

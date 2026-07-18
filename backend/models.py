@@ -273,8 +273,9 @@ class ConsentLog(db.Model):
     session_id = db.Column(db.String(128), nullable=False, index=True)
     categories = db.Column(db.JSON, nullable=False)
     version = db.Column(db.String(40), nullable=False)
-    ip = db.Column(db.String(45), nullable=True)
-    user_agent = db.Column(db.String(512), nullable=True)
+    # These columns contain keyed hashes, never raw session, IP or user-agent data.
+    ip = db.Column(db.String(64), nullable=True)
+    user_agent = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
 
     user = db.relationship("User", backref="consent_logs")

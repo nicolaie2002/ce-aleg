@@ -1,26 +1,51 @@
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { NextIntlClientProvider } from "next-intl";
+import { createIntlMessages } from "../../messages/intlMessages";
 
 const LocaleContext = createContext(null);
 
-export function LocaleProvider({ children }) {
-  const [locale, setLocale] = useState("ro");
+function normalizeLocale(value) {
+  return value === "en" ? "en" : "ro";
+}
+
+function persistLocale(locale) {
+  localStorage.setItem("cealeg_locale", locale);
+  document.cookie = `cealeg_locale=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
+  document.documentElement.lang = locale;
+}
+
+async function loadClientMessages(locale) {
+  const catalog = locale === "en"
+    ? (await import("../../messages/en.json")).default
+    : (await import("../../messages/ro.json")).default;
+
+  return createIntlMessages(catalog);
+}
+
+export function LocaleProvider({ children, initialLocale = "ro", messages = {} }) {
+  const [locale, setLocale] = useState(() => normalizeLocale(initialLocale));
+  const [intlMessages, setIntlMessages] = useState(messages);
 
   useEffect(() => {
     queueMicrotask(() => {
       const savedLocale = localStorage.getItem("cealeg_locale");
-      const normalizedLocale = savedLocale === "en" ? "en" : "ro";
-      document.documentElement.lang = normalizedLocale;
+      const normalizedLocale = normalizeLocale(savedLocale || initialLocale);
+      persistLocale(normalizedLocale);
       setLocale(normalizedLocale);
+
+      if (normalizedLocale !== normalizeLocale(initialLocale)) {
+        loadClientMessages(normalizedLocale).then(setIntlMessages).catch(() => null);
+      }
     });
-  }, []);
+  }, [initialLocale]);
 
   function changeLocale(nextLocale) {
-    const normalizedLocale = nextLocale === "en" ? "en" : "ro";
-    localStorage.setItem("cealeg_locale", normalizedLocale);
-    document.documentElement.lang = normalizedLocale;
+    const normalizedLocale = normalizeLocale(nextLocale);
+    persistLocale(normalizedLocale);
     setLocale(normalizedLocale);
+    loadClientMessages(normalizedLocale).then(setIntlMessages).catch(() => null);
   }
 
   const value = useMemo(
@@ -33,7 +58,11 @@ export function LocaleProvider({ children }) {
     [locale]
   );
 
-  return <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>;
+  return (
+    <NextIntlClientProvider locale={locale} messages={intlMessages}>
+      <LocaleContext.Provider value={value}>{children}</LocaleContext.Provider>
+    </NextIntlClientProvider>
+  );
 }
 
 export function useLocale() {

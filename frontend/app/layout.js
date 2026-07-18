@@ -10,6 +10,8 @@ import { BackendWarmup } from "./components/BackendWarmup";
 import { ServiceWorkerRegistration } from "./components/ServiceWorkerRegistration";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { Analytics } from "./components/Analytics";
+import romanianMessages from "../messages/ro.json";
+import { createIntlMessages } from "../messages/intlMessages";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -184,7 +186,10 @@ export default function RootLayout({ children }) {
           suppressHydrationWarning
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
-        <LocaleProvider>
+        <LocaleProvider
+          initialLocale="ro"
+          messages={createIntlMessages(romanianMessages)}
+        >
           <ThemeProvider>
             <AutomaticPageTranslation />
             <CarbonVaporBackground />

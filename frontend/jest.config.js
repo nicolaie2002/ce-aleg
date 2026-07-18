@@ -10,17 +10,49 @@ const customJestConfig = {
   testEnvironment: "jsdom",
   setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
   testMatch: ["<rootDir>/__tests__/**/*.test.[jt]s?(x)"],
+  modulePathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/.open-next/"],
+  watchPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/.open-next/"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/$1",
   },
   collectCoverageFrom: [
     "app/**/*.{js,jsx,ts,tsx}",
     "instrumentation*.js",
-    "proxy.js",
+    "middleware.js",
     "sentry.*.config.js",
     "!app/**/*.d.ts",
   ],
   coverageThreshold: {
+    "./app/components/AppHeader.js": {
+      branches: 45,
+      functions: 60,
+      lines: 60,
+      statements: 60,
+    },
+    "./app/components/CookieConsentBanner.js": {
+      branches: 70,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+    "./app/components/CookieManager.js": {
+      branches: 60,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+    "./app/components/LanguageSwitcher.js": {
+      branches: 70,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
+    "./app/components/ProductImage.js": {
+      branches: 70,
+      functions: 80,
+      lines: 80,
+      statements: 80,
+    },
     "./app/components/useTranslatedText.js": {
       branches: 75,
       functions: 95,

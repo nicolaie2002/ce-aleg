@@ -140,6 +140,7 @@ function getProductFamily(product) {
     return "coffee_drink";
   }
 
+  /** @type {Array<[string, string[]]>} */
   const priorityRules = [
     ["sparkling_water", ["apă minerală", "apa minerala", "apă carbogazoasă", "apa carbogazoasa", "sparkling water", "mineral water"]],
     ["still_water", ["apă plată", "apa plata", "still water", "spring water"]],

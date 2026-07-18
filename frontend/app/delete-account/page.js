@@ -11,6 +11,7 @@ import {
   clearAuthenticatedSession,
   useConsumedAuthToken,
 } from "../utils/authStorage";
+import { getApiErrorMessage, localizeApiMessage, readApiJson } from "../utils/apiResponse";
 
 export default function DeleteAccountPage() {
   const { pick } = useLocale();
@@ -30,14 +31,23 @@ export default function DeleteAccountPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),
       });
-      const data = await response.json().catch(() => ({}));
+      const data = await readApiJson(response);
 
       if (!response.ok) {
-        throw new Error(data.error || pick("Contul nu a putut fi sters.", "The account could not be deleted."));
+        throw new Error(getApiErrorMessage(
+          data,
+          pick,
+          "Contul nu a putut fi șters.",
+          "The account could not be deleted."
+        ));
       }
 
       clearAuthenticatedSession();
-      setSuccessMessage(data.message || pick("Contul a fost sters.", "The account has been deleted."));
+      setSuccessMessage(
+        data.message
+          ? localizeApiMessage(data.message, pick, data.code)
+          : pick("Contul a fost șters.", "The account has been deleted.")
+      );
     } catch (error) {
       setErrorMessage(error.message || pick("A aparut o eroare.", "An error occurred."));
     } finally {

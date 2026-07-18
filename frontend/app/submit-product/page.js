@@ -452,14 +452,21 @@ function SubmitProductPageContent() {
         throw new Error(getApiErrorMessage(data, pick, "Nu s-a putut verifica produsul automat.", "The product could not be reviewed automatically."));
       }
 
-      let details = `${data.message || ""} ${pick("Grad de verificare", "Review confidence")}: ${data.confidence}/100.`;
+      const reviewMessage = data.message
+        ? localizeApiMessage(data.message, pick, data.code)
+        : "";
+      let details = `${reviewMessage} ${pick("Grad de verificare", "Review confidence")}: ${data.confidence}/100.`;
 
       if (data.problems && data.problems.length > 0) {
-        details += ` ${pick("Probleme", "Problems")}: ${data.problems.join(" | ")}`;
+        details += ` ${pick("Probleme", "Problems")}: ${data.problems
+          .map((item) => localizeApiMessage(item, pick))
+          .join(" | ")}`;
       }
 
       if (data.warnings && data.warnings.length > 0) {
-        details += ` ${pick("Atenționări", "Warnings")}: ${data.warnings.join(" | ")}`;
+        details += ` ${pick("Atenționări", "Warnings")}: ${data.warnings
+          .map((item) => localizeApiMessage(item, pick))
+          .join(" | ")}`;
       }
 
       setMessage(details);

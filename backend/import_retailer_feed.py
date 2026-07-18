@@ -91,7 +91,9 @@ def identity_key(barcode, name, store, category, ingredients):
     if not text:
         return ""
 
-    return "name:" + hashlib.sha1(text.encode("utf-8")).hexdigest()[:18]
+    return "name:" + hashlib.sha1(
+        text.encode("utf-8"), usedforsecurity=False
+    ).hexdigest()[:18]
 
 
 def existing_keys():

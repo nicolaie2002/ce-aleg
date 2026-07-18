@@ -1,10 +1,13 @@
 import { withSentryConfig } from "@sentry/nextjs";
-import withPWA from "@ducanh2912/next-pwa";
+import withNextIntl from "next-intl/plugin";
+
+const withNextIntlConfig = withNextIntl("./i18n/request.ts");
 
 const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:5001";
 const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || "";
 const isProduction = process.env.NODE_ENV === "production";
 const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+const isCloudflareDeployment = process.env.CLOUDFLARE_DEPLOYMENT === "true";
 
 function getHttpOrigin(value) {
   if (!value?.startsWith("http")) return "";
@@ -18,6 +21,9 @@ function getHttpOrigin(value) {
 
 const publicApiOrigin = getHttpOrigin(publicApiUrl);
 const sentryOrigin = getHttpOrigin(process.env.NEXT_PUBLIC_SENTRY_DSN || "");
+const siteOrigin = getHttpOrigin(process.env.NEXT_PUBLIC_SITE_URL || "");
+const usesLocalHttpOrigin = /^http:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/.test(siteOrigin);
+const enforceSecureTransport = isProduction && !usesLocalHttpOrigin;
 
 const scriptSources = [
   "'self'",
@@ -60,43 +66,18 @@ const contentSecurityPolicy = [
   "media-src 'self' blob:",
   "worker-src 'self' blob:",
   "manifest-src 'self'",
-  isProduction ? "upgrade-insecure-requests" : "",
 ]
   .filter(Boolean)
   .join("; ");
 
-const withPWAConfig = withPWA({
-  dest: "public",
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
-  runtimeCaching: [
-    {
-      urlPattern: /^https:\/\/images\.openfoodfacts\.org/,
-      handler: "CacheFirst",
-      options: {
-        cacheName: "product-images",
-        expiration: { maxEntries: 200, maxAgeSeconds: 30 * 24 * 60 * 60 },
-      },
-    },
-    {
-      urlPattern: /^https:\/\/.*\.supabase\.co/,
-      handler: "NetworkFirst",
-      options: { cacheName: "supabase-api", networkTimeoutSeconds: 10 },
-    },
-    {
-      urlPattern: /\/api\/backend/,
-      handler: "NetworkFirst",
-      options: { cacheName: "api-cache", networkTimeoutSeconds: 5 },
-    },
-  ],
-  fallbacks: { document: "/offline" },
-});
-
-const nextConfig = withPWAConfig({
+const nextConfig = {
   poweredByHeader: false,
   compress: true,
+  ...(isCloudflareDeployment ? { output: "standalone" } : {}),
   images: {
+    // Cloudflare image transformations can generate charges. Serve originals
+    // on the zero-cost Workers deployment and keep Next optimization elsewhere.
+    unoptimized: isCloudflareDeployment,
     formats: ["image/avif", "image/webp"],
     remotePatterns: [
       {
@@ -176,7 +157,7 @@ const nextConfig = withPWAConfig({
             key: "Permissions-Policy",
             value: "camera=(self), microphone=(self), geolocation=()",
           },
-          ...(isProduction
+          ...(enforceSecureTransport
             ? [
                 {
                   key: "Strict-Transport-Security",
@@ -188,13 +169,14 @@ const nextConfig = withPWAConfig({
       },
     ];
   },
-});
+};
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withNextIntlConfig(nextConfig), {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   authToken: sentryAuthToken,
-  silent: !process.env.CI,
+  silent: !sentryAuthToken,
+  telemetry: false,
   widenClientFileUpload: Boolean(sentryAuthToken),
   sourcemaps: sentryAuthToken
     ? { deleteSourcemapsAfterUpload: true }

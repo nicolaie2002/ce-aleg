@@ -153,16 +153,17 @@ proiect Supabase disposable. Procedura completa este in
 | Componenta | Configuratie fara cost nou | Degradare acceptata |
 |---|---|---|
 | AI vizual cloud | `ENABLE_OPENAI_VISION=false`, `VISION_PROVIDER=local` | scanner prin cod de bare si OCR local |
-| Redis | `REDIS_URL` gol | cache si rate limit in memoria unui singur worker |
-| Sentry/analytics | DSN/ID-uri goale | logging JSON, fara dashboard extern |
+| Redis | Render Key Value free prin `REDIS_URL` | fallback local daca serviciul gratuit nu raspunde |
+| Sentry/analytics | DSN/ID-uri goale sau free tier | logging JSON; PostHog se incarca numai dupa consimtamant |
 | Open Food Facts/Open Prices | API-uri publice, kill switch disponibil | catalog local si contributii |
-| Hosting | nivelurile gratuite existente | cold start, cote si fara SLA |
+| Hosting | Render free + Cloudflare Workers Free pregatit | cold start, cote si fara SLA |
 | Backup | GitHub Actions si artifact criptat | limitat de cota gratuita GitHub |
 
 Stripe nu necesita un abonament software nou, dar percepe comision la fiecare
-incasare. Domeniul are costul normal de reinnoire. Vercel Hobby poate avea
-restrictii pentru folosirea comerciala; acestea trebuie verificate de
-proprietar in termenii curenti ai furnizorului.
+incasare. Domeniul are costul normal de reinnoire. Vercel Hobby nu este folosit
+ca destinatie comerciala finala; configuratia OpenNext pregateste migrarea pe
+Cloudflare Workers Free dupa validarea workflow-ului Linux si conectarea
+domeniului de catre proprietar.
 
 ## Observabilitate si operare
 

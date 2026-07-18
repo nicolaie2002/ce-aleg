@@ -3,8 +3,12 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { useLocale } from "./LocaleProvider";
+import adminTranslations from "../../messages/admin-en.json";
+import flowTranslations from "../../messages/flow-en.json";
 
 const translations = {
+  ...adminTranslations,
+  ...flowTranslations,
   "Dashboard": "Dashboard",
   "Scanează": "Scan",
   "Scanează produs": "Scan product",
@@ -117,7 +121,32 @@ const translations = {
 };
 
 const originals = new WeakMap();
+const renderedValues = new WeakMap();
 const translatedAttributes = ["placeholder", "title", "aria-label"];
+/** @type {Array<[RegExp, (...matches: string[]) => string]>} */
+const translationPatterns = [
+  [/^Am găsit ([\d.,]+) produse\.$/, (count) => `Found ${count} products.`],
+  [/^Am găsit ([\d.,]+) produse pentru raportare\.$/, (count) => `Found ${count} products for this report.`],
+  [/^([\d.,]+) din ([\d.,]+) conturi afișate$/, (visible, total) => `${visible} of ${total} accounts shown`],
+  [/^([\d.,]+)% din catalog$/, (count) => `${count}% of the catalog`],
+  [/^([\d.,]+) produse în plus$/, (count) => `${count} duplicate products`],
+  [/^([\d.,]+) fără ingrediente$/, (count) => `${count} without ingredients`],
+  [/^([\d.,]+) propuneri de verificat$/, (count) => `${count} submissions to review`],
+  [/^([\d.,]+) neîncadrate$/, (count) => `${count} uncategorized`],
+  [/^([\d.,]+) produse$/, (count) => `${count} products`],
+  [/^([\d.,]+) rapoarte$/, (count) => `${count} reports`],
+  [/^([\d.,]+) erori checkout$/, (count) => `${count} checkout errors`],
+  [/^([\d.,]+) coduri negăsite, ([\d.,]+) analize fără rezultat$/, (barcodes, analyses) => `${barcodes} missing barcodes, ${analyses} analyses without results`],
+  [/^([\d.,]+) schimbări din ([\d.,]+) verificate$/, (changed, checked) => `${changed} changes from ${checked} checked`],
+  [/^Caut produs raportat: (.+)$/, (query) => `Searching for reported product: ${query}`],
+  [/^Magazin: (.+) · Cerință: (.+)$/, (store, requirement) => `Store: ${store} · Request: ${requirement}`],
+  [/^Pentru: (.+)$/, (product) => `For: ${product}`],
+  [/^Ai folosit ([\d.,]+)\/([\d.,]+) scanări gratuite luna aceasta\.$/, (used, limit) => `You used ${used}/${limit} free scans this month.`],
+  [/^Încredere: ([\d.,]+)%$/, (confidence) => `Confidence: ${confidence}%`],
+  [/^Camera ([\d.,]+)$/, (index) => `Camera ${index}`],
+  [/^Trimite la verificare - până la ([\d.,]+) CeCoins după aprobare$/, (coins) => `Submit for review - up to ${coins} CeCoins after approval`],
+  [/^Poză optimizată: (.+) -> (.+)\.$/, (before, after) => `Photo optimized: ${before} -> ${after}.`],
+];
 const manuallyLocalizedPages = new Set([
   "/",
   "/billing/cancel",
@@ -150,7 +179,33 @@ function translateValue(value, locale) {
   const leading = value.match(/^\s*/)?.[0] || "";
   const trailing = value.match(/\s*$/)?.[0] || "";
   const normalized = value.trim();
-  return `${leading}${locale === "en" ? translations[normalized] || normalized : normalized}${trailing}`;
+  let translated = normalized;
+
+  if (locale === "en") {
+    translated = translations[normalized] || normalized;
+    if (translated === normalized) {
+      for (const [pattern, replacer] of translationPatterns) {
+        const match = normalized.match(pattern);
+        if (match) {
+          translated = replacer(...match.slice(1));
+          break;
+        }
+      }
+    }
+  }
+
+  return `${leading}${translated}${trailing}`;
+}
+
+function translateTextNode(node, locale) {
+  const currentValue = node.nodeValue || "";
+  if (!originals.has(node) || currentValue !== renderedValues.get(node)) {
+    originals.set(node, currentValue);
+  }
+
+  const translated = translateValue(originals.get(node), locale);
+  renderedValues.set(node, translated);
+  if (currentValue !== translated) node.nodeValue = translated;
 }
 
 function translateTree(root, locale) {
@@ -158,10 +213,7 @@ function translateTree(root, locale) {
   let node = walker.nextNode();
 
   while (node) {
-    if (!originals.has(node)) originals.set(node, node.nodeValue);
-    const original = originals.get(node);
-    const translated = translateValue(original, locale);
-    if (node.nodeValue !== translated) node.nodeValue = translated;
+    translateTextNode(node, locale);
     node = walker.nextNode();
   }
 
@@ -188,13 +240,17 @@ export function AutomaticPageTranslation() {
     translateTree(document.body, locale);
     const observer = new MutationObserver((entries) => {
       entries.forEach((entry) => {
+        if (entry.type === "characterData") {
+          translateTextNode(entry.target, locale);
+          return;
+        }
         entry.addedNodes.forEach((node) => {
           if (node.nodeType === Node.ELEMENT_NODE) translateTree(node, locale);
           if (node.nodeType === Node.TEXT_NODE && node.parentElement) translateTree(node.parentElement, locale);
         });
       });
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+    observer.observe(document.body, { characterData: true, childList: true, subtree: true });
     return () => observer.disconnect();
   }, [locale, pathname]);
 
