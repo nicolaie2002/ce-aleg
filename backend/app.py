@@ -7825,6 +7825,16 @@ def ensure_database_indexes():
             "ON products USING gin (name gin_trgm_ops)",
             "products name trigram",
         )
+        execute_schema_statement(
+            "CREATE INDEX IF NOT EXISTS ix_products_category_trgm "
+            "ON products USING gin (category gin_trgm_ops)",
+            "products category trigram",
+        )
+        execute_schema_statement(
+            "CREATE INDEX IF NOT EXISTS ix_products_store_trgm "
+            "ON products USING gin (store gin_trgm_ops)",
+            "products store trigram",
+        )
 
 
 def ensure_configured_admin():

@@ -17,7 +17,7 @@ backup/restore, deployment și test pe telefoane reale.
 
 | Poartă | Rezultat |
 | --- | --- |
-| Backend pytest | 359 teste trecute; 73,35% `app.py`, 100% `api_docs.py`, prag 70% |
+| Backend pytest | 361 teste trecute; 72,74% `app.py`, 100% `api_docs.py`, prag 70% |
 | Frontend Jest | 16 suite și 84 teste trecute |
 | Coverage țintit frontend | componente 61,37% statements / 62,61% lines; utils 88,56% / 93,54%; prag automat 60% |
 | Playwright full stack | 32 trecute, 10 sărite intenționat pe mobil, 0 eșuate |
@@ -48,6 +48,9 @@ offline-ul rulează atât desktop, cât și mobil.
   ca runtime-ul, iar testele interzic reapariția contractelor `inferred`.
 - App factory Flask, migrări Alembic versionate și verificarea migration head la
   pornirea în producție.
+- Căutarea PostgreSQL folosește indexuri GIN `pg_trgm` versionate pentru nume,
+  categorie și magazin. Interogările `ILIKE` din catalog și admin pot combina
+  ramurile indexate fără scanarea completă a celor peste 60.000 de produse.
 - Rate limiting și cache Redis distribuit cu fallback local, plus Render Key
   Value gratuit legat prin `REDIS_URL`.
 - Validare de input, limite de payload, headere de securitate, logging JSON și

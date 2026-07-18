@@ -7,10 +7,11 @@ from sqlalchemy import create_engine, inspect, text
 
 from database import db
 from migration import assert_database_at_head, run_migrations, run_release
+from migrations.versions import c19f3a7b2e64_add_catalog_search_trigram_indexes as search_index_migration
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "a84f5c6e9d21"
+HEAD_REVISION = "c19f3a7b2e64"
 
 
 def sqlite_url(database_path):
@@ -256,3 +257,42 @@ def test_production_start_commands_release_before_gunicorn():
     expected_order = "python migration.py release && exec gunicorn"
     assert expected_order in render_config
     assert expected_order in dockerfile
+
+
+def test_catalog_search_migration_manages_postgres_trigram_indexes(monkeypatch):
+    class PostgresBind:
+        class dialect:
+            name = "postgresql"
+
+    statements = []
+    monkeypatch.setattr(search_index_migration.op, "get_bind", PostgresBind)
+    monkeypatch.setattr(search_index_migration.op, "execute", statements.append)
+
+    search_index_migration.upgrade()
+
+    assert any("ix_products_category_trgm" in statement for statement in statements)
+    assert any("ix_products_store_trgm" in statement for statement in statements)
+    assert all("gin_trgm_ops" in statement for statement in statements[1:])
+
+    statements.clear()
+    search_index_migration.downgrade()
+
+    assert statements == [
+        "DROP INDEX IF EXISTS ix_products_store_trgm",
+        "DROP INDEX IF EXISTS ix_products_category_trgm",
+    ]
+
+
+def test_catalog_search_migration_is_noop_outside_postgres(monkeypatch):
+    class SqliteBind:
+        class dialect:
+            name = "sqlite"
+
+    statements = []
+    monkeypatch.setattr(search_index_migration.op, "get_bind", SqliteBind)
+    monkeypatch.setattr(search_index_migration.op, "execute", statements.append)
+
+    search_index_migration.upgrade()
+    search_index_migration.downgrade()
+
+    assert statements == []

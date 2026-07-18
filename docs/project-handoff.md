@@ -4,7 +4,7 @@ Ultima actualizare: 2026-07-18
 
 ## Stare curenta
 
-- Portile locale sunt verzi: backend 359 teste, 73,35% coverage pentru `app.py`
+- Portile locale sunt verzi: backend 361 teste, 72,74% coverage pentru `app.py`
   si 100% pentru `api_docs.py`;
   frontend 84 teste Jest in 16 suite; Playwright 32 trecute, 10 skip
   intentionat si zero esecuri.
@@ -23,6 +23,9 @@ Ultima actualizare: 2026-07-18
   si tipuri media. Dashboard, Family, cos, favorite, istoric, cont,
   confidentialitate, scanare AI, contributii, admin, cron si Stripe sunt blocate
   prin teste; orice contract `inferred` nou opreste suita.
+- Migrarea `c19f3a7b2e64` adauga indexuri GIN trigram pentru categoria si magazinul
+  produselor, completand indexul existent pe nume. Cautarea publica si editorul
+  admin evita astfel scanarea completa a catalogului pentru ramurile `ILIKE`.
 - Verificarea publica din 18 iulie a gasit backendul sanatos, dar inca la
   `bb5cfef`; setarea Auto-Deploy din serviciul Render trebuie confirmata o data.
 - Configuratia OpenNext/Cloudflare Workers Free este pregatita, dar nu se face
