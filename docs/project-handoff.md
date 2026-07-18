@@ -19,9 +19,10 @@ Ultima actualizare: 2026-07-18
 - Render este configurat `checksPass`: dupa ce workflow-ul `CI` trece, publica
   automat commitul. Deploy hook-ul GitHub ramane doar fallback manual optional si
   verifica apoi commitul din `/version`.
-- OpenAPI are 109/109 operatii cu raspunsuri 2xx tipizate, dintre care 60 cu
+- OpenAPI are 109/109 operatii cu raspunsuri 2xx tipizate, dintre care 72 cu
   contract explicit. Contractele principale pentru dashboard, Family, cos,
-  favorite, istoric, cont si traducere sunt blocate prin teste.
+  favorite, istoric, cont, confidentialitate, scanare AI, contributii si
+  traducere sunt blocate prin teste.
 - Verificarea publica din 18 iulie a gasit backendul sanatos, dar inca la
   `bb5cfef`; setarea Auto-Deploy din serviciul Render trebuie confirmata o data.
 - Configuratia OpenNext/Cloudflare Workers Free este pregatita, dar nu se face

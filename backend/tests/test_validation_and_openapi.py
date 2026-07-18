@@ -286,7 +286,16 @@ def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_docum
         ("/account/delete/request", "post"),
         ("/account/delete/confirm", "post"),
         ("/account/restriction", "post"),
+        ("/account/consent", "post"),
+        ("/account/privacy", "get"),
+        ("/account/data", "get"),
+        ("/account/data-export", "get"),
+        ("/account/export", "get"),
+        ("/privacy/consent", "post"),
+        ("/consent/log", "post"),
         ("/ai/status", "get"),
+        ("/ai/extract-product-info", "post"),
+        ("/ai/identify-product-frame", "post"),
         ("/translate", "post"),
         ("/dashboard/summary", "get"),
         ("/family/profiles", "get"),
@@ -306,6 +315,14 @@ def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_docum
         ("/history/add", "post"),
         ("/history/item/{history_id}", "delete"),
         ("/history/clear/{user_id}", "delete"),
+        ("/submissions/item/{submission_id}", "delete"),
+        ("/submissions/ai-review/{submission_id}", "post"),
+        ("/submissions/approve/{submission_id}", "post"),
+    }
+    bodyless_mutations = {
+        ("/account/delete/request", "post"),
+        ("/submissions/ai-review/{submission_id}", "post"),
+        ("/submissions/approve/{submission_id}", "post"),
     }
 
     for path, method in expected_operations:
@@ -322,12 +339,18 @@ def test_openapi_core_frontend_flows_have_explicit_typed_contracts(openapi_docum
             method,
         )
 
-        if method in {"post", "put", "patch"} and path != "/account/delete/request":
+        if method in {"post", "put", "patch"} and (path, method) not in bodyless_mutations:
             assert operation.get("requestBody", {}).get("content"), (path, method)
 
     assert paths["/auth/me"]["get"]["responses"]["200"]["content"][
         "application/json"
     ]["schema"] == {"$ref": "#/components/schemas/CurrentUserResponse"}
+    assert "multipart/form-data" in paths["/ai/extract-product-info"]["post"][
+        "requestBody"
+    ]["content"]
+    assert paths["/consent/log"]["post"]["x-validation-helper"] == (
+        "validate_consent_log_payload"
+    )
 
 
 def test_openapi_operation_ids_are_unique_and_path_parameters_declared(

@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 import restore_supabase_storage as restore_module

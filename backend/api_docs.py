@@ -804,6 +804,246 @@ def _schemas(password_min_length: int) -> dict[str, Any]:
             },
             "additionalProperties": False,
         },
+        "AccountConsentRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["analytics"],
+            "properties": {"analytics": {"type": "boolean"}},
+        },
+        "AccountConsentResponse": {
+            "type": "object",
+            "required": ["message", "analyticsConsent", "analyticsConsentAt"],
+            "properties": {
+                "message": text,
+                "analyticsConsent": {"type": "boolean"},
+                "analyticsConsentAt": nullable_text,
+            },
+            "additionalProperties": False,
+        },
+        "AccountPrivacyResponse": {
+            "type": "object",
+            "required": ["processingRestricted"],
+            "properties": {
+                "termsVersion": nullable_text,
+                "termsAcceptedAt": nullable_text,
+                "ageConfirmedAt": nullable_text,
+                "analyticsConsent": {"type": ["boolean", "null"]},
+                "analyticsConsentAt": nullable_text,
+                "processingRestricted": {"type": "boolean"},
+                "processingRestrictedAt": nullable_text,
+            },
+            "additionalProperties": False,
+        },
+        "AccountDataSummary": {
+            "type": "object",
+            "required": ["account", "subscription", "counts", "exportUrl"],
+            "properties": {
+                "account": _ref("GenericObject"),
+                "subscription": {"oneOf": [_ref("GenericObject"), {"type": "null"}]},
+                "counts": {
+                    "type": "object",
+                    "additionalProperties": {"type": "integer", "minimum": 0},
+                },
+                "exportUrl": {"type": "string", "format": "uri-reference"},
+            },
+            "additionalProperties": False,
+        },
+        "AccountDataExport": {
+            "type": "object",
+            "required": ["exportedAt", "formatVersion", "account"],
+            "properties": {
+                "exportedAt": text,
+                "formatVersion": text,
+                "account": _ref("GenericObject"),
+                "subscription": {"oneOf": [_ref("GenericObject"), {"type": "null"}]},
+                "familyProfiles": {"type": "array", "items": _ref("FamilyProfile")},
+                "cart": {"type": "array", "items": _ref("CartItem")},
+                "favorites": {"type": "array", "items": _ref("FavoriteItem")},
+                "scanHistory": {"type": "array", "items": _ref("HistoryItem")},
+                "productSubmissions": {
+                    "type": "array",
+                    "items": _ref("ProductSubmission"),
+                },
+            },
+            "additionalProperties": True,
+        },
+        "PrivacyConsentRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["type", "granted"],
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": ["analytics", "marketing", "functional", "privacy", "terms"],
+                },
+                "granted": {"type": "boolean"},
+                "policyVersion": {"type": "string", "maxLength": 40},
+                "source": {"type": "string", "maxLength": 80},
+            },
+        },
+        "PrivacyConsentResponse": {
+            "type": "object",
+            "required": ["recorded", "consentId"],
+            "properties": {
+                "recorded": {"const": True},
+                "consentId": {"type": "integer"},
+            },
+            "additionalProperties": False,
+        },
+        "CookieConsentLogRequest": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["categories", "version"],
+            "properties": {
+                "categories": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["necessary", "analytics", "marketing", "functional"],
+                    "properties": {
+                        "necessary": {"const": True},
+                        "analytics": {"type": "boolean"},
+                        "marketing": {"type": "boolean"},
+                        "functional": {"type": "boolean"},
+                    },
+                },
+                "version": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9._-]{1,40}$",
+                },
+                "timestamp": {"type": "string", "maxLength": 40},
+            },
+        },
+        "CookieConsentLogResponse": {
+            "type": "object",
+            "required": ["logged", "id"],
+            "properties": {
+                "logged": {"const": True},
+                "id": {"type": "integer"},
+            },
+            "additionalProperties": False,
+        },
+        "AiExtractionForm": {
+            "type": "object",
+            "properties": {
+                "front_image": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": "image/jpeg",
+                },
+                "nutrition_image": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": "image/jpeg",
+                },
+                "product_hint": {"type": "string", "maxLength": 250},
+            },
+            "anyOf": [
+                {"required": ["front_image"]},
+                {"required": ["nutrition_image"]},
+                {"required": ["product_hint"]},
+            ],
+        },
+        "AiExtractionData": {
+            "type": "object",
+            "required": ["productName", "category", "confidence", "source", "notes"],
+            "properties": {
+                "productName": text,
+                "brand": text,
+                "category": text,
+                "quantityValue": text,
+                "quantityUnit": text,
+                "calories": text,
+                "protein": text,
+                "sugar": text,
+                "fat": text,
+                "ingredients": text,
+                "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                "source": text,
+                "notes": {"type": "array", "items": text},
+            },
+            "additionalProperties": False,
+        },
+        "AiExtractionResponse": {
+            "type": "object",
+            "required": ["message", "data"],
+            "properties": {
+                "message": text,
+                "data": _ref("AiExtractionData"),
+            },
+            "additionalProperties": False,
+        },
+        "VisionFrameForm": {
+            "type": "object",
+            "required": ["frame"],
+            "properties": {
+                "frame": {
+                    "type": "string",
+                    "format": "binary",
+                    "contentMediaType": "image/jpeg",
+                }
+            },
+            "additionalProperties": False,
+        },
+        "VisionCandidate": {
+            "type": "object",
+            "properties": {
+                "name": nullable_text,
+                "brand": nullable_text,
+                "variant": nullable_text,
+                "barcode": nullable_text,
+                "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                "needs_barcode": {"type": "boolean"},
+                "message": text,
+                "local_match_score": {"type": "number", "minimum": 0},
+            },
+            "additionalProperties": False,
+        },
+        "VisionFrameResponse": {
+            "type": "object",
+            "required": ["identified"],
+            "properties": {
+                "identified": {"type": "boolean"},
+                "chargeable": {"type": "boolean"},
+                "source": {"type": "string", "enum": ["local", "vision"]},
+                "message": text,
+                "product": {"oneOf": [_ref("Product"), {"type": "null"}]},
+                "candidate": _ref("VisionCandidate"),
+            },
+            "additionalProperties": False,
+        },
+        "SubmissionReviewResponse": {
+            "type": "object",
+            "required": ["message", "status", "confidence", "problems", "warnings", "item"],
+            "properties": {
+                "message": text,
+                "status": text,
+                "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
+                "problems": {"type": "array", "items": text},
+                "warnings": {"type": "array", "items": text},
+                "item": _ref("ProductSubmission"),
+            },
+            "additionalProperties": False,
+        },
+        "SubmissionApprovalResponse": {
+            "type": "object",
+            "required": ["message", "reward", "product", "submission"],
+            "properties": {
+                "message": text,
+                "reward": {
+                    "type": "object",
+                    "required": ["bonusScans", "coins", "claimed"],
+                    "properties": {
+                        "bonusScans": {"type": "integer", "minimum": 0},
+                        "coins": {"type": "integer", "minimum": 0},
+                        "claimed": {"type": "boolean"},
+                    },
+                    "additionalProperties": False,
+                },
+                "product": _ref("Product"),
+                "submission": _ref("ProductSubmission"),
+            },
+            "additionalProperties": False,
+        },
         "GenericObject": {"type": "object", "additionalProperties": True},
     }
 
@@ -960,6 +1200,81 @@ def _paths() -> dict[str, Any]:
                 error_statuses=("400", "401", "423", "429", "500"),
             ),
         },
+        "/account/consent": {
+            "post": _operation(
+                "updateAccountConsent",
+                "Update the authenticated user's analytics consent",
+                "Privacy",
+                _ref("AccountConsentResponse"),
+                request_schema=_ref("AccountConsentRequest"),
+                security=True,
+                error_statuses=("400", "401", "429", "500"),
+            ),
+        },
+        "/account/privacy": {
+            "get": _operation(
+                "getAccountPrivacy",
+                "Get account privacy and consent state",
+                "Privacy",
+                _ref("AccountPrivacyResponse"),
+                security=True,
+                error_statuses=("401", "500"),
+            ),
+        },
+        "/account/data": {
+            "get": _operation(
+                "getAccountDataSummary",
+                "Get an account data summary before export",
+                "Privacy",
+                _ref("AccountDataSummary"),
+                security=True,
+                error_statuses=("401", "500"),
+            ),
+        },
+        "/account/data-export": {
+            "get": _operation(
+                "exportAccountData",
+                "Download the authenticated user's complete JSON data export",
+                "Privacy",
+                _ref("AccountDataExport"),
+                security=True,
+                error_statuses=("401", "500"),
+            ),
+        },
+        "/account/export": {
+            "get": _operation(
+                "exportAccountDataLegacyAlias",
+                "Legacy alias for the complete JSON account export",
+                "Privacy",
+                _ref("AccountDataExport"),
+                security=True,
+                error_statuses=("401", "500"),
+            ),
+        },
+        "/privacy/consent": {
+            "post": _operation(
+                "recordPrivacyConsent",
+                "Record a versioned account privacy decision",
+                "Privacy",
+                _ref("PrivacyConsentResponse"),
+                success_status="201",
+                request_schema=_ref("PrivacyConsentRequest"),
+                security=True,
+                error_statuses=("400", "401", "429", "500"),
+            ),
+        },
+        "/consent/log": {
+            "post": _operation(
+                "logCookieConsent",
+                "Record an anonymous or authenticated cookie consent decision",
+                "Privacy",
+                _ref("CookieConsentLogResponse"),
+                success_status="201",
+                request_schema=_ref("CookieConsentLogRequest"),
+                error_statuses=("400", "413", "429", "500"),
+                validation_helper="validate_consent_log_payload",
+            ),
+        },
         "/translate": {
             "post": _operation(
                 "translateText",
@@ -978,6 +1293,30 @@ def _paths() -> dict[str, Any]:
                 "Scanning",
                 _ref("AiStatus"),
                 error_statuses=("429", "500"),
+            ),
+        },
+        "/ai/extract-product-info": {
+            "post": _operation(
+                "extractProductInfo",
+                "Extract product and nutrition fields from contribution photos",
+                "Scanning",
+                _ref("AiExtractionResponse"),
+                request_schema=_ref("AiExtractionForm"),
+                media_type=MULTIPART,
+                security=True,
+                error_statuses=("400", "401", "413", "429", "500"),
+            ),
+        },
+        "/ai/identify-product-frame": {
+            "post": _operation(
+                "identifyProductFrame",
+                "Identify a product from one live camera frame",
+                "Scanning",
+                _ref("VisionFrameResponse"),
+                request_schema=_ref("VisionFrameForm"),
+                media_type=MULTIPART,
+                security=True,
+                error_statuses=("400", "401", "402", "413", "429", "500", "502", "503"),
             ),
         },
         "/analytics/event": {
@@ -1575,6 +1914,57 @@ def _paths() -> dict[str, Any]:
                 security=True,
                 error_statuses=("400", "401", "404", "409", "413", "429", "500"),
                 validation_helper="validate_product_submission_payload",
+            ),
+        },
+        "/submissions/item/{submission_id}": {
+            "delete": _operation(
+                "deleteProductSubmission",
+                "Delete one owned or administrator-visible product submission",
+                "Submissions",
+                message,
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "submission_id",
+                        {"type": "integer", "minimum": 1},
+                        "Submission identifier",
+                    )
+                ],
+                error_statuses=("401", "403", "404", "423", "500"),
+            ),
+        },
+        "/submissions/ai-review/{submission_id}": {
+            "post": _operation(
+                "reviewProductSubmission",
+                "Run the deterministic submission review as administrator",
+                "Submissions",
+                _ref("SubmissionReviewResponse"),
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "submission_id",
+                        {"type": "integer", "minimum": 1},
+                        "Submission identifier",
+                    )
+                ],
+                error_statuses=("401", "403", "404", "500"),
+            ),
+        },
+        "/submissions/approve/{submission_id}": {
+            "post": _operation(
+                "approveProductSubmission",
+                "Publish an approved submission and synchronize its reward",
+                "Submissions",
+                _ref("SubmissionApprovalResponse"),
+                security=True,
+                parameters=[
+                    _path_parameter(
+                        "submission_id",
+                        {"type": "integer", "minimum": 1},
+                        "Submission identifier",
+                    )
+                ],
+                error_statuses=("400", "401", "403", "404", "500", "502"),
             ),
         },
         "/prices/report": {
