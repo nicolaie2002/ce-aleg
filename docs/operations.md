@@ -72,7 +72,8 @@ Din radacina proiectului:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\check-production.ps1 `
   -BackendUrl "https://cealeg-api.onrender.com" `
-  -FrontendUrl "https://www.cealeg.shop"
+  -FrontendUrl "https://www.cealeg.shop" `
+  -ExpectedCommit (git rev-parse HEAD)
 ```
 
 Verificari fara autentificare:
@@ -84,6 +85,8 @@ Invoke-RestMethod "https://cealeg-api.onrender.com/version" -TimeoutSec 90
 Invoke-RestMethod "https://www.cealeg.shop/api/backend/health" -TimeoutSec 90
 ```
 
+Scriptul compara si backend-ul direct cu proxy-ul frontend, iar cand primeste
+`-ExpectedCommit` detecteaza o productie ramasa in urma fata de `main`.
 `/health` confirma doar ca procesul web raspunde. `/readiness` si
 `/admin/monitoring` contin diagnostice si necesita o sesiune de administrator;
 se verifica din pagina `/admin`, nu se transforma in endpoint-uri publice.

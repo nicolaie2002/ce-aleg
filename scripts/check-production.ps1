@@ -1,6 +1,7 @@
 param(
     [string]$BackendUrl = "https://cealeg-api.onrender.com",
-    [string]$FrontendUrl = ""
+    [string]$FrontendUrl = "",
+    [string]$ExpectedCommit = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -27,6 +28,17 @@ Invoke-Check "Backend health" {
     $response = Invoke-WebRequest "$backend/health" -UseBasicParsing -TimeoutSec 90
     if ($response.StatusCode -ne 200) {
         throw "HTTP $($response.StatusCode)"
+    }
+}
+
+Invoke-Check "Backend release" {
+    $version = Invoke-RestMethod "$backend/version" -TimeoutSec 90
+    if (-not $version.ok -or -not $version.commit) {
+        throw "Version endpoint did not return a commit."
+    }
+
+    if ($ExpectedCommit -and $version.commit.ToLowerInvariant() -ne $ExpectedCommit.Trim().ToLowerInvariant()) {
+        throw "Deployed $($version.commit), expected $($ExpectedCommit.Trim())."
     }
 }
 
@@ -66,6 +78,14 @@ if ($FrontendUrl) {
         $response = Invoke-WebRequest "$frontend/api/backend/health" -UseBasicParsing -TimeoutSec 90
         if ($response.StatusCode -ne 200) {
             throw "HTTP $($response.StatusCode)"
+        }
+    }
+
+    Invoke-Check "Frontend backend release proxy" {
+        $directVersion = Invoke-RestMethod "$backend/version" -TimeoutSec 90
+        $proxyVersion = Invoke-RestMethod "$frontend/api/backend/version" -TimeoutSec 90
+        if ($directVersion.commit -ne $proxyVersion.commit) {
+            throw "Proxy $($proxyVersion.commit), direct backend $($directVersion.commit)."
         }
     }
 }

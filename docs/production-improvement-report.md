@@ -66,6 +66,8 @@ offline-ul rulează atât desktop, cât și mobil.
 - Auto-deploy backend Render numai după ce CI trece; deploy hook-ul gratuit rămâne
   fallback manual cu verificarea commitului exact în `/version`, iar migrarea
   rulează la startup.
+- Uptime-ul programat compară SHA-ul din `main` cu backendul direct și proxy-ul
+  frontend, semnalând automat un deploy rămas în urmă.
 - Brevo/Resend au retry limitat pentru erori temporare și diagnostice mai precise
   pentru sender invalid, cheie respinsă, rate limit și domeniu neverificat.
 - Configurație pregătită pentru Cloudflare Workers Free, fără Images/R2 sau alte

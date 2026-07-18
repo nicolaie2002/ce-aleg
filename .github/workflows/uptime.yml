@@ -6,6 +6,11 @@ on:
     # included GitHub Actions minutes for private repositories.
     - cron: "17 */6 * * *"
   workflow_dispatch:
+    inputs:
+      expected_commit:
+        description: Full backend commit SHA (defaults to current main)
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -15,6 +20,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.repository_owner == 'nicolaie2002'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      EXPECTED_COMMIT: ${{ inputs.expected_commit || github.sha }}
     steps:
       - name: Check frontend
         shell: bash
@@ -25,13 +32,32 @@ jobs:
         run: |
           health="$(curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 90 https://cealeg-api.onrender.com/health)"
           version="$(curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 90 https://cealeg-api.onrender.com/version)"
-          python - "$health" "$version" <<'PY'
+          proxy_version="$(curl --fail --silent --show-error --retry 2 --retry-all-errors --max-time 90 https://www.cealeg.shop/api/backend/version)"
+          python - "$health" "$version" "$proxy_version" <<'PY'
           import json
+          import os
           import sys
 
           health = json.loads(sys.argv[1])
           version = json.loads(sys.argv[2])
+          proxy_version = json.loads(sys.argv[3])
+          expected = os.environ["EXPECTED_COMMIT"].strip().lower()
+          deployed = str(version.get("commit") or "").lower()
+          proxied = str(proxy_version.get("commit") or "").lower()
+
           assert health.get("ok") is True
           assert version.get("ok") is True
-          assert version.get("commit")
+          assert proxy_version.get("ok") is True
+          assert deployed, version
+          assert deployed == proxied, {
+              "error": "Frontend proxy and direct backend expose different releases",
+              "direct": deployed,
+              "proxy": proxied,
+          }
+          assert deployed == expected, {
+              "error": "Production backend is behind main",
+              "deployed": deployed,
+              "expected": expected,
+          }
+          print(f"Production release is current: {deployed[:7]}")
           PY
