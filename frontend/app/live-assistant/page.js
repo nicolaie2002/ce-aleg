@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BrowserMultiFormatReader } from "@zxing/browser";
-import { BarcodeFormat, DecodeHintType } from "@zxing/library";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -10,7 +8,6 @@ import {
   Camera,
   CameraIcon,
   Crown,
-  Info,
   Mic,
   MicOff,
   RefreshCw,
@@ -25,6 +22,7 @@ import { getAIProvider } from "../../components/AIProvider";
 import { getApiErrorMessage, localizeApiMessage } from "../utils/apiResponse";
 
 const MAX_CAMERA_SESSION_MS = 2 * 60 * 1000;
+let barcodeReaderModulePromise;
 
 function productToResult(product) {
   return {
@@ -48,7 +46,24 @@ function productToResult(product) {
   };
 }
 
-function createBarcodeReader() {
+async function loadBarcodeReaderModules() {
+  if (!barcodeReaderModulePromise) {
+    barcodeReaderModulePromise = Promise.all([
+      import("@zxing/browser"),
+      import("@zxing/library"),
+    ]).then(([browserModule, libraryModule]) => ({
+      BrowserMultiFormatReader: browserModule.BrowserMultiFormatReader,
+      BarcodeFormat: libraryModule.BarcodeFormat,
+      DecodeHintType: libraryModule.DecodeHintType,
+    }));
+  }
+
+  return barcodeReaderModulePromise;
+}
+
+async function createBarcodeReader() {
+  const { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } =
+    await loadBarcodeReaderModules();
   const hints = new Map();
 
   hints.set(DecodeHintType.TRY_HARDER, true);
@@ -220,8 +235,8 @@ useEffect(() => {
               plan,
             });
             setMessage(pick(
-              "AI vizual va fi inclus în Pro și Family. Pe Free poți folosi scanarea codului de bare.",
-              "AI visual recognition will be included in Pro and Family. On Free, you can use barcode scanning."
+              "Asistentul live este inclus în Pro și Family. Pe Free poți folosi scanarea codului de bare.",
+              "The live assistant is included in Pro and Family. On Free, you can use barcode scanning."
             ));
           }
         })
@@ -288,7 +303,7 @@ useEffect(() => {
           )
     );
     try {
-      const reader = createBarcodeReader();
+      const reader = await createBarcodeReader();
       scannerControlsRef.current = await reader.decodeFromVideoDevice(
         deviceId || undefined,
         videoRef.current,
@@ -697,13 +712,13 @@ const analyzeFrame = useCallback(async () => {
         <div className="flex flex-col gap-4 border-b border-white/10 pb-7 md:flex-row md:items-end md:justify-between">
           <div>
             <p className="flex items-center gap-2 text-sm font-bold text-cyan-200">
-              <Sparkles size={16} /> {pick("AI vizual în curând", "AI visual coming soon")}
+              <Sparkles size={16} /> {pick("Asistent live", "Live assistant")}
             </p>
             <h1 className="mt-3 max-w-3xl text-4xl font-black md:text-5xl">
-              {pick("Scanare ghidată acum, identificare AI în curând.", "Guided scanning now, AI identification coming soon.")}
+              {pick("Scanare ghidată cu pași clari pe telefon.", "Guided scanning with clear steps on your phone.")}
             </h1>
             <p className="mt-3 max-w-2xl text-gray-300">
-              {pick("Camera folosește codul de bare pentru rezultate precise. Identificarea după ambalaj va fi disponibilă pentru Pro și Family când serviciul AI este activ.", "The camera uses the barcode for precise results. Package recognition will be available for Pro and Family when the AI service is active.")}
+              {pick("Camera confirmă produsul prin codul de bare, apoi îți arată verdictul și alternativele. Identificarea completă după ambalaj va fi activată când serviciul AI este pregătit.", "The camera confirms the product by barcode, then shows the verdict and alternatives. Full package recognition will be enabled when the AI service is ready.")}
             </p>
           </div>
         </div>
@@ -719,8 +734,8 @@ const analyzeFrame = useCallback(async () => {
                     {isCheckingBilling
                       ? pick("Verificam planul tau...", "Checking your plan...")
                       : pick(
-                          "AI vizual va fi inclus în Pro și Family.",
-                          "AI visual recognition will be included in Pro and Family."
+                          "Asistentul live este inclus în Pro și Family.",
+                          "The live assistant is included in Pro and Family."
                         )}
                   </p>
                   {!isCheckingBilling && (
@@ -816,14 +831,14 @@ const analyzeFrame = useCallback(async () => {
               <section className="rounded-lg border border-yellow-300/25 bg-yellow-300/10 p-5 text-sm leading-6 text-yellow-100">
                 <p className="font-bold text-yellow-200">
                   {billingGate.code === "paid_plan_required"
-                    ? pick("AI vizual în curând pentru Pro și Family", "AI visual coming soon for Pro and Family")
+                    ? pick("Asistent live pentru Pro și Family", "Live assistant for Pro and Family")
                     : pick("Limita gratuită a fost atinsă", "Free limit reached")}
                 </p>
                 <p className="mt-2">
                   {billingGate.code === "paid_plan_required"
                     ? pick(
-                        "Pe Free poți folosi scanarea codului de bare. Identificarea după ambalaj va fi disponibilă pentru Pro și Family.",
-                        "On Free, use barcode scanning. Package recognition will be available for Pro and Family."
+                        "Pe Free poți folosi scanarea codului de bare. Asistentul live este disponibil pe Pro și Family.",
+                        "On Free, use barcode scanning. The live assistant is available on Pro and Family."
                       )
                     : pick(
                     "Treci la Pro pentru scanări nelimitate.",

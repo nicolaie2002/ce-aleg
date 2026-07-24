@@ -85,6 +85,14 @@ function ScanPageContent() {
     });
   }, []);
 
+  useEffect(() => {
+    if (!imagePreview) return undefined;
+
+    return () => {
+      URL.revokeObjectURL(imagePreview);
+    };
+  }, [imagePreview]);
+
   function extractProductHint(text) {
     const ignoredTerms = [
       "ingrediente",

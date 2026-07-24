@@ -1,6 +1,6 @@
 # Raport Production Improvement Plan
 
-**Actualizat:** 18 iulie 2026
+**Actualizat:** 24 iulie 2026
 
 **Ramură:** `main`
 
@@ -23,7 +23,7 @@ backup/restore, deployment și test pe telefoane reale.
 | Playwright full stack | 32 trecute, 10 sărite intenționat pe mobil, 0 eșuate |
 | ESLint și TypeScript | trecute fără warnings/errors |
 | Next.js build | trecut, 66 rute generate |
-| Bundle | toate cele 41 rute sub 500 KB gzip; maxim 200,0 KB |
+| Bundle | toate cele 41 rute sub 500 KB gzip; maxim 91,2 KB |
 | Lighthouse `/` | performance 78, accessibility 100, best practices 100, SEO 100 |
 | Lighthouse `/help` | performance 77, accessibility 100, best practices 100, SEO 100 |
 | Lighthouse `/pricing` | performance 77, accessibility 100, best practices 96, SEO 100 |
@@ -63,6 +63,9 @@ offline-ul rulează atât desktop, cât și mobil.
   mesajele pentru utilizatorii nelogați.
 - Pagină Help, protecție pentru checkout nelogat, timeout controlat la misiuni și
   retrimitere manuală a emailului de confirmare din admin.
+- Asistentul live/scannerul ghidat încarcă librăria de coduri de bare doar la
+  pornirea camerei; ruta a scăzut de la 200,0 KB la 79,7 KB gzip. Scannerul cu
+  poză curăță preview-urile temporare pentru memorie mai bună pe telefon.
 - PWA refăcută cu service worker static: offline stabil, update controlat și fără
   cache pentru API/Supabase sau date private. Au fost eliminate 182 de pachete
   tranzitive Workbox/PWA.
