@@ -8,5 +8,5 @@ requests==2.34.2
 psycopg[binary]>=3.2,<4
 gunicorn>=22,<24
 stripe>=14.4,<15
-redis>=5,<7
+redis>=8.1.0,<9
 sentry-sdk[flask]>=2,<3
