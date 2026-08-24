@@ -3,7 +3,7 @@ flask-cors==6.0.2
 Flask-SQLAlchemy==3.1.1
 alembic>=1.14,<2
 pillow==12.3.0
-python-dotenv>=1.0,<2
+python-dotenv>=1.2.3,<2
 requests==2.34.2
 psycopg[binary]>=3.2,<4
 gunicorn>=22,<24
