@@ -5,7 +5,7 @@ alembic>=1.14,<2
 pillow==12.3.0
 python-dotenv>=1.0,<2
 requests==2.34.2
-psycopg[binary]>=3.2,<4
+psycopg[binary]>=3.3.5,<4
 gunicorn>=22,<24
 stripe>=14.4,<15
 redis>=5,<7
